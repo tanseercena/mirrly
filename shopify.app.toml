@@ -1,0 +1,27 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "Digitally ‑ Digital Products"
+client_id = "78b2cf9c2a9c63431defd44ad600ee8f"
+application_url = "https://digitally.conversionproplus.com"
+embedded = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_products,read_script_tags,write_script_tags,read_orders,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_third_party_fulfillment_orders,write_third_party_fulfillment_orders,read_themes"
+use_legacy_install_flow = true
+
+[auth]
+redirect_urls = [
+  "https://digitally.conversionproplus.com/auth/callback",
+  "https://digitally.conversionproplus.com/auth/shopify/callback",
+  "https://digitally.conversionproplus.com/api/auth/callback",
+  "https://digitally.conversionproplus.com"
+]
+
+[webhooks]
+api_version = "2025-01"
+
+[pos]
+embedded = false
+
+[build]

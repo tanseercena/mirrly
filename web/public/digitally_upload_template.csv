@@ -1,0 +1,4 @@
+Products IDs or Variants IDs,Files,Sample Files,is_download_limit_enabled,download_limit,download_expiration,expiration_type,expiration_value,is_product_message_enabled,product_message,Custom Links (JSON),License (JSON)
+8277626486999,"https://example.com/file1.pdf, https://example.com/file2.pdf","https://example.com/sample1.pdf",TRUE,3,TRUE,days,30,TRUE,Thank you for your purchase!,"[{""title"": ""Download Guide"", ""redirect_url"": ""https://example.com/guide"", ""link_details"": ""Click here for instructions""}]","[{""title"": ""Product Key"", ""license_type"": ""automated"", ""prefix"": ""KEY"", ""suffix"": ""END"", ""code_length"": 12, ""total_codes"": 100}]"
+44535594451159,https://example.com/ebook.pdf,https://example.com/preview.pdf,FALSE,0,FALSE,,,FALSE,,[],"[{""title"": ""License Codes"", ""license_type"": ""manual"", ""file"": ""{\"url\": \"https://example.com/licenses.csv\"}""}]"
+8277626552535,"https://example.com/video.mp4",,,,,,,,,[],[]

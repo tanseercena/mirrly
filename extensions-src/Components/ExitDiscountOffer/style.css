@@ -1,0 +1,11 @@
+.swal-overlay {
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+.swal-modal {
+    width: 500px;
+}
+
+.swal-overlay:before {
+    height: 50%;
+}

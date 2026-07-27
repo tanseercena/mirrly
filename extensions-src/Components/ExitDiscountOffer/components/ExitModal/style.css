@@ -1,0 +1,92 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap");
+
+.pushy-exit-discounts {
+    font-family: "Montserrat", sans-serif;
+}
+
+.pushy-exit-discounts-title {
+    font-size: 2.5rem;
+    margin-bottom: 0;
+    letter-spacing: 1.5px;
+}
+
+.pushy-exit-discounts-subtitle {
+    margin-top: 1rem;
+    font-size: 2rem;
+    margin-bottom: 1.8rem;
+    letter-spacing: 1px;
+}
+
+.pushy-exit-discounts-discount {
+    margin-top: 1rem;
+    font-size: 2rem;
+    margin-bottom: 0;
+    letter-spacing: 1px;
+}
+
+.pushy-exit-discounts p {
+    margin-top: 0 !important;
+    margin-bottom: 1.5rem !important;
+    font-size: 1.7rem;
+}
+
+.pushy-exit-discounts .warning {
+    margin-top: 1.5rem !important;
+    color: red;
+}
+
+.pushy-exit-discounts button {
+    /* background-color: #000000;
+    color: #ffffff; */
+    padding: 1.5rem;
+    font-size: 20px;
+    border-radius: 5px;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    margin-bottom: 1.2rem;
+    border: 1px solid transparent;
+    padding: 20px;
+    width: 90%;
+    font-weight: 600;
+    transition: all .2s ease-in-out;
+}
+
+.pushy-exit-discounts button:hover {
+    /* border-width: 3px; */
+    /* padding: 25px; */
+    transform: scale(0.9);
+}
+
+.pushy-exit-discounts .cancel {
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.pushy-exit-discounts .discount-box {
+    padding: 7px;
+    font-size: 30px;
+    text-align: center;
+    letter-spacing: 6px;
+    border-style: dashed;
+    color: #5b5959;
+}
+
+.pushy-exit-discounts .form-input {
+    padding: 10px;
+    font-size: 20px;
+    letter-spacing: 1px;
+    color: #1f1e1e;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    width: 90%;
+    border-width: 0.5px;
+}
+
+.pushy-exit-discounts .form-input:focus {
+    border: none;
+}
+
+[data-testid="bars-loading"] {
+    justify-content: center;
+}

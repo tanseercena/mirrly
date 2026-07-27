@@ -1,0 +1,11 @@
+<input type="hidden" value="{{  product.id }}" id="digitally-product-id">
+<input id="digitally-page-type" type="hidden" value="{{ request.page_type }}">
+{% comment %}<script src="https://digitally.test/js/digitally-script.js" defer></script>{% endcomment %}
+<script src="https://digitally.conversionproplus.com/js/digitally-script.js" defer></script>
+
+{% schema %}
+{
+    "name": "Digitally",
+    "target": "body"
+}
+{% endschema %}

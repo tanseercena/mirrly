@@ -1,0 +1,80 @@
+.ticket-container {
+    position: relative;
+    width: 600px;
+    height: 260px;
+    background: url('/images/ticket_bg.png') no-repeat center center;
+    background-size: cover;
+    text-align: center;
+    border-radius: 10px;
+}
+
+.header {
+    margin-top: 10px;
+}
+.header h1, .header h2 {
+    margin: 0;
+    color: #000;
+}
+.header h1 {
+    font-size: 30px;
+    font-weight: bold;
+    padding-top: 30px;
+}
+.header h2 {
+    font-size: 24px;
+    font-weight: bold;
+    margin-top: 30px;
+}
+.code {
+    margin: 15px 0;
+    display: inline-block;
+    font-size: 32px;
+    font-weight: bold;
+    padding: 10px 20px;
+    border: 2px solid #000;
+    background-color: #000;
+    color: #fff;
+}
+.info {
+    width: 80%;
+    margin: 0px auto;
+    border-top: 2px solid #000;
+}
+.info div {
+    overflow: hidden;
+}
+.info div p {
+    width: 50%;
+    float: left;
+}
+.info .phone {
+    text-align: left;
+}
+.info .site {
+    text-align: right;
+}
+
+.info .address {
+    border-top: 2px solid #000;
+    padding-top: 5px;
+}
+
+.info p {
+    margin: 5px 0;
+    font-size: 18px;
+    color: #000;
+}
+.info a {
+    text-decoration: none;
+    color: #000;
+}
+
+.card-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  filter: grayscale(40%);
+}
+#crisp-chatbox {
+    bottom: auto !important;
+    top: 20px !important;
+}

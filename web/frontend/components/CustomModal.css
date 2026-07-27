@@ -1,0 +1,687 @@
+/* ========================================
+   CUSTOM MODAL STYLES - RESPONSIVE DESIGN
+   Following comprehensive design system
+   ======================================== */
+
+/* ========================================
+   1. BREAKPOINTS
+   - xs (Mobile): 320px – 479px
+   - sm (Mobile large): 480px – 767px
+   - md (Tablet): 768px – 1023px
+   - lg (Desktop): 1024px – 1279px
+   - xl (Wide): 1280px+
+   ======================================== */
+
+/* ========================================
+   2. BACKDROP
+   Full screen overlay, prevents body scroll
+   ======================================== */
+
+.custom-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--cm-spacing-lg);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ========================================
+   3. MODAL CONTAINER
+   Responsive width with proper sizing
+   ======================================== */
+
+.custom-modal-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  width: 100%;
+  max-width: 500px;
+  margin: auto;
+}
+
+.custom-modal-small {
+  max-width: 400px;
+}
+
+.custom-modal-medium {
+  max-width: 500px;
+}
+
+.custom-modal-large {
+  max-width: 700px;
+}
+
+/* ========================================
+   4. CSS CUSTOM PROPERTIES FOR SPACING
+   Scale: 4, 8, 12, 16, 20, 24, 32, 48, 64px
+   ======================================== */
+
+:root {
+  --cm-spacing-xs: 4px;
+  --cm-spacing-sm: 8px;
+  --cm-spacing-md: 12px;
+  --cm-spacing-lg: 16px;
+  --cm-spacing-xl: 20px;
+  --cm-spacing-2xl: 24px;
+  --cm-spacing-3xl: 32px;
+  --cm-spacing-4xl: 48px;
+  --cm-spacing-5xl: 64px;
+}
+
+/* ========================================
+   5. HEADER
+   Responsive padding, proper close button sizing
+   ======================================== */
+
+.custom-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--cm-spacing-xl);
+  border-bottom: 1px solid #e1e3e5;
+  flex-shrink: 0;
+}
+
+.custom-modal-header h2 {
+  font-size: clamp(16px, 3vw, 20px);
+  line-height: 1.2;
+  margin: 0;
+}
+
+.custom-modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  color: #6d7175;
+  cursor: pointer;
+  padding: var(--cm-spacing-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+  min-width: 36px;
+  min-height: 36px;
+}
+
+.custom-modal-close:hover {
+  background-color: #f1f2f4;
+  color: #202223;
+}
+
+.custom-modal-close:active {
+  background-color: #e1e3e5;
+}
+
+.custom-modal-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   6. BODY
+   Scrollable with proper max-height
+   ======================================== */
+
+.custom-modal-body {
+  padding: var(--cm-spacing-xl);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ========================================
+   7. LOADING STATE
+   ======================================== */
+
+.custom-modal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cm-spacing-4xl) var(--cm-spacing-xl);
+  gap: var(--cm-spacing-lg);
+}
+
+.custom-modal-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e1e3e5;
+  border-top-color: #5c6ac4;
+  border-radius: 50%;
+  animation: custom-modal-spin 0.8s linear infinite;
+}
+
+@keyframes custom-modal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ========================================
+   8. FOOTER & ACTIONS
+   Responsive button layout
+   ======================================== */
+
+.custom-modal-footer {
+  padding: var(--cm-spacing-lg) var(--cm-spacing-xl);
+  border-top: 1px solid #e1e3e5;
+  flex-shrink: 0;
+}
+
+.custom-modal-actions {
+  display: flex;
+  gap: var(--cm-spacing-md);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* ========================================
+   9. SECTION
+   ======================================== */
+
+.custom-modal-section {
+  margin-bottom: var(--cm-spacing-lg);
+}
+
+.custom-modal-section:last-child {
+  margin-bottom: 0;
+}
+
+/* ========================================
+   10. RESPONSIVE MEDIA QUERIES - MOBILE FIRST
+   ======================================== */
+
+/* Extra small devices (phones, less than 490px) */
+@media (max-width: 490px) {
+  /* Backdrop - minimal padding */
+  .custom-modal-backdrop {
+    padding: var(--cm-spacing-sm);
+    align-items: flex-end; /* Bottom sheet style on very small screens */
+  }
+
+  /* Modal container - full width, bottom sheet style */
+  .custom-modal-container {
+    max-height: 85vh;
+    max-width: 100%;
+    margin-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  /* Header - compact */
+  .custom-modal-header {
+    padding: var(--cm-spacing-lg);
+  }
+
+  /* Header title - smaller */
+  .custom-modal-header h2 {
+    font-size: 16px;
+  }
+
+  /* Close button - compact */
+  .custom-modal-close {
+    font-size: 24px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  /* Body - compact */
+  .custom-modal-body {
+    padding: var(--cm-spacing-lg);
+    max-height: 70vh;
+  }
+
+  /* Footer - compact */
+  .custom-modal-footer {
+    padding: var(--cm-spacing-md) var(--cm-spacing-lg);
+  }
+
+  /* Actions - vertical stack, reversed (primary on bottom) */
+  .custom-modal-actions {
+    flex-direction: column-reverse;
+    gap: var(--cm-spacing-sm);
+  }
+
+  .custom-modal-actions button {
+    width: 100%;
+  }
+
+  /* Section spacing - compact */
+  .custom-modal-section {
+    margin-bottom: var(--cm-spacing-md);
+  }
+
+  /* Form elements in modal - compact */
+  .custom-modal-section .Polaris-TextField {
+    margin-bottom: var(--cm-spacing-sm);
+  }
+
+  .custom-modal-section .Polaris-TextField:last-child {
+    margin-bottom: 0;
+  }
+
+  /* BlockStack in modal - compact */
+  .custom-modal-section .Polaris-BlockStack {
+    gap: var(--cm-spacing-md);
+  }
+}
+
+/* Small devices (landscape phones, 490px to 767px) */
+@media (min-width: 490px) and (max-width: 767px) {
+  /* Backdrop */
+  .custom-modal-backdrop {
+    padding: var(--cm-spacing-md);
+    align-items: center;
+  }
+
+  /* Modal container */
+  .custom-modal-container {
+    max-width: 100%;
+  }
+
+  /* Header */
+  .custom-modal-header {
+    padding: var(--cm-spacing-xl);
+  }
+
+  /* Body */
+  .custom-modal-body {
+    padding: var(--cm-spacing-xl);
+    max-height: 75vh;
+  }
+
+  /* Footer */
+  .custom-modal-footer {
+    padding: var(--cm-spacing-lg) var(--cm-spacing-xl);
+  }
+
+  /* Actions - still vertical but slightly larger gap */
+  .custom-modal-actions {
+    gap: var(--cm-spacing-md);
+  }
+
+  /* Close button */
+  .custom-modal-close {
+    font-size: 26px;
+    min-width: 34px;
+    min-height: 34px;
+  }
+}
+
+/* Medium devices (tablets, 768px to 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Backdrop */
+  .custom-modal-backdrop {
+    padding: var(--cm-spacing-lg);
+    align-items: center;
+  }
+
+  /* Modal container - wider */
+  .custom-modal-container {
+    max-width: 600px;
+  }
+
+  /* Header */
+  .custom-modal-header {
+    padding: var(--cm-spacing-2xl);
+  }
+
+  /* Body */
+  .custom-modal-body {
+    padding: var(--cm-spacing-2xl);
+  }
+
+  /* Footer */
+  .custom-modal-footer {
+    padding: var(--cm-spacing-lg) var(--cm-spacing-2xl);
+  }
+
+  /* Actions - horizontal on tablet */
+  .custom-modal-actions {
+    flex-direction: row;
+    gap: var(--cm-spacing-md);
+  }
+
+  .custom-modal-actions button {
+    width: auto;
+  }
+
+  /* Close button */
+  .custom-modal-close {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+/* Desktop (1024px+) */
+@media (min-width: 1024px) {
+  /* Backdrop */
+  .custom-modal-backdrop {
+    padding: var(--cm-spacing-2xl);
+    align-items: center;
+  }
+
+  /* Modal container */
+  .custom-modal-small {
+    max-width: 450px;
+  }
+
+  .custom-modal-medium {
+    max-width: 550px;
+  }
+
+  .custom-modal-large {
+    max-width: 750px;
+  }
+
+  /* Header */
+  .custom-modal-header {
+    padding: var(--cm-spacing-2xl);
+  }
+
+  /* Body */
+  .custom-modal-body {
+    padding: var(--cm-spacing-2xl);
+  }
+
+  /* Footer */
+  .custom-modal-footer {
+    padding: var(--cm-spacing-xl) var(--cm-spacing-2xl);
+  }
+
+  /* Actions - horizontal */
+  .custom-modal-actions {
+    gap: var(--cm-spacing-lg);
+  }
+
+  /* Close button */
+  .custom-modal-close {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* ========================================
+   11. BUTTON SIZING IN MODAL
+   Compact on mobile, normal on desktop
+   ======================================== */
+
+/* Mobile: compact buttons */
+@media (max-width: 767px) {
+  .custom-modal-actions .Polaris-Button {
+    min-height: 36px;
+    padding: 0 var(--cm-spacing-md);
+    font-size: 13px;
+  }
+
+  .custom-modal-actions .Polaris-Button--variantPrimary {
+    min-height: 38px;
+  }
+}
+
+/* Tablet: medium buttons */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .custom-modal-actions .Polaris-Button {
+    min-height: 38px;
+    padding: 0 var(--cm-spacing-lg);
+    font-size: 14px;
+  }
+}
+
+/* Desktop: normal buttons */
+@media (min-width: 1024px) {
+  .custom-modal-actions .Polaris-Button {
+    min-height: 40px;
+    padding: 0 var(--cm-spacing-xl);
+    font-size: 14px;
+  }
+}
+
+/* ========================================
+   12. FORM ELEMENTS IN MODAL
+   Full width on mobile, proper touch targets
+   ======================================== */
+
+@media (max-width: 767px) {
+  /* TextField - full width */
+  .custom-modal-section .Polaris-TextField {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .custom-modal-section .Polaris-TextField input {
+    font-size: 16px; /* Prevents iOS zoom */
+    min-height: 44px;
+  }
+
+  /* Select - full width */
+  .custom-modal-section .Polaris-Select {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .custom-modal-section .Polaris-Select select {
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  /* Radio buttons - proper spacing */
+  .custom-modal-section .Polaris-RadioButton {
+    min-height: 44px;
+  }
+}
+
+/* ========================================
+   13. RADIO BUTTON GROUP RESPONSIVE
+   Vertical on mobile, grid on desktop
+   ======================================== */
+
+.radio-group-responsive {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cm-spacing-md);
+}
+
+@media (min-width: 490px) {
+  .radio-group-responsive {
+    flex-direction: row;
+    gap: var(--cm-spacing-xl);
+  }
+}
+
+@media (min-width: 768px) {
+  .radio-group-responsive {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--cm-spacing-2xl);
+  }
+}
+
+/* ========================================
+   14. ACCESSIBILITY (A11Y)
+   Focus rings, tap targets, close button label
+   ======================================== */
+
+/* Focus visible on close button */
+.custom-modal-close:focus-visible {
+  outline: 2px solid #5c6ac4;
+  outline-offset: 2px;
+}
+
+/* Ensure close button has 44px tap target on mobile */
+@media (max-width: 767px) {
+  .custom-modal-close {
+    position: relative;
+  }
+
+  .custom-modal-close::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 44px;
+    height: 44px;
+    pointer-events: none;
+  }
+}
+
+/* ========================================
+   15. PREVENT BODY SCROLL WHEN MODAL OPEN
+   ======================================== */
+
+body.custom-modal-open {
+  overflow: hidden;
+  width: 100%;
+}
+
+/* ========================================
+   16. MOBILE SAFE AREA SUPPORT
+   For devices with notches/home indicators
+   ======================================== */
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  .custom-modal-footer {
+    padding-bottom: calc(var(--cm-spacing-lg) + env(safe-area-inset-bottom));
+  }
+
+  @media (max-width: 490px) {
+    .custom-modal-backdrop {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+}
+
+/* ========================================
+   17. ANIMATIONS
+   Smooth entrance on mobile
+   ======================================== */
+
+@media (max-width: 767px) {
+  /* Bottom sheet slide-up animation on mobile */
+  .custom-modal-container {
+    animation: custom-modal-slide-up 0.3s ease-out;
+  }
+
+  @keyframes custom-modal-slide-up {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+@media (min-width: 768px) {
+  /* Fade-in animation on larger screens */
+  .custom-modal-container {
+    animation: custom-modal-fade-in 0.2s ease-out;
+  }
+
+  @keyframes custom-modal-fade-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+/* ========================================
+   18. PRESETS FOR SPECIFIC MODAL SIZES
+   ======================================== */
+
+/* Small modal - compact */
+@media (max-width: 767px) {
+  .custom-modal-small .custom-modal-body {
+    padding: var(--cm-spacing-lg);
+  }
+
+  .custom-modal-small .custom-modal-header,
+  .custom-modal-small .custom-modal-footer {
+    padding: var(--cm-spacing-md) var(--cm-spacing-lg);
+  }
+}
+
+/* Large modal - more content */
+@media (min-width: 1024px) {
+  .custom-modal-large .custom-modal-body {
+    max-height: 85vh;
+  }
+}
+
+/* ========================================
+   19. TEXT RESPONSIVE SIZING IN MODAL
+   ======================================== */
+
+.custom-modal-body .Polaris-Text--bodyMd {
+  font-size: clamp(14px, 1rem, 16px);
+  line-height: 1.5;
+}
+
+.custom-modal-body .Polaris-Text--bodySm {
+  font-size: clamp(12px, 0.9rem, 14px);
+  line-height: 1.4;
+}
+
+@media (max-width: 767px) {
+  .custom-modal-body .Polaris-Text--bodySm {
+    font-size: 13px;
+  }
+}
+
+/* ========================================
+   20. PRODUCT PICKER IN MODAL
+   Specific styles for ProductPicker component
+   ======================================== */
+
+.custom-modal-section .product-picker {
+  margin-bottom: var(--cm-spacing-lg);
+}
+
+@media (max-width: 767px) {
+  .custom-modal-section .product-picker {
+    margin-bottom: var(--cm-spacing-md);
+  }
+
+  .custom-modal-section .product-picker .Polaris-Button {
+    width: 100%;
+  }
+}
+
+/* ========================================
+   21. ERROR STATES IN MODAL
+   Proper spacing for banners and alerts
+   ======================================== */
+
+.custom-modal-section .Polaris-Banner {
+  margin-bottom: var(--cm-spacing-lg);
+}
+
+@media (max-width: 767px) {
+  .custom-modal-section .Polaris-Banner {
+    margin-bottom: var(--cm-spacing-md);
+    margin-left: calc(var(--cm-spacing-lg) * -1);
+    margin-right: calc(var(--cm-spacing-lg) * -1);
+  }
+}

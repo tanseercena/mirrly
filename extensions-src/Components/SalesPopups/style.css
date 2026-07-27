@@ -1,0 +1,160 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap");
+
+@media only screen and (max-width: 600px) {
+    .pushy-salespop-wrapper {
+        /* bottom: 80px; */
+        left: 0px;
+        padding: 16px 0px;
+    }
+}
+
+@media only screen and (min-width: 600px) {
+    .pushy-salespop-wrapper {
+        /* bottom: 80px; */
+        left: 0px;
+        padding: 16px 0px;
+    }
+}
+
+.pushy-salespop-wrapper {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 9999999999999 !important;
+    font-family: "Montserrat", sans-serif;
+}
+
+.pushy-salespop-wrapper .pushy-salespop {
+    min-width: 400px;
+    border: 0;
+    text-align: left;
+    z-index: 99999;
+    box-sizing: border-box;
+    font-weight: 500;
+    border-radius: 6px;
+    box-shadow: 2px 2px 10px 2px rgba(11, 10, 10, 0.2);
+    background-color: #fff;
+    position: relative;
+    cursor: pointer;
+    padding: 8px 0px;
+}
+
+.pushy-salespop-wrapper .pushy-salespop .pushy-salespop-container {
+    display: flex !important;
+    align-items: center;
+    height: 80px;
+}
+
+.pushy-salespop-wrapper .pushy-salespop-image-wrapper {
+    padding-left: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.pushy-salespop-wrapper .pushy-salespop .pushy-salespop-container .pushy-salespop-image-wrapper img {
+    max-height: 75px;
+    width: 90px;
+    overflow: hidden;
+    border-radius: 6px 0 0 6px;
+    object-fit: cover;
+}
+
+.pushy-salespop-wrapper .pushy-salespop .pushy-salespop-container .pushy-salespop-content-wrapper {
+    margin: 0;
+    height: 100%;
+    color: gray;
+    padding-left: 20px;
+    padding-right: 20px;
+    border-radius: 0 6px 6px 0;
+    flex: 1;
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.pushy-salespop-wrapper .pushy-salespop .pushy-salespop-container .pushy-salespop-content-wrapper .pushy-salespop-content {
+    font-family: inherit !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 14px;
+    line-height: 16px;
+}
+
+.pushy-salespop-wrapper .pushy-salespop .pushy-salespop-container .pushy-salespop-content-wrapper .pushy-salespop-content .pushy-salespop-content-text {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 8px;
+}
+
+.pushy-salespop-wrapper .pushy-salespop .pushy-salespop-container .pushy-salespop-content-wrapper .pushy-salespop-content .pushy-salespop-content-text .pushy-salespop-content-text-topline {
+    display: inline-block;
+    margin-bottom: 4px;
+}
+
+.pushy-salespop-wrapper .pushy-salespop .pushy-salespop-container .pushy-salespop-content-wrapper .pushy-salespop-content .pushy-salespop-content-text .pushy-salespop-content-text-bottomline {
+    display: inline-block;
+    /* margin-bottom: 8px; */
+}
+
+.pushy-salespop-wrapper .pushy-salespop .pushy-salespop-container .pushy-salespop-content-wrapper .pushy-salespop-content .pushy-salespop-content-meta {
+    display: inline-block;
+    /* margin-bottom: 8px; */
+}
+
+.pushy-salespop-wrapper .pushy-salespop .pushy-salespop-container .pushy-salespop-content-wrapper .pushy-salespop-content small {
+    margin-top: 3px !important;
+    display: block !important;
+    font-size: 12px !important;
+    opacity: 0.8;
+}
+
+.pushy-salespop-wrapper .pushy-salespop .custom-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    height: 12px;
+    width: 12px;
+    cursor: pointer;
+    transition: 0.2s ease-in-out;
+    transform: rotate(45deg);
+    opacity: 0;
+}
+
+.pushy-salespop-wrapper .pushy-salespop .custom-close::before {
+    content: "";
+    display: block;
+    width: 100%;
+    height: 2px;
+    background-color: gray;
+    position: absolute;
+    left: 0;
+    top: 5px;
+}
+
+.pushy-salespop-wrapper .pushy-salespop .custom-close::after {
+    content: "";
+    display: block;
+    height: 100%;
+    width: 2px;
+    background-color: gray;
+    position: absolute;
+    left: 5px;
+    top: 0;
+}
+
+.pushy-salespop-wrapper .pushy-salespop:hover .custom-close {
+    opacity: 1;
+}
+
+.poweredby {
+    font-weight: 600;
+    text-decoration: none;
+    margin-left: 3px;
+    color: #54914C;
+}
+
+.Toastify__toast {
+    background: transparent !important;
+    box-shadow: none !important;
+}

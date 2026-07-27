@@ -1,0 +1,117 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap");
+
+.topBarPromoter {
+    position: fixed;
+    z-index: 1119999;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: "Montserrat", sans-serif;
+}
+
+.topBarPromoter .close_btn {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+}
+
+.pushy-promotion-bar-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pushy-promotion-bar-cta,
+.pushy-promotion-bar-lead {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+}
+
+.pushy-promotion-bar-cta-button,
+.pushy-promotion-bar-lead-button {
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    /* font-size: 1.05rem/1; */
+    letter-spacing: .05em;
+    overflow: hidden;
+    padding: 1.15em 3.5em;
+    /* min-height: 3.3em; */
+    margin-left: 1em;
+    position: relative;
+    text-decoration: none;
+    padding: 0.5em 2em;
+    transition: all .2s ease-in-out;
+    min-width: 200px;
+    /* min-height: 30px; */
+    height: 38px;
+}
+
+.pushy-promotion-bar-cta-button:hover,
+.pushy-promotion-bar-lead-button:hover {
+    transform: scale(0.9);
+}
+
+.pushy-promotion-bar-lead-input {
+    /* font-size: 16px;
+        line-height: 28px; */
+    padding: 0.5em 2em;
+    /* width: 100%;
+    min-height: 44px; */
+    border: unset;
+    border-radius: 4px;
+    outline-color: rgb(84 105 212 / 0.5);
+    background-color: rgb(255, 255, 255);
+    box-shadow: rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(60, 66, 87, 0.16) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px;
+}
+
+.pushy-promotion-bar-form {
+    margin-left: 1em;
+    display: flex;
+    align-items: center;
+}
+
+.pushy-promotion-bar-lead-input-name {
+    margin-right: 0.5em;
+}
+
+@media only screen and (max-width: 600px) {
+    .pushy-promotion-bar-lead {
+        flex-direction: column;
+    }
+
+    .pushy-promotion-bar-lead-input {
+        margin-bottom: 0.5em;
+        width: 180px;
+    }
+
+    .pushy-promotion-bar-lead-input-wrapper {
+        display: flex;
+        justify-content: center;
+    }
+
+    .pushy-promotion-bar-lead-button {
+        min-width: 90%;
+        margin-bottom: 1em;
+    }
+
+    .pushy-promotion-bar-form {
+        display: block;
+    }
+}
+
+.close {
+    cursor: pointer;
+    position: absolute;
+    right: 30px;
+}

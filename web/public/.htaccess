@@ -1,0 +1,63 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # --------------------------------------------------
+    # Serve precompressed .gz files (Vite)
+    # --------------------------------------------------
+
+    #RewriteCond %{HTTP:Accept-Encoding} gzip
+    #RewriteCond %{REQUEST_FILENAME}.gz -f
+    #RewriteRule ^(.+)$ $1.gz [L]
+
+    # --------------------------------------------------
+    # Handle Authorization Header
+    # --------------------------------------------------
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # --------------------------------------------------
+    # Redirect Trailing Slashes If Not A Folder
+    # --------------------------------------------------
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # --------------------------------------------------
+    # Laravel Front Controller
+    # --------------------------------------------------
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# --------------------------------------------------
+# Tell Apache what .gz files are
+# --------------------------------------------------
+<IfModule mod_mime.c>
+    AddEncoding gzip .gz
+
+    # Force correct MIME types for gzipped files
+    AddType application/javascript .js.gz
+    AddType text/css .css.gz
+</IfModule>
+
+# --------------------------------------------------
+# Send headers ONLY for gz files
+# --------------------------------------------------
+<IfModule mod_headers.c>
+    <FilesMatch "\.js\.gz$">
+        Header set Content-Type application/javascript
+        Header set Content-Encoding gzip
+        Header append Vary Accept-Encoding
+    </FilesMatch>
+
+    <FilesMatch "\.css\.gz$">
+        Header set Content-Type text/css
+        Header set Content-Encoding gzip
+        Header append Vary Accept-Encoding
+    </FilesMatch>
+</IfModule>
