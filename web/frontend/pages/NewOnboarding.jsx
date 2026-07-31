@@ -65,7 +65,27 @@ export default function NewOnboarding() {
         useState(false);
     const [selectedProductType, setSelectedProductType] = useState(null);
 
-    const totalSteps = 4;
+    // Step 2: Product scope selection
+    const [productScope, setProductScope] = useState("all"); // "all" or "specific"
+    const [selectedProductsOrCollections, setSelectedProductsOrCollections] = useState([]);
+    const [productCount, setProductCount] = useState(0);
+
+    // Step 3: Theme embed setup
+    const [isThemeEmbedActive, setIsThemeEmbedActive] = useState(false);
+    const [isCheckingEmbedStatus, setIsCheckingEmbedStatus] = useState(false);
+    const [copySuccess, setCopySuccess] = useState(false);
+    const [themeType, setThemeType] = useState("os2"); // "os2" or "vintage"
+
+    // Step 4: Live test
+    const [liveTestProduct, setLiveTestProduct] = useState(null);
+    const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+    const [testFeedback, setTestFeedback] = useState(null); // 'positive' or 'negative'
+    const [showPhotoTip, setShowPhotoTip] = useState(false);
+
+    // Step 5: Plan selection
+    const [selectedPlan, setSelectedPlan] = useState("starter"); // Default to starter plan
+
+    const totalSteps = 5;
 
     //s cr
     const { store } = React.useContext(AppContext);
@@ -344,7 +364,7 @@ export default function NewOnboarding() {
                 const errorData = await response.json();
                 alert(
                     "Error generating preview: " +
-                        (errorData.message || "Unknown error")
+                    (errorData.message || "Unknown error")
                 );
             }
         } catch (error) {
@@ -676,9 +696,9 @@ export default function NewOnboarding() {
         const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1)
             .toString()
             .padStart(2, "0")}-${date
-            .getDate()
-            .toString()
-            .padStart(2, "0")} ${hours}:${minutes}:${seconds}`;
+                .getDate()
+                .toString()
+                .padStart(2, "0")} ${hours}:${minutes}:${seconds}`;
         return formattedDate;
     }
 
@@ -2602,13 +2622,12 @@ export default function NewOnboarding() {
 
     const fileLabelText = `${t(
         "createdigitalproduct.drag_and_drop_your_files"
-    )} ${
-        fileSizeLimit
-            ? `(${t("createdigitalproduct.max")} ${formatFileSizeLimit(
-                  fileSizeLimit
-              )} ${t("createdigitalproduct.per_file")})`
-            : t("createdigitalproduct.no_limit_per_file")
-    }`;
+    )} ${fileSizeLimit
+        ? `(${t("createdigitalproduct.max")} ${formatFileSizeLimit(
+            fileSizeLimit
+        )} ${t("createdigitalproduct.per_file")})`
+        : t("createdigitalproduct.no_limit_per_file")
+        }`;
 
     const exceedMaxSizeForLicense = licenseFiles.size > MAX_FILE_BYTE;
 
@@ -2639,8 +2658,8 @@ export default function NewOnboarding() {
         if (currentStep < totalSteps) {
             const nextStep = currentStep + 1;
 
-            // Call finish-onboarding API when moving to step 3
-            if (nextStep === 3) {
+            // Call finish-onboarding API when moving to step 5 (final step)
+            if (nextStep === 5) {
                 setIsFinishingOnboarding(true);
                 try {
                     await fetch("/api/finish-onboarding", {
@@ -2694,6 +2713,91 @@ export default function NewOnboarding() {
         navigate("/");
     };
 
+    // Step 2: ResourcePicker handlers
+    const handleResourcePickerOpen = async () => {
+        try {
+            const selected = await shopify.resourcePicker({
+                type: ['product', 'collection'],
+                action: 'select',
+                multiple: true,
+            });
+
+            if (selected && selected.length > 0) {
+                const selectedItems = selected.map((item) => ({
+                    id: item.id,
+                    title: item.title,
+                    type: item.type, // 'product' or 'collection'
+                }));
+                setSelectedProductsOrCollections(selectedItems);
+                setProductCount(selectedItems.length);
+                setSelectedProductType("specific"); // Enable continue button
+            }
+        } catch (error) {
+            console.error('Resource picker error:', error);
+            // User cancelled the picker
+        }
+    };
+
+    const handleRemoveSelection = (id) => {
+        const updated = selectedProductsOrCollections.filter((item) => item.id !== id);
+        setSelectedProductsOrCollections(updated);
+        setProductCount(updated.length);
+        if (updated.length === 0) {
+            setSelectedProductType(null); // Disable continue button if no items
+        }
+    };
+
+    // Step 3: Theme embed handlers
+    const handleOpenThemeEditor = () => {
+        // Deep link to theme editor with app embed pre-activated
+        const appEmbedUuid = process.env.SHOPIFY_APP_EMBED_UUID || "your-app-embed-uuid";
+        const blockHandle = "mirrly-try-on"; // Replace with actual block handle
+        const themeEditorUrl = `/admin/themes/current/editor?context=apps&template=product&activateAppId=${appEmbedUuid}/${blockHandle}`;
+        window.open(themeEditorUrl, '_blank');
+
+        // Start polling for embed status after opening theme editor
+        const pollInterval = setInterval(checkThemeEmbedStatus, 3000);
+        setTimeout(() => clearInterval(pollInterval), 60000); // Stop after 1 minute
+    };
+
+    const handleCopySnippet = () => {
+        const snippet = `{% render 'mirrly-try-on' %}`;
+        navigator.clipboard.writeText(snippet);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+    };
+
+    const checkThemeEmbedStatus = async () => {
+        setIsCheckingEmbedStatus(true);
+        try {
+            // API call to check if theme embed is active
+            const response = await fetch('/api/check-theme-embed', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+            setIsThemeEmbedActive(data.isActive || false);
+        } catch (error) {
+            console.error('Error checking theme embed status:', error);
+        } finally {
+            setIsCheckingEmbedStatus(false);
+        }
+    };
+
+    // Check embed status when entering step 3
+    useEffect(() => {
+        if (currentStep === 3) {
+            checkThemeEmbedStatus();
+        }
+    }, [currentStep]);
+
+    // Set default live test product when products are selected
+    useEffect(() => {
+        if (selectedProductsOrCollections.length > 0 && !liveTestProduct) {
+            setLiveTestProduct(selectedProductsOrCollections[0]);
+        }
+    }, [selectedProductsOrCollections]);
+
 
     const stepProgress = (currentStep / totalSteps) * 100;
 
@@ -2713,7 +2817,7 @@ export default function NewOnboarding() {
         return <PageLoader />;
     }
 
- if (currentStep === 1) {
+    if (currentStep === 1) {
         return (
             <>
                 <style>
@@ -2726,6 +2830,17 @@ export default function NewOnboarding() {
                             to {
                                 opacity: 1;
                                 transform: translateY(0);
+                            }
+                        }
+
+                        @keyframes pulse {
+                            0%, 100% {
+                                opacity: 1;
+                                transform: scale(1);
+                            }
+                            50% {
+                                opacity: 0.5;
+                                transform: scale(1.2);
                             }
                         }
 
@@ -2742,12 +2857,12 @@ export default function NewOnboarding() {
                         }
 
                         .onboarding-content {
-                            flex: 1 1 320px;
+                            flex: 1 1 0;
                             min-width: 0;
                         }
 
                         .onboarding-image-col {
-                            flex: 1 1 320px;
+                            flex: 1 1 0;
                             min-width: 0;
                             display: flex;
                             align-items: center;
@@ -2759,6 +2874,18 @@ export default function NewOnboarding() {
                             max-width: 100%;
                             height: auto;
                             border-radius: 8px;
+                            display: block;
+                        }
+
+                        .onboarding-video {
+                            width: 100%;
+                            border-radius: 8px;
+                            overflow: hidden;
+                        }
+
+                        .onboarding-video video {
+                            width: 100%;
+                            height: auto;
                             display: block;
                         }
 
@@ -2817,24 +2944,30 @@ export default function NewOnboarding() {
 
                         /* ── Next button ── */
                         .onboarding-next-btn {
-                            background-color: white;
-                            color: #303030;
-                            border: 1.5px solid #d0d0d0;
+                            background-color: #088395;
+                            color: white;
+                            border: none;
                             border-radius: 8px;
-                            padding: 12px 24px;
+                            padding: 12px 28px;
                             font-size: 15px;
                             font-weight: 500;
                             cursor: pointer;
                             display: flex;
                             align-items: center;
                             gap: 6px;
-                            transition: background-color 0.2s, border-color 0.2s;
+                            transition: all 0.2s ease;
                             white-space: nowrap;
                         }
 
-                        .onboarding-next-btn:hover {
-                            background-color: #f5f5f5;
-                            border-color: #a0a0a0;
+                        .onboarding-next-btn:hover:not(:disabled) {
+                            background-color: #09637E;
+                            transform: translateY(-1px);
+                        }
+
+                        .onboarding-next-btn:disabled {
+                            background-color: #cccccc;
+                            opacity: 0.6;
+                            cursor: not-allowed;
                         }
 
                         /* ── Breakpoint: tablet (≤ 768px) ── */
@@ -2874,46 +3007,195 @@ export default function NewOnboarding() {
                                 font-size: 14px;
                                 width: 100%;
                                 justify-content: center;
+                                
                             }
 
                             .onboarding-footer {
                                 flex-direction: column;
                                 align-items: stretch;
                                 text-align: center;
+                                gap: 16px;
+                               
                             }
 
-                            .progress-wrapper {
+                            .onboarding-footer > div:first-child {
                                 justify-content: center;
                             }
+
+                            .onboarding-next-btn {
+                                width: 100%;
+                                justify-content: center;
+                            }
+                        }
+
+                        /* ── Feature items responsive styles ── */
+                        @media (max-width: 480px) {
+                            .onboarding-content > div > div > div > div > div > div[style*="flex-direction: column"] > div {
+                                gap: "16px";
+                            }
+                        }
+
+                        /* ── Step breadcrumb bar ── */
+                        .ob2-steps {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            flex-wrap: wrap;
+                        }
+
+                        .ob2-step-pill {
+                            display: flex;
+                            align-items: center;
+                            gap: 6px;
+                            padding: 6px 12px;
+                            border-radius: 20px;
+                            background-color: #f5f5f5;
+                            border: 1px solid #e0e0e0;
+                        }
+
+                        .ob2-step-circle {
+                            width: 22px;
+                            height: 22px;
+                            border-radius: 50%;
+                            border: 1.5px solid #09637E;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-weight: bold;
+                            font-size: 12px;
+                            flex-shrink: 0;
+                        }
+
+                        .ob2-step-circle--done {
+                            background-color: #088395;
+                            color: white;
+                        }
+
+                        .ob2-step-circle--active {
+                            background-color: white;
+                            color: #088395;
+                        }
+
+                        .ob2-step-circle--inactive {
+                            background-color: white;
+                            color: #088395;
+                        }
+
+                        .ob2-step-label {
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #303030;
+                            white-space: nowrap;
+                        }
+
+                        .ob2-step-badge {
+                            background: none;
+                            border: none;
+                            padding: 0;
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #088395;
+                            cursor: default;
                         }
 
                         /* ── Wrapper padding for responsive spacing ── */
                         .onboarding-step-1-wrapper {
                             padding: 0;
+                            max-width: 1600px;
+                            margin: 0 auto;
+                        }
+                        .onboarding-step-1-wrapper > div {
+                            max-width: none;
                         }
                     `}
                 </style>
 
                 <div className="onboarding-step-1-wrapper">
-                <Page>
-                    <Card className="fade-in-step">
+                    <Page>
+                        <Card className="fade-in-step">
 
-                        {/* ── Two-column layout ── */}
-                        <div className="onboarding-layout">
+                            {/* ── Step breadcrumb ── */}
+                            <Box paddingInline="600" paddingBlockStart="800" paddingBlockEnd="800">
+                                <div className="ob2-steps">
 
-                            {/* Left: text content */}
-                            <div className="onboarding-content">
-                                <Box padding="400">
-                                    <BlockStack gap="600">
+                                    {/* Step 1 – active */}
+                                    <div className="ob2-step-pill">
+                                        <div className="ob2-step-circle ob2-step-circle--active">1</div>
+                                        <span className="ob2-step-label">
+                                            <button className="ob2-step-badge">
+                                                {t("onboarding.Welcome")}
+                                            </button>
+                                        </span>
+                                    </div>
 
-                                        {/* Heading group */}
-                                        <BlockStack>
-                                            <InlineStack
-                                                align="start"
-                                                blockAlign="center"
-                                                gap="200"
-                                                wrap="wrap"
-                                            >
+                                    {/* Step 2 */}
+                                    <div className="ob2-step-pill">
+                                        <div className="ob2-step-circle ob2-step-circle--inactive">2</div>
+                                        <span className="ob2-step-label">{t("onboarding.Product_Type")}</span>
+                                    </div>
+
+                                    {/* Step 3 */}
+                                    <div className="ob2-step-pill">
+                                        <div className="ob2-step-circle ob2-step-circle--inactive">3</div>
+                                        <span className="ob2-step-label">{t("onboarding.Choose_Product")}</span>
+                                    </div>
+
+                                    {/* Step 4 */}
+                                    <div className="ob2-step-pill">
+                                        <div className="ob2-step-circle ob2-step-circle--inactive">4</div>
+                                        <span className="ob2-step-label">{t("onboarding.Live_Test")}</span>
+                                    </div>
+
+                                    {/* Step 5 */}
+                                    <div className="ob2-step-pill">
+                                        <div className="ob2-step-circle ob2-step-circle--inactive">5</div>
+                                        <span className="ob2-step-label">{t("onboarding.congratulations")}</span>
+                                    </div>
+
+                                </div>
+                            </Box>
+
+                            {/* ── Two-column layout ── */}
+                            <div className="onboarding-layout">
+
+                                {/* Left: text content */}
+                                <div className="onboarding-content">
+                                    <Box padding="400">
+                                        <BlockStack gap="600">
+
+                                            {/* Heading group */}
+                                            <BlockStack>
+                                                <InlineStack
+                                                    align="start"
+                                                    blockAlign="center"
+                                                    gap="200"
+                                                    wrap="wrap"
+                                                >
+                                                    <Text
+                                                        variant="heading3xl"
+                                                        as="h2"
+                                                        fontWeight="bold"
+                                                    >
+                                                        <span
+                                                            className="onboarding-heading"
+                                                            style={{ color: "#09637E" }}
+                                                        >
+                                                            {t("onboarding.Mirrly_Onboarding_title")}
+                                                        </span>
+                                                    </Text>
+                                                    {/* */}
+                                                    {/* <Badge size="large"> */}
+                                                    <span style={{ color: "#088395" }}>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#7AB2B2" stroke="#7AB2B2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles-icon lucide-sparkles"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /><path d="M20 2v4" /><path d="M22 4h-4" /><circle cx="4" cy="20" r="2" /></svg>
+
+                                                        {/* {t("onboarding.Deliveries")} */}
+
+                                                    </span>
+                                                    {/* </Badge> */}
+
+                                                </InlineStack>
+
                                                 <Text
                                                     variant="heading3xl"
                                                     as="h2"
@@ -2923,145 +3205,2242 @@ export default function NewOnboarding() {
                                                         className="onboarding-heading"
                                                         style={{ color: "#09637E" }}
                                                     >
-                                                        {t("onboarding.Welcome_to")}
+                                                        {t("onboarding.Lets_get_your_Mirrly_products_ready")}
                                                     </span>
                                                 </Text>
-                                                <Badge size="large">
-                                                    <span style={{ color: "#088395" }}>
-                                                        {t("onboarding.Deliveries")}
-                                                    </span>
-                                                </Badge>
-                                            </InlineStack>
+                                            </BlockStack>
 
-                                            <Text
-                                                variant="heading3xl"
-                                                as="h2"
-                                                fontWeight="bold"
-                                            >
-                                                <span
-                                                    className="onboarding-heading"
-                                                    style={{ color: "#09637E" }}
-                                                >
-                                                    {t("onboarding.Digitally_Digital_Products")}
+                                            {/* Subtitle  */}
+                                            <Text as="p" variant="headingLg" tone="magic">
+                                                <span style={{ color: "#7AB2B2" }}>
+                                                    {t("onboarding.Mirrly_Onboarding_Subtitle")}
                                                 </span>
                                             </Text>
-                                        </BlockStack>
 
-                                        {/* Subtitle */}
-                                        <Text as="p" variant="headingMd" tone="magic">
-                                            <span style={{ color: "#7AB2B2" }}>
-                                                {t("onboarding.Lets_get_your_digital_products_ready")}
-                                            </span>
-                                        </Text>
 
-                                        {/* Language selector */}
+                                            {/* Feature items */}
+                                            <div style={{ marginTop: "32px" }}>
+                                                <div style={{ display: "flex", flexDirection: "column", gap: "36px" }}>
+                                                    {/* Feature 1 */}
+                                                    <div style={{ display: "flex", alignItems: "flex-start", gap: "28px" }}>
+                                                        <div style={{
+                                                            width: "64px",
+                                                            height: "64px",
+                                                            borderRadius: "50%",
+                                                            backgroundColor: "#E0F2F1",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            flexShrink: 0
+                                                        }}>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#09637E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+                                                                <path d="m9 12 2 2 4-4" />
+                                                            </svg>
+                                                        </div>
+                                                        <div>
+                                                            <Text variant="headingLg" as="h3" fontWeight="bold" tone="magic">
+                                                                <span style={{ color: "#09637E" }}>{t("onboarding.step1_no_api_keys")}</span>
+                                                            </Text>
+                                                            <Text as="p" variant="headingMd" tone="subdued">
+                                                                <span style={{ color: "#7AB2B2" }}>{t("onboarding.step1_ai_engine_builtin")}</span>
+                                                            </Text>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Feature 2 */}
+                                                    <div style={{ display: "flex", alignItems: "flex-start", gap: "28px" }}>
+                                                        <div style={{
+                                                            width: "64px",
+                                                            height: "64px",
+                                                            borderRadius: "50%",
+                                                            backgroundColor: "#E0F2F1",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            flexShrink: 0
+                                                        }}>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#09637E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                                                            </svg>
+                                                        </div>
+                                                        <div>
+                                                            <Text variant="headingLg" as="h3" fontWeight="bold" tone="magic">
+                                                                <span style={{ color: "#09637E" }}>{t("onboarding.step1_works_instantly")}</span>
+                                                            </Text>
+                                                            <Text as="p" variant="headingMd" tone="subdued">
+                                                                <span style={{ color: "#7AB2B2" }}>{t("onboarding.step1_go_live_quickly")}</span>
+                                                            </Text>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Feature 3 */}
+                                                    <div style={{ display: "flex", alignItems: "flex-start", gap: "28px" }}>
+                                                        <div style={{
+                                                            width: "64px",
+                                                            height: "64px",
+                                                            borderRadius: "50%",
+                                                            backgroundColor: "#E0F2F1",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            flexShrink: 0
+                                                        }}>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#09637E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <rect width="3" height="3" x="3" y="3" rx="1" />
+                                                                <rect width="3" height="3" x="17" y="17" rx="1" />
+                                                                <path d="m7 7 10 10" />
+                                                                <circle cx="12" cy="12" r="3" />
+                                                            </svg>
+                                                        </div>
+                                                        <div>
+                                                            <Text variant="headingLg" as="h3" fontWeight="bold" tone="magic">
+                                                                <span style={{ color: "#09637E" }}>{t("onboarding.step1_you_control")}</span>
+                                                            </Text>
+                                                            <Text as="p" variant="headingMd" tone="subdued">
+                                                                <span style={{ color: "#7AB2B2" }}>{t("onboarding.step1_enable_apparel")}</span>
+                                                            </Text>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Language selector */}
+                                            {/* 
                                         <div style={{ maxWidth: "80px", marginLeft: "40px" }}>
                                             <LanguageSelector />
                                         </div>
+                                        */}
 
-                                    </BlockStack>
-                                </Box>
-                            </div>
+                                        </BlockStack>
+                                    </Box>
+                                </div>
 
-                            {/* Right: illustration */}
-                            <div className="onboarding-image-col">
-                                <img
-                                    src="/images/on.png"
-                                    alt="Onboarding illustration"
-                                />
-                            </div>
-                        </div>
+                                {/* Right: illustration */}
 
-                        {/* ── Footer: progress + next button ── */}
-                        <BlockStack gap="100">
-                            <Box padding="400">
-                                <div className="onboarding-footer">
 
-                                    {/* Spacer (keeps Next button right-aligned on desktop) */}
-                                    <div aria-hidden="true" />
+                                <div className="onboarding-image-col">
+                                    <Card>
+                                        <div style={{ padding: "16px" }}>
+                                            {/* LIVE TRY-ON Badge */}
+                                            <div style={{
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: "8px",
+                                                padding: "8px 16px",
+                                                borderRadius: "20px",
+                                                backgroundColor: "#E0F2F1",
+                                                marginBottom: "16px"
+                                            }}>
+                                                <div style={{
+                                                    width: "8px",
+                                                    height: "8px",
+                                                    borderRadius: "50%",
+                                                    backgroundColor: "#09637E",
+                                                    animation: "pulse 2s infinite"
+                                                }}></div>
+                                                <Text variant="bodyMd" as="span" fontWeight="bold" tone="magic">
+                                                    <span style={{ color: "#09637E" }}>{t("onboarding.step1_live_try_on_badge")}</span>
+                                                </Text>
+                                            </div>
 
-                                    {/* Progress dots */}
-                                    <div className="progress-wrapper">
-                                        <div className="progress-dots">
-                                            <div className="progress-dot progress-dot--active" />
-                                            <div className="progress-dot progress-dot--inactive" />
-                                            <div className="progress-dot progress-dot--inactive" />
-                                            <div className="progress-dot progress-dot--inactive" />
+                                            {/* Video Container */}
+                                            <div className="onboarding-video" style={{
+                                                width: "100%",
+                                                borderRadius: "8px",
+                                                overflow: "hidden"
+                                            }}>
+                                                <video width="100%" height="auto" controls src="/images/onboarding_video.mp4"></video>
+                                            </div>
                                         </div>
-                                        <span className="progress-label">1/4</span>
-                                    </div>
+                                    </Card>
+                                </div>
 
-                                    {/* Action Buttons */}
-                                    <div style={{ display: "flex", gap: "12px" }}>
-                                        {/* Skip Onboarding */}
+
+                            </div>
+
+                            {/* ── Footer: left text + right button ── */}
+                            <BlockStack gap="100">
+                                <Box padding="400">
+                                    <div className="onboarding-footer" style={{ alignItems: "center" }}>
+
+                                        {/* Left side: Lightbulb icon with text */}
+                                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                            <div style={{
+                                                width: "40px",
+                                                height: "40px",
+                                                borderRadius: "50%",
+                                                backgroundColor: "#E0F2F1",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                flexShrink: 0
+                                            }}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#09637E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M9 18h6" />
+                                                    <path d="M10 22h4" />
+                                                    <path d="M12 2a7 7 0 0 0-7 7c0 2 0 3 2 4.5V15a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1.5c2-1.5 2-2.5 2-4.5a7 7 0 0 0-7-7z" />
+                                                </svg>
+                                            </div>
+                                            <Text as="p" variant="bodyMd" tone="subdued">
+                                                <span style={{ color: "#7AB2B2" }}>
+                                                    {t("onboarding.step1_realtime_live")}{" "}
+                                                    <span style={{ color: "#088395", fontWeight: 600 }}>{t("onboarding.step1_instant_tryon")}</span>
+                                                </span>
+                                            </Text>
+                                        </div>
+
+                                        {/* Right side: Get started button */}
                                         <button
                                             className="onboarding-next-btn"
-                                            onClick={handleSkipOnboarding}
-                                            style={{
-                                                backgroundColor: "white",
-                                                color: "#303030",
-                                                border: "1.5px solid #d0d0d0",
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.backgroundColor = "#f5f5f5";
-                                                e.currentTarget.style.borderColor = "#a0a0a0";
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.backgroundColor = "white";
-                                                e.currentTarget.style.borderColor = "#d0d0d0";
-                                            }}
-                                        >
-                                            {t("onboarding.Skip_Onboarding")}
-                                        </button>
 
-                                        {/* Next button */}
-                                        <button
-                                            className="onboarding-next-btn"
                                             onClick={handleNext}
                                         >
-                                            {t("onboarding.Next_→")}
+                                            {t("onboarding.step1_get_started")}
                                         </button>
+
                                     </div>
+                                </Box>
+                            </BlockStack>
 
-                                </div>
-                            </Box>
-                        </BlockStack>
-
-                    </Card>
-                </Page>
+                        </Card>
+                    </Page>
                 </div>
             </>
         );
     }
 
-   if (currentStep === 2) {
-        const productTypes = [
-            {
-                key: "file",
-                icon: "./images/file_icon.png",
-                title: t("onboarding.files"),
-                desc1: t("onboarding.pdf_zip_e_book_software_etc"),
-            },
-            {
-                key: "license",
-                icon: "./images/License.png",
-                title: t("onboarding.keys_codes"),
-                desc1: t("onboarding.license_keys_codes_serials"),
-            },
-            {
-                key: "pdf",
-                icon: "./images/pdf-file.png",
-                title: t("onboarding.pdf_with_stamping"),
-                desc1: t("onboarding.watermark_stamp_user_info"),
-            },
-            {
-                key: "links",
-                icon: "./images/link_icon.png",
-                title: t("onboarding.custom_links"),
-                desc1: t("onboarding.send_protected_access_or"),
-            },
-        ];
+    if (currentStep === 2) {
+        return (
+            <>
+                <style>
+                    {`
+                        /* ── Step 2 Modern Polaris Design ── */
 
+                        /* Main container */
+                        .step2-container {
+                            background-color: #F6F6F7;
+                            min-height: 100vh;
+                            padding: 24px;
+                        }
+
+                        /* White rounded container */
+                        .step2-main-card {
+                            background-color: #FFFFFF;
+                            border-radius: 16px;
+                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+                            overflow: hidden;
+                        }
+
+                        /* Two column layout */
+                        .step2-layout {
+                            display: grid;
+                            grid-template-columns: 55fr 45fr;
+                            gap: 40px;
+                            padding: 40px;
+                        }
+
+                        /* Left column */
+                        .step2-left-col {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 16px;
+                        }
+
+                        /* Right column */
+                        .step2-right-col {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 20px;
+                        }
+
+                        /* Heading */
+                        .step2-heading {
+                            font-size: 36px;
+                            font-weight: 700;
+                            color: #12324B;
+                            line-height: 1.2;
+                            letter-spacing: -0.8px;
+                            margin-bottom: 16px;
+                        }
+
+                        /* Description */
+                        .step2-description {
+                            font-size: 15px;
+                            color: #667085;
+                            line-height: 1.5;
+                            max-width: 520px;
+                            margin-bottom: 20px;
+                        }
+
+                        /* Option card base */
+                        .step2-option-card {
+                            display: flex;
+                            align-items: center;
+                            gap: 16px;
+                            padding: 16px;
+                            background-color: #FFFFFF;
+                            border-radius: 12px;
+                            border: 2px solid #DCE3EA;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            position: relative;
+                        }
+
+                        .step2-option-card:hover {
+                            border-color: #0F8B8D;
+                            box-shadow: 0 4px 12px rgba(15, 139, 141, 0.1);
+                        }
+
+                        .step2-option-card.selected {
+                            border-color: #0F8B8D;
+                            background-color: #FFFFFF;
+                            box-shadow: 0 4px 16px rgba(15, 139, 141, 0.15);
+                        }
+
+                        /* Radio button */
+                        .step2-radio {
+                            width: 24px;
+                            height: 24px;
+                            border: 2px solid #DCE3EA;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step2-option-card.selected .step2-radio {
+                            border-color: #0F8B8D;
+                            background-color: #0F8B8D;
+                        }
+
+                        .step2-radio-inner {
+                            width: 8px;
+                            height: 8px;
+                            background-color: white;
+                            border-radius: 50%;
+                            opacity: 0;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step2-option-card.selected .step2-radio-inner {
+                            opacity: 1;
+                        }
+
+                        /* Card content */
+                        .step2-card-content {
+                            flex: 1;
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                        }
+
+                        /* Card title */
+                        .step2-card-title {
+                            font-size: 18px;
+                            font-weight: 600;
+                            color: #12324B;
+                            letter-spacing: -0.3px;
+                            margin-bottom: 2px;
+                        }
+
+                        /* Card description */
+                        .step2-card-desc {
+                            font-size: 14px;
+                            color: #667085;
+                            line-height: 1.4;
+                        }
+
+                        /* Recommended badge */
+                        .step2-badge {
+                            display: inline-flex;
+                            align-items: center;
+                            padding: 4px 12px;
+                            background-color: #DDF8EA;
+                            color: #1F8A4D;
+                            border-radius: 16px;
+                            font-size: 13px;
+                            font-weight: 600;
+                            margin-left: 8px;
+                        }
+
+                        /* Icon container */
+                        .step2-icon-container {
+                            width: 48px;
+                            height: 48px;
+                            border-radius: 50%;
+                            background-color: #EAF6FD;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                            position: relative;
+                        }
+
+                        /* Sparkle decorations */
+                        .step2-sparkle {
+                            position: absolute;
+                            width: 6px;
+                            height: 6px;
+                            background-color: #0F8B8D;
+                            border-radius: 50%;
+                            opacity: 0.3;
+                        }
+
+                        .step2-sparkle-1 {
+                            top: -3px;
+                            right: 6px;
+                        }
+
+                        .step2-sparkle-2 {
+                            bottom: 4px;
+                            right: -2px;
+                        }
+
+                        .step2-sparkle-3 {
+                            top: 8px;
+                            right: -5px;
+                            width: 4px;
+                            height: 4px;
+                        }
+
+                        /* Browse button */
+                        .step2-browse-btn {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                            padding: 12px 20px;
+                            background-color: #0F8B8D;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            margin-top: 8px;
+                        }
+
+                        .step2-browse-btn:hover {
+                            background-color: #0C7778;
+                            transform: translateY(-1px);
+                            box-shadow: 0 4px 12px rgba(15, 139, 141, 0.2);
+                        }
+
+                        .step2-browse-btn:active {
+                            transform: translateY(0);
+                        }
+
+                        /* Statistics card */
+                        .step2-stats-card {
+                            background-color: #FFFFFF;
+                            border: 1px solid #DCE3EA;
+                            border-radius: 16px;
+                            padding: 24px;
+                        }
+
+                        .step2-stats-header {
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                            margin-bottom: 20px;
+                        }
+
+                        .step2-stats-icon {
+                            width: 32px;
+                            height: 32px;
+                            color: #0F8B8D;
+                        }
+
+                        .step2-stats-title {
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: #12324B;
+                        }
+
+                        .step2-stats-number {
+                            font-size: 56px;
+                            font-weight: 700;
+                            color: #0F8B8D;
+                            line-height: 1;
+                            margin-bottom: 8px;
+                        }
+
+                        .step2-stats-label {
+                            font-size: 18px;
+                            color: #667085;
+                            margin-left: 4px;
+                        }
+
+                        .step2-stats-note {
+                            font-size: 14px;
+                            color: #667085;
+                            margin-top: 8px;
+                        }
+
+                        /* Includes section */
+                        .step2-includes {
+                            margin-top: 20px;
+                            padding-top: 20px;
+                            border-top: 1px solid #E8E8E8;
+                        }
+
+                        .step2-includes-title {
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 12px;
+                        }
+
+                        .step2-include-item {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            font-size: 14px;
+                            color: #12324B;
+                            margin-bottom: 8px;
+                        }
+
+                        .step2-check-icon {
+                            width: 18px;
+                            height: 18px;
+                            color: #1F8A4D;
+                            flex-shrink: 0;
+                        }
+
+                        /* Info alert */
+                        .step2-info-alert {
+                            background-color: #EAF6FD;
+                            border-radius: 12px;
+                            padding: 16px;
+                            display: flex;
+                            align-items: flex-start;
+                            gap: 12px;
+                        }
+
+                        .step2-info-icon {
+                            width: 20px;
+                            height: 20px;
+                            color: #0F8B8D;
+                            flex-shrink: 0;
+                            margin-top: 2px;
+                        }
+
+                        .step2-info-text {
+                            font-size: 14px;
+                            color: #12324B;
+                            line-height: 1.4;
+                        }
+
+                        /* Warning alert */
+                        .step2-warning-alert {
+                            background-color: #FFF7E6;
+                            border-radius: 12px;
+                            padding: 16px;
+                            display: flex;
+                            align-items: flex-start;
+                            gap: 12px;
+                        }
+
+                        .step2-warning-icon {
+                            width: 20px;
+                            height: 20px;
+                            color: #B56A00;
+                            flex-shrink: 0;
+                            margin-top: 2px;
+                        }
+
+                        .step2-warning-title {
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 2px;
+                        }
+
+                        .step2-warning-text {
+                            font-size: 14px;
+                            color: #667085;
+                            line-height: 1.4;
+                        }
+
+                        /* Selected items list */
+                        .step2-selected-list {
+                            margin-top: 16px;
+                            display: flex;
+                            flex-direction: column;
+                            gap: 8px;
+                        }
+
+                        .step2-selected-item {
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            padding: 12px 16px;
+                            background-color: #F6F6F7;
+                            border-radius: 8px;
+                            border: 1px solid #E8E8E8;
+                        }
+
+                        .step2-item-title {
+                            font-size: 14px;
+                            color: #12324B;
+                        }
+
+                        .step2-remove-btn {
+                            background: none;
+                            border: none;
+                            color: #667085;
+                            cursor: pointer;
+                            padding: 4px;
+                            border-radius: 4px;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step2-remove-btn:hover {
+                            background-color: #E8E8E8;
+                            color: #D03030;
+                        }
+
+                        /* Footer navigation */
+                        .step2-footer {
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            padding: 24px 40px;
+                            border-top: 1px solid #E8E8E8;
+                            background-color: #FFFFFF;
+                            flex-wrap: wrap;
+                            gap: 16px;
+                        }
+
+                        .step2-prev-btn {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                            padding: 12px 20px;
+                            background-color: white;
+                            color: #12324B;
+                            border: 1px solid #DCE3EA;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step2-prev-btn:hover:not(:disabled) {
+                            background-color: #F6F6F7;
+                            border-color: #0F8B8D;
+                        }
+
+                        .step2-prev-btn:disabled {
+                            opacity: 0.5;
+                            cursor: not-allowed;
+                        }
+
+                        .step2-progress {
+                            display: flex;
+                            align-items: center;
+                            gap: 16px;
+                        }
+
+                        .step2-dots {
+                            display: flex;
+                            gap: 6px;
+                        }
+
+                        .step2-dot {
+                            width: 32px;
+                            height: 5px;
+                            border-radius: 3px;
+                            background-color: #E8E8E8;
+                        }
+
+                        .step2-dot.active {
+                            background-color: #0F8B8D;
+                        }
+
+                        .step2-progress-label {
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: #0F8B8D;
+                        }
+
+                        .step2-continue-btn {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                            padding: 12px 28px;
+                            background-color: #0F8B8D;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step2-continue-btn:hover:not(:disabled) {
+                            background-color: #0C7778;
+                            transform: translateY(-1px);
+                            box-shadow: 0 4px 12px rgba(15, 139, 141, 0.2);
+                        }
+
+                        .step2-continue-btn:disabled {
+                            background-color: #E8E8E8;
+                            color: #A0A0A0;
+                            cursor: not-allowed;
+                        }
+
+                        /* Breadcrumb */
+                        .step2-breadcrumb {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            padding: 24px 40px 0;
+                            flex-wrap: wrap;
+                        }
+
+                        .step2-breadcrumb-item {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            padding: 8px 16px;
+                            background-color: #F6F6F7;
+                            border-radius: 20px;
+                        }
+
+                        .step2-breadcrumb-circle {
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 12px;
+                            font-weight: 600;
+                        }
+
+                        .step2-breadcrumb-circle.done {
+                            background-color: #0F8B8D;
+                            color: white;
+                        }
+
+                        .step2-breadcrumb-circle.active {
+                            background-color: white;
+                            color: #0F8B8D;
+                            border: 2px solid #0F8B8D;
+                        }
+
+                        .step2-breadcrumb-circle.inactive {
+                            background-color: white;
+                            color: #A0A0A0;
+                            border: 2px solid #E8E8E8;
+                        }
+
+                        .step2-breadcrumb-label {
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #667085;
+                            white-space: nowrap;
+                        }
+
+                        .step2-breadcrumb-item.active .step2-breadcrumb-label {
+                            color: #0F8B8D;
+                            font-weight: 600;
+                        }
+
+                        .step2-breadcrumb-badge {
+                            background-color: #0F8B8D;
+                            color: white;
+                            padding: 2px 8px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            font-weight: 600;
+                        }
+
+                        /* Mobile responsive */
+                        @media (max-width: 1024px) {
+                            .step2-layout {
+                                grid-template-columns: 1fr;
+                                gap: 32px;
+                            }
+
+                            .step2-right-col {
+                                order: 2;
+                            }
+
+                            .step2-heading {
+                                font-size: 32px;
+                            }
+                        }
+
+                        @media (max-width: 768px) {
+                            .step2-container {
+                                padding: 16px;
+                            }
+
+                            .step2-layout {
+                                padding: 24px;
+                                gap: 24px;
+                            }
+
+                            .step2-heading {
+                                font-size: 28px;
+                            }
+
+                            .step2-description {
+                                font-size: 14px;
+                            }
+
+                            .step2-option-card {
+                                padding: 16px;
+                                flex-direction: column;
+                                align-items: flex-start;
+                                gap: 12px;
+                            }
+
+                            .step2-card-content {
+                                flex-direction: column;
+                                align-items: flex-start;
+                                gap: 12px;
+                            }
+
+                            .step2-icon-container {
+                                align-self: flex-end;
+                            }
+
+                            .step2-footer {
+                                padding: 20px 24px;
+                                flex-direction: column;
+                                align-items: stretch;
+                            }
+
+                            .step2-prev-btn,
+                            .step2-continue-btn {
+                                justify-content: center;
+                                width: 100%;
+                            }
+
+                            .step2-progress {
+                                justify-content: center;
+                            }
+
+                            .step2-breadcrumb {
+                                padding: 16px 24px 0;
+                            }
+                        }
+
+                        @media (max-width: 480px) {
+                            .step2-heading {
+                                font-size: 24px;
+                            }
+
+                            .step2-stats-number {
+                                font-size: 42px;
+                            }
+
+                            .step2-option-card {
+                                padding: 14px;
+                            }
+
+                            .step2-card-title {
+                                font-size: 16px;
+                            }
+
+                            .step2-card-desc {
+                                font-size: 13px;
+                            }
+                        }
+
+                        /* Spinner animation */
+                        @keyframes spin {
+                            0% { transform: rotate(0deg); }
+                            100% { transform: rotate(360deg); }
+                        }
+
+                        .step2-spinner {
+                            width: 16px;
+                            height: 16px;
+                            border: 2px solid rgba(255, 255, 255, 0.3);
+                            border-top-color: white;
+                            border-radius: 50%;
+                            animation: spin 0.8s linear infinite;
+                        }
+                    `}
+                </style>
+
+                <div className="step2-container">
+                    <div className="step2-main-card">
+
+                        {/* Breadcrumb */}
+                        <div className="step2-breadcrumb">
+                            <div className="step2-breadcrumb-item">
+                                <div className="step2-breadcrumb-circle done">✓</div>
+                                <span className="step2-breadcrumb-label">{t("onboarding.Welcome")}</span>
+                            </div>
+                            <div className="step2-breadcrumb-item active">
+                                <div className="step2-breadcrumb-circle active">2</div>
+                                <span className="step2-breadcrumb-label">
+                                    <span className="step2-breadcrumb-badge">{t("onboarding.Product_Type")}</span>
+                                </span>
+                            </div>
+                            <div className="step2-breadcrumb-item">
+                                <div className="step2-breadcrumb-circle inactive">3</div>
+                                <span className="step2-breadcrumb-label">{t("onboarding.Choose_Product")}</span>
+                            </div>
+                            <div className="step2-breadcrumb-item">
+                                <div className="step2-breadcrumb-circle inactive">4</div>
+                                <span className="step2-breadcrumb-label">{t("onboarding.Live_Test")}</span>
+                            </div>
+                            <div className="step2-breadcrumb-item">
+                                <div className="step2-breadcrumb-circle inactive">5</div>
+                                <span className="step2-breadcrumb-label">{t("onboarding.complete")}</span>
+                            </div>
+                        </div>
+
+                        {/* Main layout */}
+                        <div className="step2-layout">
+
+                            {/* Left column */}
+                            <div className="step2-left-col">
+                                <h1 className="step2-heading">
+                                    {t("onboarding.step2_heading")}
+                                </h1>
+                                <p className="step2-description">
+                                    {t("onboarding.step2_description")}
+                                </p>
+
+                                {/* Option Card 1: All apparel */}
+                                <div
+                                    className={`step2-option-card ${productScope === "all" ? "selected" : ""}`}
+                                    onClick={() => {
+                                        setProductScope("all");
+                                        setSelectedProductType("all");
+                                    }}
+                                >
+                                    <div className="step2-radio">
+                                        <div className="step2-radio-inner"></div>
+                                    </div>
+                                    <div className="step2-card-content">
+                                        <div>
+                                            <div className="step2-card-title">
+                                                {t("onboarding.step2_all_apparel_title")}
+                                                <span className="step2-badge">{t("onboarding.recommended")}</span>
+                                            </div>
+                                            <div className="step2-card-desc">
+                                                {t("onboarding.step2_all_apparel_desc")}
+                                            </div>
+                                        </div>
+                                        <div className="step2-icon-container">
+                                            {/* Shirt icon */}
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0F8B8D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
+                                            </svg>
+                                            <div className="step2-sparkle step2-sparkle-1"></div>
+                                            <div className="step2-sparkle step2-sparkle-2"></div>
+                                            <div className="step2-sparkle step2-sparkle-3"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Option Card 2: Specific collections */}
+                                <div
+                                    className={`step2-option-card ${productScope === "specific" ? "selected" : ""}`}
+                                    onClick={() => {
+                                        setProductScope("specific");
+                                        setSelectedProductType("specific");
+                                    }}
+                                >
+                                    <div className="step2-radio">
+                                        <div className="step2-radio-inner"></div>
+                                    </div>
+                                    <div className="step2-card-content">
+                                        <div>
+                                            <div className="step2-card-title">
+                                                {t("onboarding.step2_specific_title")}
+                                            </div>
+                                            <div className="step2-card-desc">
+                                                {t("onboarding.step2_specific_desc")}
+                                            </div>
+                                        </div>
+                                        <div className="step2-icon-container">
+                                            {/* Folder icon */}
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0F8B8D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                                            </svg>
+                                            <div className="step2-sparkle step2-sparkle-1"></div>
+                                            <div className="step2-sparkle step2-sparkle-2"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Browse button (only show when specific is selected) */}
+                                {productScope === "specific" && (
+                                    <button
+                                        className="step2-browse-btn"
+                                        onClick={handleResourcePickerOpen}
+                                    >
+                                        {/* Search icon */}
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="11" cy="11" r="8" />
+                                            <path d="m21 21-4.35-4.35" />
+                                        </svg>
+                                        {t("onboarding.step2_browse_button")}
+                                    </button>
+                                )}
+
+                                {/* Selected items list (when specific is selected) */}
+                                {productScope === "specific" && selectedProductsOrCollections.length > 0 && (
+                                    <div className="step2-selected-list">
+                                        {selectedProductsOrCollections.map((item) => (
+                                            <div key={item.id} className="step2-selected-item">
+                                                <span className="step2-item-title">{item.title}</span>
+                                                <button
+                                                    className="step2-remove-btn"
+                                                    onClick={() => handleRemoveSelection(item.id)}
+                                                >
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Right column */}
+                            <div className="step2-right-col">
+                                {/* Statistics card */}
+                                <div className="step2-stats-card">
+                                    <div className="step2-stats-header">
+                                        {/* Shirt icon */}
+                                        <svg className="step2-stats-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
+                                        </svg>
+                                        <span className="step2-stats-title">{t("onboarding.step2_stats_title")}</span>
+                                    </div>
+                                    <div>
+                                        <span className="step2-stats-number">
+                                            {productScope === "all" ? "—" : (productCount > 0 ? productCount : "0")}
+                                        </span>
+                                        <span className="step2-stats-label">{t("onboarding.step2_stats_label")}</span>
+                                    </div>
+                                    <div className="step2-stats-note">
+                                        {t("onboarding.step2_stats_note")}
+                                    </div>
+
+                                    {/* Includes section */}
+                                    <div className="step2-includes">
+                                        <div className="step2-includes-title">{t("onboarding.step2_includes_title")}</div>
+                                        <div className="step2-include-item">
+                                            {/* Check icon */}
+                                            <svg className="step2-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                <path d="m9 11 3 3L22 4" />
+                                            </svg>
+                                            {t("onboarding.step2_includes_model_images")}
+                                        </div>
+                                        <div className="step2-include-item">
+                                            {/* Check icon */}
+                                            <svg className="step2-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                <path d="m9 11 3 3L22 4" />
+                                            </svg>
+                                            {t("onboarding.step2_includes_apparel")}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Info alert */}
+                                <div className="step2-info-alert">
+                                    {/* Info icon */}
+                                    <svg className="step2-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <path d="M12 16v-4" />
+                                        <path d="M12 8h.01" />
+                                    </svg>
+                                    <span className="step2-info-text">
+                                        {t("onboarding.step2_info_text")}
+                                    </span>
+                                </div>
+
+                                {/* Warning alert (only show when zero products and specific is selected) */}
+                                {productScope === "specific" && selectedProductsOrCollections.length > 0 && productCount === 0 && (
+                                    <div className="step2-warning-alert">
+                                        {/* Warning icon */}
+                                        <svg className="step2-warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                            <line x1="12" y1="9" x2="12" y2="13" />
+                                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                                        </svg>
+                                        <div>
+                                            <div className="step2-warning-title">{t("onboarding.step2_no_products_matched")}</div>
+                                            <div className="step2-warning-text">
+                                                {t("onboarding.step2_try_different")}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Footer navigation */}
+                        <div className="step2-footer">
+                            <button
+                                className="step2-prev-btn"
+                                onClick={handleBack}
+                                disabled={currentStep === 4 || isFinishingOnboarding}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="m15 18-6-6 6-6" />
+                                </svg>
+                                {t("onboarding.Previous")}
+                            </button>
+
+                            <div className="step2-progress">
+                                <div className="step2-dots">
+                                    <div className="step2-dot active"></div>
+                                    <div className="step2-dot active"></div>
+                                    <div className="step2-dot"></div>
+                                    <div className="step2-dot"></div>
+                                    <div className="step2-dot"></div>
+                                </div>
+                                <span className="step2-progress-label">2/5</span>
+                            </div>
+
+                            <button
+                                className="step2-continue-btn"
+                                disabled={!selectedProductType || isFinishingOnboarding}
+                                onClick={handleNext}
+                            >
+                                {isFinishingOnboarding ? (
+                                    <>
+                                        <div className="step2-spinner"></div>
+                                        {t("settings.email_content.loading")}
+                                    </>
+                                ) : (
+                                    <>
+                                        {t("onboarding.Continue")}
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m9 18 6-6-6-6" />
+                                        </svg>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </>
+        );
+    }
+
+    if (currentStep === 3) {
+        return (
+            <>
+                <style>
+                    {`
+                        /* ── Step 3 Premium Polaris Design ── */
+
+                        /* Main container */
+                        .step3-container {
+                            background-color: #F6F6F7;
+                            min-height: 100vh;
+                            padding: 24px;
+                        }
+
+                        /* White rounded container */
+                        .step3-main-card {
+                            background-color: #FFFFFF;
+                            border-radius: 16px;
+                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+                            overflow: hidden;
+                        }
+
+                        /* Two column layout */
+                        .step3-layout {
+                            display: grid;
+                            grid-template-columns: 48fr 52fr;
+                            gap: 32px;
+                            padding: 40px;
+                        }
+
+                        /* Left column */
+                        .step3-left-col {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 8px;
+                        }
+
+                        /* Right column */
+                        .step3-right-col {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 24px;
+                        }
+
+                        /* Heading */
+                        .step3-heading {
+                            font-size: 36px;
+                            font-weight: 700;
+                            color: #12324B;
+                            line-height: 1.2;
+                            letter-spacing: -0.8px;
+                            margin-bottom: 16px;
+                        }
+
+                        /* Description */
+                        .step3-description {
+                            font-size: 15px;
+                            color: #667085;
+                            line-height: 1.5;
+                            margin-bottom: 20px;
+                        }
+
+                        /* Theme detection card - success */
+                        .step3-theme-card {
+                            background-color: #ECFDF5;
+                            border-radius: 12px;
+                            padding: 20px;
+                            display: flex;
+                            align-items: flex-start;
+                            gap: 16px;
+                            border: 1px solid #D7F9D6;
+                        }
+
+                        /* Theme detection card - warning (vintage) */
+                        .step3-theme-card.warning {
+                            background-color: #FFF7E6;
+                            border-color: #FFE7B3;
+                        }
+
+                        .step3-theme-icon {
+                            width: 24px;
+                            height: 24px;
+                            color: #1F8A4D;
+                            flex-shrink: 0;
+                        }
+
+                        .step3-theme-card.warning .step3-theme-icon {
+                            color: #B56A00;
+                        }
+
+                        .step3-theme-content {
+                            flex: 1;
+                        }
+
+                        .step3-theme-title {
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 4px;
+                        }
+
+                        .step3-theme-desc {
+                            font-size: 14px;
+                            color: #667085;
+                            line-height: 1.4;
+                        }
+
+                        /* Section title */
+                        .step3-section-title {
+                            font-size: 18px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 8px;
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                        }
+
+                        /* Recommended badge */
+                        .step3-badge {
+                            display: inline-flex;
+                            align-items: center;
+                            padding: 4px 12px;
+                            background-color: #DDF8EA;
+                            color: #1F8A4D;
+                            border-radius: 16px;
+                            font-size: 12px;
+                            font-weight: 600;
+                        }
+
+                        /* Section description */
+                        .step3-section-desc {
+                            font-size: 14px;
+                            color: #667085;
+                            line-height: 1.5;
+                            margin-bottom: 20px;
+                        }
+
+                        /* Primary button */
+                        .step3-primary-btn {
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            padding: 14px 24px;
+                            background-color: #0F8B8D;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            text-decoration: none;
+                        }
+
+                        .step3-primary-btn:hover:not(:disabled) {
+                            background-color: #0C7778;
+                            transform: translateY(-1px);
+                            box-shadow: 0 4px 12px rgba(15, 139, 141, 0.2);
+                        }
+
+                        .step3-primary-btn:active:not(:disabled) {
+                            transform: translateY(0);
+                        }
+
+                        .step3-primary-btn:disabled {
+                            background-color: #E8E8E8;
+                            color: #A0A0A0;
+                            cursor: not-allowed;
+                        }
+
+                        /* Help text with lock icon */
+                        .step3-help-text {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            margin-top: 12px;
+                        }
+
+                        .step3-lock-icon {
+                            width: 16px;
+                            height: 16px;
+                            color: #667085;
+                        }
+
+                        .step3-help-text span {
+                            font-size: 13px;
+                            color: #667085;
+                        }
+
+                        /* Divider */
+                        .step3-divider {
+                            height: 1px;
+                            background-color: #E8E8E8;
+                            margin: 24px 0;
+                        }
+
+                        /* Manual install section - Vintage Theme */
+                        .step3-manual-section {
+                            padding: 32px 40px 24px;
+                            border-top: 1px solid #E8E8E8;
+                        }
+
+                        .step3-manual-layout {
+                            display: grid;
+                            grid-template-columns: 48fr 52fr;
+                            gap: 32px;
+                            align-items: start;
+                        }
+
+                        .step3-manual-left {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 12px;
+                        }
+
+                        .step3-manual-right {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 16px;
+                        }
+
+                        .step3-manual-title {
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 0;
+                        }
+
+                        .step3-manual-desc {
+                            font-size: 14px;
+                            color: #667085;
+                            line-height: 1.5;
+                            margin: 0;
+                        }
+
+                        /* Code snippet card */
+                        .step3-snippet-card {
+                            background-color: #F8FAFC;
+                            border: 1px solid #DCE3EA;
+                            border-radius: 12px;
+                            padding: 20px;
+                            position: relative;
+                        }
+
+                        .step3-snippet {
+                            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+                            font-size: 13px;
+                            color: #12324B;
+                            line-height: 1.6;
+                            background: none;
+                            border: none;
+                            padding: 0;
+                            margin: 0;
+                            width: 100%;
+                        }
+
+                        .step3-copy-btn {
+                            position: absolute;
+                            top: 16px;
+                            right: 16px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 6px;
+                            padding: 8px 12px;
+                            background-color: white;
+                            color: #667085;
+                            border: 1px solid #DCE3EA;
+                            border-radius: 6px;
+                            font-size: 13px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step3-copy-btn:hover {
+                            background-color: #F6F6F7;
+                            border-color: #0F8B8D;
+                            color: #0F8B8D;
+                        }
+
+                        .step3-copy-btn.copied {
+                            background-color: #ECFDF5;
+                            border-color: #1F8A4D;
+                            color: #1F8A4D;
+                        }
+
+                        /* Recommendation section with learn more link */
+                        .step3-manual-recommendation {
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            gap: 16px;
+                            padding: 0 4px;
+                        }
+
+                        .step3-manual-recommend-text {
+                            font-size: 13px;
+                            color: #667085;
+                            line-height: 1.5;
+                            flex: 1;
+                        }
+
+                        .step3-manual-learn-link {
+                            display: flex;
+                            align-items: center;
+                            gap: 4px;
+                            font-size: 13px;
+                            font-weight: 500;
+                            color: #088395;
+                            text-decoration: none;
+                            white-space: nowrap;
+                            transition: color 0.2s ease;
+                        }
+
+                        .step3-manual-learn-link:hover {
+                            color: #09637E;
+                        }
+
+                        .step3-manual-learn-link svg {
+                            flex-shrink: 0;
+                        }
+
+                        /* Manual section copy button */
+                        .step3-manual-copy-btn {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            padding: 10px 20px;
+                            background-color: white;
+                            color: #088395;
+                            border: 1.5px solid #088395;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            width: fit-content;
+                        }
+
+                        .step3-manual-copy-btn:hover {
+                            background-color: #088395;
+                            color: white;
+                        }
+
+                        .step3-manual-copy-btn.copied {
+                            background-color: #ECFDF5;
+                            border-color: #1F8A4D;
+                            color: #1F8A4D;
+                        }
+
+                        .step3-manual-copy-btn.copied:hover {
+                            background-color: #1F8A4D;
+                            color: white;
+                        }
+
+                        /* Product preview image */
+                        .step3-preview-image {
+                            width: 100%;
+                            max-width: 600px;
+                            height: auto;
+                            display: block;
+                            border-radius: 12px;
+                            object-fit: contain;
+                        }
+
+                        .step3-preview-content {
+                            padding: 20px;
+                        }
+
+                        .step3-preview-title {
+                            font-size: 18px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 8px;
+                        }
+
+                        .step3-preview-price {
+                            font-size: 20px;
+                            font-weight: 700;
+                            color: #12324B;
+                            margin-bottom: 16px;
+                        }
+
+                        /* Color selector mock */
+                        .step3-color-selector {
+                            display: flex;
+                            gap: 8px;
+                            margin-bottom: 12px;
+                        }
+
+                        .step3-color-dot {
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 50%;
+                            border: 2px solid #E8E8E8;
+                        }
+
+                        .step3-color-dot.active {
+                            border-color: #0F8B8D;
+                            box-shadow: 0 0 0 2px white, 0 0 0 4px #0F8B8D;
+                        }
+
+                        /* Size selector mock */
+                        .step3-size-selector {
+                            display: flex;
+                            gap: 8px;
+                            margin-bottom: 16px;
+                        }
+
+                        .step3-size-btn {
+                            width: 36px;
+                            height: 36px;
+                            border: 1px solid #DCE3EA;
+                            border-radius: 6px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 13px;
+                            font-weight: 500;
+                            color: #12324B;
+                            background-color: white;
+                        }
+
+                        .step3-size-btn.active {
+                            background-color: #12324B;
+                            color: white;
+                            border-color: #12324B;
+                        }
+
+                        /* Add to cart button mock */
+                        .step3-atc-btn {
+                            width: 100%;
+                            padding: 14px;
+                            background-color: #12324B;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 15px;
+                            font-weight: 600;
+                            margin-bottom: 12px;
+                        }
+
+                        /* Try-on button mock */
+                        .step3-tryon-btn {
+                            width: 100%;
+                            padding: 14px;
+                            background: linear-gradient(135deg, #0F8B8D 0%, #0C7778 100%);
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 15px;
+                            font-weight: 600;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            position: relative;
+                        }
+
+                        /* Annotation */
+                        .step3-annotation {
+                            position: absolute;
+                            top: -50px;
+                            right: -20px;
+                            background-color: white;
+                            padding: 8px 12px;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+                            font-size: 12px;
+                            font-weight: 600;
+                            color: #0F8B8D;
+                            white-space: nowrap;
+                            z-index: 10;
+                        }
+
+                        .step3-annotation::before {
+                            content: '';
+                            position: absolute;
+                            bottom: -8px;
+                            left: 20px;
+                            width: 0;
+                            height: 0;
+                            border-left: 8px solid transparent;
+                            border-right: 8px solid transparent;
+                            border-top: 8px solid white;
+                        }
+
+                        .step3-arrow {
+                            position: absolute;
+                            top: -35px;
+                            right: 10px;
+                            width: 40px;
+                            height: 40px;
+                        }
+
+                        /* Embed status card */
+                        .step3-embed-card {
+                            background-color: #ECFDF5;
+                            border-radius: 12px;
+                            padding: 16px 20px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            border: 1px solid #D7F9D6;
+                        }
+
+                        .step3-embed-card.pending {
+                            background-color: #FFF7E6;
+                            border-color: #FFE7B3;
+                        }
+
+                        .step3-embed-left {
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                        }
+
+                        .step3-embed-icon {
+                            width: 20px;
+                            height: 20px;
+                            color: #1F8A4D;
+                        }
+
+                        .step3-embed-card.pending .step3-embed-icon {
+                            color: #B56A00;
+                        }
+
+                        .step3-embed-title {
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #12324B;
+                        }
+
+                        .step3-embed-desc {
+                            font-size: 13px;
+                            color: #667085;
+                        }
+
+                        .step3-refresh-btn {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            padding: 8px;
+                            background-color: white;
+                            border: 1px solid #DCE3EA;
+                            border-radius: 6px;
+                            color: #667085;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step3-refresh-btn:hover {
+                            border-color: #0F8B8D;
+                            color: #0F8B8D;
+                        }
+
+                        .step3-refresh-btn svg {
+                            width: 18px;
+                            height: 18px;
+                        }
+
+                        .step3-refresh-btn.spinning svg {
+                            animation: spin 1s linear infinite;
+                        }
+
+                        /* Footer navigation */
+                        .step3-footer {
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            padding: 24px 40px;
+                            border-top: 1px solid #E8E8E8;
+                            background-color: #FFFFFF;
+                            flex-wrap: wrap;
+                            gap: 16px;
+                        }
+
+                        .step3-prev-btn {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                            padding: 12px 20px;
+                            background-color: white;
+                            color: #12324B;
+                            border: 1px solid #DCE3EA;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step3-prev-btn:hover:not(:disabled) {
+                            background-color: #F6F6F7;
+                            border-color: #0F8B8D;
+                        }
+
+                        .step3-prev-btn:disabled {
+                            opacity: 0.5;
+                            cursor: not-allowed;
+                        }
+
+                        .step3-progress {
+                            display: flex;
+                            align-items: center;
+                            gap: 16px;
+                        }
+
+                        .step3-dots {
+                            display: flex;
+                            gap: 6px;
+                        }
+
+                        .step3-dot {
+                            width: 32px;
+                            height: 5px;
+                            border-radius: 3px;
+                            background-color: #E8E8E8;
+                        }
+
+                        .step3-dot.active {
+                            background-color: #0F8B8D;
+                        }
+
+                        .step3-progress-label {
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: #0F8B8D;
+                        }
+
+                        .step3-continue-btn {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                            padding: 12px 28px;
+                            background-color: #0F8B8D;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step3-continue-btn:hover:not(:disabled) {
+                            background-color: #0C7778;
+                            transform: translateY(-1px);
+                            box-shadow: 0 4px 12px rgba(15, 139, 141, 0.2);
+                        }
+
+                        .step3-continue-btn:disabled {
+                            background-color: #E8E8E8;
+                            color: #A0A0A0;
+                            cursor: not-allowed;
+                        }
+
+                        /* Breadcrumb */
+                        .step3-breadcrumb {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            padding: 24px 40px 0;
+                            flex-wrap: wrap;
+                        }
+
+                        .step3-breadcrumb-item {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            padding: 8px 16px;
+                            background-color: #F6F6F7;
+                            border-radius: 20px;
+                        }
+
+                        .step3-breadcrumb-circle {
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 12px;
+                            font-weight: 600;
+                        }
+
+                        .step3-breadcrumb-circle.done {
+                            background-color: #0F8B8D;
+                            color: white;
+                        }
+
+                        .step3-breadcrumb-circle.active {
+                            background-color: white;
+                            color: #0F8B8D;
+                            border: 2px solid #0F8B8D;
+                        }
+
+                        .step3-breadcrumb-circle.inactive {
+                            background-color: white;
+                            color: #A0A0A0;
+                            border: 2px solid #E8E8E8;
+                        }
+
+                        .step3-breadcrumb-label {
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #667085;
+                            white-space: nowrap;
+                        }
+
+                        .step3-breadcrumb-item.active .step3-breadcrumb-label {
+                            color: #0F8B8D;
+                            font-weight: 600;
+                        }
+
+                        .step3-breadcrumb-badge {
+                            background-color: #0F8B8D;
+                            color: white;
+                            padding: 2px 8px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            font-weight: 600;
+                        }
+
+                        /* Spinner animation */
+                        @keyframes spin {
+                            0% { transform: rotate(0deg); }
+                            100% { transform: rotate(360deg); }
+                        }
+
+                        .step3-spinner {
+                            width: 16px;
+                            height: 16px;
+                            border: 2px solid rgba(255, 255, 255, 0.3);
+                            border-top-color: white;
+                            border-radius: 50%;
+                            animation: spin 0.8s linear infinite;
+                        }
+
+                        /* Mobile responsive */
+                        @media (max-width: 1024px) {
+                            .step3-layout {
+                                grid-template-columns: 1fr;
+                                gap: 32px;
+                            }
+
+                            .step3-right-col {
+                                order: 2;
+                            }
+
+                            .step3-heading {
+                                font-size: 32px;
+                            }
+                        }
+
+                        @media (max-width: 768px) {
+                            .step3-container {
+                                padding: 16px;
+                            }
+
+                            .step3-layout {
+                                padding: 24px;
+                                gap: 24px;
+                            }
+
+                            .step3-heading {
+                                font-size: 28px;
+                            }
+
+                            .step3-description {
+                                font-size: 14px;
+                            }
+
+                            .step3-footer {
+                                padding: 20px 24px;
+                                flex-direction: column;
+                                align-items: stretch;
+                            }
+
+                            .step3-prev-btn,
+                            .step3-continue-btn {
+                                justify-content: center;
+                                width: 100%;
+                            }
+
+                            .step3-progress {
+                                justify-content: center;
+                            }
+
+                            .step3-breadcrumb {
+                                padding: 16px 24px 0;
+                            }
+
+                            .step3-preview-image {
+                                max-width: 500px;
+                            }
+
+                            /* Manual section responsive */
+                            .step3-manual-section {
+                                padding: 24px;
+                            }
+
+                            .step3-manual-layout {
+                                grid-template-columns: 1fr;
+                                gap: 20px;
+                            }
+
+                            .step3-manual-recommendation {
+                                flex-direction: column;
+                                align-items: flex-start;
+                                gap: 8px;
+                            }
+                        }
+
+                        @media (max-width: 480px) {
+                            .step3-heading {
+                                font-size: 24px;
+                            }
+
+                            .step3-theme-card {
+                                flex-direction: column;
+                                gap: 12px;
+                            }
+
+                            .step3-annotation {
+                                display: none;
+                            }
+
+                            .step3-arrow {
+                                display: none;
+                            }
+                        }
+                    `}
+                </style>
+
+                <div className="step3-container">
+                    <div className="step3-main-card">
+
+                        {/* Breadcrumb */}
+                        <div className="step3-breadcrumb">
+                            <div className="step3-breadcrumb-item">
+                                <div className="step3-breadcrumb-circle done">✓</div>
+                                <span className="step3-breadcrumb-label">{t("onboarding.Welcome")}</span>
+                            </div>
+                            <div className="step3-breadcrumb-item">
+                                <div className="step3-breadcrumb-circle done">✓</div>
+                                <span className="step3-breadcrumb-label">{t("onboarding.Product_Type")}</span>
+                            </div>
+                            <div className="step3-breadcrumb-item active">
+                                <div className="step3-breadcrumb-circle active">3</div>
+                                <span className="step3-breadcrumb-label">
+                                    <span className="step3-breadcrumb-badge">{t("onboarding.Theme_App_Embed")}</span>
+                                </span>
+                            </div>
+                            <div className="step3-breadcrumb-item">
+                                <div className="step3-breadcrumb-circle inactive">4</div>
+                                <span className="step3-breadcrumb-label">{t("onboarding.Live_Test")}</span>
+                            </div>
+                            <div className="step3-breadcrumb-item">
+                                <div className="step3-breadcrumb-circle inactive">5</div>
+                                <span className="step3-breadcrumb-label">{t("onboarding.complete")}</span>
+                            </div>
+                        </div>
+
+                        {/* Main layout */}
+                        <div className="step3-layout">
+
+                            {/* Left column */}
+                            <div className="step3-left-col">
+                                <h1 className="step3-heading">
+                                    {t("onboarding.step3_heading")}
+                                </h1>
+                                <p className="step3-description">
+                                    {t("onboarding.step3_description")}
+                                </p>
+
+                                {/* Theme Detection Card */}
+                                {themeType === "os2" ? (
+                                    <div className="step3-theme-card">
+                                        <svg className="step3-theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                            <path d="m9 11 3 3L22 4" />
+                                        </svg>
+                                        <div className="step3-theme-content">
+                                            <div className="step3-theme-title">{t("onboarding.os2_theme_detected")}</div>
+                                            <div className="step3-theme-desc">{t("onboarding.os2_theme_desc")}</div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="step3-theme-card warning">
+                                        <svg className="step3-theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                            <line x1="12" y1="9" x2="12" y2="13" />
+                                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                                        </svg>
+                                        <div className="step3-theme-content">
+                                            <div className="step3-theme-title">{t("onboarding.vintage_theme_detected")}</div>
+                                            <div className="step3-theme-desc">{t("onboarding.vintage_theme_desc")}</div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Automatic Install Section */}
+                                {themeType === "os2" && (
+                                    <>
+                                        <div className="step3-section-title">
+                                            {t("onboarding.add_to_theme_automatic_title")}
+                                            <span className="step3-badge">{t("onboarding.recommended")}</span>
+                                        </div>
+                                        <p className="step3-section-desc">
+                                            {t("onboarding.add_to_theme_automatic_desc")}
+                                        </p>
+                                        <button
+                                            className="step3-primary-btn"
+                                            onClick={handleOpenThemeEditor}
+                                            disabled={isThemeEmbedActive}
+                                        >
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                                <polyline points="15 3 21 3 21 9" />
+                                                <line x1="10" y1="14" x2="21" y2="3" />
+                                            </svg>
+                                            {t("onboarding.add_to_theme_automatically")}
+                                        </button>
+                                        <div className="step3-help-text">
+                                            <svg className="step3-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                                                <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                                            </svg>
+                                            <span>{t("onboarding.opens_theme_editor_help")}</span>
+                                        </div>
+                                    </>
+                                )}
+
+                            </div>
+
+                            {/* Right column */}
+                            <div className="step3-right-col">
+                                {/* Product Preview */}
+                                <img
+                                    src="/images/step3_imgPreview.jpg"
+                                    alt="Product preview"
+                                    className="step3-preview-image"
+                                />
+
+                                {/* Embed Status Card */}
+                                <div className={`step3-embed-card ${isThemeEmbedActive ? '' : 'pending'}`}>
+                                    <div className="step3-embed-left">
+                                        {isThemeEmbedActive ? (
+                                            <svg className="step3-embed-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                <path d="m9 11 3 3L22 4" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="step3-embed-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <line x1="12" y1="8" x2="12" y2="12" />
+                                                <line x1="12" y1="16" x2="12.01" y2="16" />
+                                            </svg>
+                                        )}
+                                        <div>
+                                            <div className="step3-embed-title">
+                                                {t("onboarding.embed_status_prefix")}: {isThemeEmbedActive ? t("onboarding.embed_status_confirmed") : t("onboarding.embed_status_not_confirmed")}
+                                            </div>
+                                            <div className="step3-embed-desc">
+                                                {isThemeEmbedActive
+                                                    ? t("onboarding.embed_status_active")
+                                                    : t("onboarding.embed_status_checking")}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        className={`step3-refresh-btn ${isCheckingEmbedStatus ? 'spinning' : ''}`}
+                                        onClick={checkThemeEmbedStatus}
+                                        disabled={isCheckingEmbedStatus}
+                                        title={t("onboarding.refresh_status")}
+                                    >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                            <path d="M3 3v5h5" />
+                                            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                                            <path d="M16 16h5v5" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Manual Install Section - Vintage Theme */}
+                        <div className="step3-manual-section">
+                            <div className="step3-manual-layout">
+                                {/* Left side - Heading and description */}
+                                <div className="step3-manual-left">
+                                    <div className="step3-manual-title">
+                                        {themeType === "vintage" ? t("onboarding.manual_install_required") : t("onboarding.using_vintage_theme")}
+                                    </div>
+                                    <p className="step3-manual-desc">
+                                        {t("onboarding.manual_install_desc")}
+                                    </p>
+                                    {/* Copy Snippet Button */}
+                                    <button
+                                        className={`step3-manual-copy-btn ${copySuccess ? 'copied' : ''}`}
+                                        onClick={handleCopySnippet}
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                        </svg>
+                                        {copySuccess ? t("onboarding.copied") : t("onboarding.copy_snippet")}
+                                    </button>
+                                </div>
+
+                                {/* Right side - Code snippet card */}
+                                <div className="step3-manual-right">
+                                    {/* Code Snippet Card */}
+                                    <div className="step3-snippet-card">
+                                        <code className="step3-snippet">
+                                            {"{% render 'mirrly-try-on' %}"}
+                                        </code>
+                                        <button
+                                            className={`step3-copy-btn ${copySuccess ? 'copied' : ''}`}
+                                            onClick={handleCopySnippet}
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                                            </svg>
+                                            {copySuccess ? t("onboarding.copied") : t("onboarding.copy")}
+                                        </button>
+                                    </div>
+
+                                    {/* Recommendation with learn more link */}
+                                    <div className="step3-manual-recommendation">
+                                        <span className="step3-manual-recommend-text">
+                                            {t("onboarding.manual_install_recommendation")}
+                                        </span>
+                                        <a
+                                            href="https://help.shopify.com/en/manual/online-store/themes/os2"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="step3-manual-learn-link"
+                                        >
+                                            {t("onboarding.learn_more")}
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                                <polyline points="15 3 21 3 21 9" />
+                                                <line x1="10" y1="14" x2="21" y2="3" />
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer navigation */}
+                        <div className="step3-footer">
+                            <button
+                                className="step3-prev-btn"
+                                onClick={handleBack}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="m15 18-6-6 6-6" />
+                                </svg>
+                                {t("onboarding.Previous")}
+                            </button>
+
+                            <div className="step3-progress">
+                                <div className="step3-dots">
+                                    <div className="step3-dot active"></div>
+                                    <div className="step3-dot active"></div>
+                                    <div className="step3-dot active"></div>
+                                    <div className="step3-dot"></div>
+                                    <div className="step3-dot"></div>
+                                </div>
+                                <span className="step3-progress-label">3/5</span>
+                            </div>
+
+                            <button
+                                className="step3-continue-btn"
+                                onClick={handleNext}
+                            >
+                                {t("onboarding.Continue")}
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="m9 18 6-6-6-6" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </>
+        );
+    }
+
+    if (currentStep === 4) {
+        // Step 4: Live Test
         return (
             <>
                 <style>
@@ -3131,126 +5510,6 @@ export default function NewOnboarding() {
                             white-space: nowrap;
                         }
 
-                        /* ── Two-column layout ── */
-                        .ob2-layout {
-                            display: flex;
-                            flex-wrap: wrap;
-                            gap: 0;
-                        }
-
-                        .ob2-col-left {
-                            flex: 1 1 280px;
-                            min-width: 0;
-                        }
-
-                        .ob2-col-right {
-                            flex: 1 1 280px;
-                            min-width: 0;
-                        }
-
-                        /* ── Heading ── */
-                        .ob2-heading {
-                            color: #088395;
-                            font-size: clamp(24px, 4vw, 46px) !important;
-                            line-height: 1.2;
-                            word-break: break-word;
-                        }
-
-                        /* ── Product grid ── */
-                        .ob2-grid {
-                            display: grid;
-                            grid-template-columns: repeat(2, 1fr);
-                            gap: 8px;
-                            max-height: 400px;
-                            overflow-y: auto;
-                            padding-right: 8px;
-                        }
-
-                        /* ── Product card ── */
-                        .ob2-card {
-                            border-radius: 12px;
-                            padding: 16px 12px;
-                            text-align: center;
-                            cursor: pointer;
-                            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            gap: 8px;
-                            min-height: 110px;
-                            position: relative;
-                            overflow: hidden;
-                            margin-top: 10px;
-                            background-color: white;
-                        }
-
-                        .ob2-card--selected {
-                            border: 2px solid #088395;
-                            box-shadow: 0 6px 18px rgba(8, 131, 149, 0.15);
-                        }
-
-                        .ob2-card--unselected {
-                            border: 1px solid #e8e8e8;
-                            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-                        }
-
-                        .ob2-card--unselected:hover {
-                            border-color: #088395;
-                            transform: translateY(-2px);
-                            box-shadow: 0 8px 20px rgba(8, 131, 149, 0.12);
-                        }
-
-                        .ob2-card-check {
-                            position: absolute;
-                            top: 8px;
-                            right: 8px;
-                            width: 20px;
-                            height: 20px;
-                            border-radius: 50%;
-                            background-color: #088395;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            animation: scaleIn 0.3s ease-out;
-                        }
-
-                        .ob2-icon-wrap {
-                            width: 48px;
-                            height: 48px;
-                            border-radius: 12px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            transition: all 0.3s ease;
-                            flex-shrink: 0;
-                        }
-
-                        .ob2-icon-wrap--selected {
-                            background: linear-gradient(135deg, #088395 0%, #06667a 100%);
-                        }
-
-                        .ob2-icon-wrap--unselected {
-                            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
-                        }
-
-                        .ob2-card-title {
-                            font-size: 14px;
-                            font-weight: 700;
-                            line-height: 1.3;
-                            letter-spacing: -0.2px;
-                        }
-
-                        .ob2-card-title--selected { color: #088395; }
-                        .ob2-card-title--unselected { color: #1a1a1a; }
-
-                        .ob2-card-desc {
-                            font-size: 11px;
-                            font-weight: 400;
-                            line-height: 1.4;
-                            color: #666666;
-                            max-width: 150px;
-                        }
-
                         /* ── Footer bar ── */
                         .ob2-footer {
                             display: flex;
@@ -3309,12 +5568,6 @@ export default function NewOnboarding() {
                             cursor: not-allowed;
                         }
 
-                        /* ── Spinner animation ── */
-                        @keyframes spin {
-                            0% { transform: rotate(0deg); }
-                            100% { transform: rotate(360deg); }
-                        }
-
                         /* ── Progress dots ── */
                         .ob2-progress {
                             display: flex;
@@ -3346,30 +5599,508 @@ export default function NewOnboarding() {
                             white-space: nowrap;
                         }
 
-                        /* ── Tablet (≤ 768px) ── */
-                        @media (max-width: 768px) {
-                            .ob2-dot {
-                                width: 24px !important;
-                                height: 4px !important;
+                        /* ── Step 4 Layout ── */
+                        .step4-layout {
+                            display: grid;
+                            grid-template-columns: 46fr 54fr;
+                            gap: 36px;
+                            padding: 24px;
+                            max-width: 1600px;
+                            margin: 0 auto;
+                        }
+
+                        .step4-left-col {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 24px;
+                        }
+
+                        .step4-right-col {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 20px;
+                        }
+
+                        /* ── Main Heading ── */
+                        .step4-heading {
+                            font-size: 32px;
+                            font-weight: 700;
+                            color: #12324B;
+                            letter-spacing: -0.8px;
+                            line-height: 1.2;
+                            margin: 0;
+                        }
+
+                        .step4-sparkle-icon {
+                            width: 18px;
+                            height: 18px;
+                            color: #0F8B8D;
+                            flex-shrink: 0;
+                            margin-left: 7px;
+                            
+                        }
+
+                        /* ── Description ── */
+                        .step4-description {
+                            font-size: 14px;
+                            color: #667085;
+                            line-height: 1.5;
+                            margin: 0;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        }
+
+                        /* ── Info Card ── */
+                        .step4-info-card {
+                            background-color: #ECF8FF;
+                            border-radius: 12px;
+                            padding: 16px;
+                            display: flex;
+                            align-items: flex-start;
+                            gap: 12px;
+                            border: 1px solid #B3D9EA;
+                        }
+
+                        .step4-info-icon {
+                            width: 20px;
+                            height: 20px;
+                            color: #0F8B8D;
+                            flex-shrink: 0;
+                        }
+
+                        .step4-info-content {
+                            flex: 1;
+                        }
+
+                        .step4-info-title {
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 3px;
+                        }
+
+                        .step4-info-desc {
+                            font-size: 13px;
+                            color: #667085;
+                            line-height: 1.4;
+                        }
+
+                        /* ── Product Selector ── */
+                        .step4-product-section {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 20px;
+                        }
+
+                        .step4-section-title {
+                            font-size: 15px;
+                            font-weight: 600;
+                            color: #12324B;
+                        }
+
+                        .step4-product-selector {
+                            position: relative;
+                        }
+
+                        .step4-product-dropdown {
+                            width: 100%;
+                            padding: 12px 14px;
+                            padding-right: 40px;
+                            border: 1px solid #DCE3EA;
+                            border-radius: 10px;
+                            font-size: 14px;
+                            color: #12324B;
+                            background-color: white;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            appearance: none;
+                            -webkit-appearance: none;
+                            -moz-appearance: none;
+                        }
+
+                        .step4-product-dropdown:hover {
+                            border-color: #0F8B8D;
+                        }
+
+                        .step4-product-dropdown:focus {
+                            outline: none;
+                            border-color: #0F8B8D;
+                            box-shadow: 0 0 0 3px rgba(15, 139, 141, 0.1);
+                        }
+
+                        .step4-dropdown-arrow {
+                            position: absolute;
+                            right: 14px;
+                            top: 50%;
+                            transform: translateY(-50%);
+                            pointer-events: none;
+                            color: #667085;
+                            width: 18px;
+                            height: 18px;
+                        }
+
+                        /* ── Empty State ── */
+                        .step4-empty-state {
+                            background-color: #F8F9FA;
+                            border-radius: 10px;
+                            padding: 10px;
+                            text-align: center;
+                        }
+
+                        .step4-empty-icon {
+                            width: 20px;
+                            height: 20px;
+                            color: #667085;
+                            margin-bottom: 10px;
+                        }
+
+                        .step4-empty-title {
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 4px;
+                        }
+
+                        .step4-empty-desc {
+                            font-size: 12px;
+                            color: #667085;
+                            line-height: 1.4;
+                        }
+
+                        /* ── Try It Now Button ── */
+                        .step4-try-button {
+                            width: 100%;
+                            padding: 16px 22px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            border-radius: 10px;
+                            border: none;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            background-color: #0F8B8D;
+                            color: white;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 10px;
+                        }
+
+                        .step4-try-button:hover:not(:disabled) {
+                            background-color: #0C7778;
+                            transform: translateY(-1px);
+                            box-shadow: 0 4px 12px rgba(15, 139, 141, 0.2);
+                        }
+
+                        .step4-try-button:disabled {
+                            background-color: #DCE3EA;
+                            color: #667085;
+                            cursor: not-allowed;
+                            transform: none;
+                            box-shadow: none;
+                        }
+
+                        .step4-try-button-icon {
+                            width: 20px;
+                            height: 20px;
+                        }
+
+                        /* ── Tips Card ── */
+                        .step4-tips-card {
+                            background-color: #F0F7FF;
+                            border-radius: 12px;
+                            padding: 16px;
+                            border: 1px solid #DCE3EA;
+                        }
+
+                        .step4-tips-header {
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            margin-bottom: 12px;
+                        }
+
+                        .step4-tips-icon {
+                            width: 18px;
+                            height: 18px;
+                            color: #0F8B8D;
+                        }
+
+                        .step4-tips-icon-wrapper {
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 50%;
+                            background-color: #E0F2F1;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        }
+
+                        .step4-tips-title {
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #12324B;
+                        }
+
+                        .step4-tips-list {
+                            list-style: none;
+                            padding: 0;
+                            margin: 0;
+                        }
+
+                        .step4-tips-item {
+                            display: flex;
+                            align-items: flex-start;
+                            gap: 8px;
+                            font-size: 13px;
+                            color: #667085;
+                            line-height: 1.5;
+                            margin-bottom: 6px;
+                        }
+
+                        .step4-tips-item:last-child {
+                            margin-bottom: 0;
+                        }
+
+                        .step4-check-icon {
+                            width: 14px;
+                            height: 14px;
+                            color: #1F8A4D;
+                            flex-shrink: 0;
+                            margin-top: 2px;
+                        }
+
+                        /* ── Preview Card ── */
+                        .step4-preview-card {
+                            background-color: white;
+                            border: 1px solid #DCE3EA;
+                            border-radius: 16px;
+                            overflow: hidden;
+                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                        }
+
+                        .step4-preview-header {
+                            background-color: #F8F9FA;
+                            padding: 16px 20px;
+                            border-bottom: 1px solid #DCE3EA;
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                        }
+
+                        .step4-preview-title {
+                            font-size: 15px;
+                            font-weight: 600;
+                            color: #12324B;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        }
+
+                        .step4-status-indicator {
+                            display: flex;
+                            align-items: center;
+                            gap: 6px;
+                            font-size: 13px;
+                            color: #1F8A4D;
+                        }
+
+                        .step4-status-dot {
+                            width: 8px;
+                            height: 8px;
+                            background-color: #1F8A4D;
+                            border-radius: 50%;
+                            animation: pulse 2s ease-in-out infinite;
+                        }
+
+                        @keyframes pulse {
+                            0%, 100% { opacity: 1; }
+                            50% { opacity: 0.5; }
+                        }
+
+                        .step4-preview-image {
+                            width: 100%;
+                            height: 320px;
+                            object-fit: cover;
+                            display: block;
+                            position: relative;
+                        }
+
+                        .step4-preview-placeholder {
+                            width: 100%;
+                            height: 320px;
+                            background: linear-gradient(135deg, #F8F9FA 0%, #EAF6FD 100%);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
+
+                        .step4-preview-placeholder-inner {
+                            text-align: center;
+                            color: #667085;
+                        }
+
+                        /* ── Floating Actions ── */
+                        .step4-floating-actions {
+                            position: absolute;
+                            top: 16px;
+                            right: 16px;
+                            display: flex;
+                            flex-direction: column;
+                            gap: 8px;
+                        }
+
+                        .step4-floating-btn {
+                            width: 40px;
+                            height: 40px;
+                            border-radius: 50%;
+                            background-color: white;
+                            border: 1px solid #DCE3EA;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                        }
+
+                        .step4-floating-btn:hover {
+                            border-color: #0F8B8D;
+                            transform: translateY(-2px);
+                        }
+
+                        .step4-floating-btn svg {
+                            width: 18px;
+                            height: 18px;
+                            color: #667085;
+                        }
+
+                        /* ── Live Status Badge ── */
+                        .step4-live-status {
+                            position: absolute;
+                            bottom: 16px;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            background-color: rgba(18, 50, 75, 0.85);
+                            backdrop-filter: blur(8px);
+                            padding: 10px 16px;
+                            border-radius: 24px;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            color: white;
+                            font-size: 14px;
+                            font-weight: 500;
+                        }
+
+                        .step4-live-status-dot {
+                            width: 8px;
+                            height: 8px;
+                            background-color: #4CAF50;
+                            border-radius: 50%;
+                            animation: pulse 1.5s ease-in-out infinite;
+                        }
+
+                        /* ── Feedback Section ── */
+                        .step4-feedback-section {
+                            padding: 20px;
+                            border-top: 1px solid #DCE3EA;
+                            background-color: #F8F9FA;
+                        }
+
+                        .step4-feedback-title {
+                            font-size: 15px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 12px;
+                        }
+
+                        .step4-feedback-buttons {
+                            display: flex;
+                            gap: 12px;
+                        }
+
+                        .step4-feedback-btn {
+                            flex: 1;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            padding: 12px 16px;
+                            border-radius: 10px;
+                            border: 1.5px solid #DCE3EA;
+                            background-color: white;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #667085;
+                        }
+
+                        .step4-feedback-btn:hover {
+                            border-color: #0F8B8D;
+                            background-color: #F0F7FF;
+                        }
+
+                        .step4-feedback-btn.positive.selected {
+                            background-color: #ECFDF5;
+                            border-color: #1F8A4D;
+                            color: #1F8A4D;
+                        }
+
+                        .step4-feedback-btn.negative.selected {
+                            background-color: #FFF7E6;
+                            border-color: #B56A00;
+                            color: #B56A00;
+                        }
+
+                        .step4-feedback-btn svg {
+                            width: 18px;
+                            height: 18px;
+                        }
+
+                        /* ── Camera Modal ── */
+                        .step4-camera-iframe {
+                            width: 100%;
+                            height: 500px;
+                            border: none;
+                            border-radius: 12px;
+                            background-color: #f5f5f5;
+                        }
+
+                        /* ── Responsive Design ── */
+                        @media (max-width: 1024px) {
+                            .step4-layout {
+                                grid-template-columns: 1fr;
+                                gap: 32px;
+                            }
+
+                            .step4-right-col {
+                                order: 2;
                             }
                         }
 
-                        /* ── Mobile (≤ 480px) ── */
+                        @media (max-width: 768px) {
+                            .step4-layout {
+                                padding: 24px;
+                                gap: 24px;
+                            }
+
+                            .step4-heading {
+                                font-size: 32px;
+                            }
+
+                            .step4-preview-image {
+                                height: 280px;
+                            }
+
+                            .step4-preview-placeholder {
+                                height: 280px;
+                            }
+                        }
+
                         @media (max-width: 480px) {
-                            .ob2-layout {
-                                flex-direction: column;
-                            }
-
-                            .ob2-col-left,
-                            .ob2-col-right {
-                                flex: 1 1 100%;
-                            }
-
-                            .ob2-grid {
-                                grid-template-columns: repeat(2, 1fr);
-                                max-height: none;
-                            }
-
                             .ob2-footer {
                                 flex-direction: column;
                                 align-items: stretch;
@@ -3388,36 +6119,37 @@ export default function NewOnboarding() {
                                 width: 20px !important;
                                 height: 3px !important;
                             }
-                        }
 
-                        /* ── Very small screens (≤ 360px) ── */
-                        @media (max-width: 360px) {
-                            .ob2-grid {
-                                grid-template-columns: 1fr;
+                            .step4-layout {
+                                padding: 16px;
                             }
 
-                            .ob2-steps {
-                                gap: 6px;
+                            .step4-heading {
+                                font-size: 28px;
                             }
 
-                            .ob2-step-pill {
-                                padding: 4px 8px;
-                            }
-
-                            .ob2-step-label,
-                            .ob2-step-badge {
-                                font-size: 11px;
+                            .step4-feedback-buttons {
+                                flex-direction: column;
                             }
                         }
 
-                        /* ── Extra small screens (≤ 495px) - Add side padding ── */
                         /* ── Wrapper padding for responsive spacing ── */
-                        .onboarding-step-2-wrapper {
+                        .onboarding-step-4-wrapper {
                             padding: 0;
+                            max-width: 100%;
+                        }
+
+                        /* Override Polaris Page and Card width constraints for Step 4 */
+                        .onboarding-step-4-wrapper > div {
+                            max-width: 1600px !important;
+                        }
+
+                        .onboarding-step-4-wrapper .Polari-Card {
+                            max-width: 100% !important;
                         }
 
                         @media (max-width: 495px) {
-                            .onboarding-step-2-wrapper {
+                            .onboarding-step-4-wrapper {
                                 padding: 0;
                             }
 
@@ -3425,19 +6157,12 @@ export default function NewOnboarding() {
                                 padding: 0 8px;
                             }
                         }
-
-                        @keyframes scaleIn {
-                            from { transform: scale(0); opacity: 0; }
-                            to   { transform: scale(1); opacity: 1; }
-                        }
                     `}
                 </style>
 
-                <div className="onboarding-step-2-wrapper">
-                <Page>
-                    <Card>
-                        <BlockStack gap="500">
-
+                <div className="onboarding-step-4-wrapper">
+                    <Page>
+                        <Card>
                             {/* ── Step breadcrumb ── */}
                             <Box paddingInline="600" paddingBlockEnd="400">
                                 <div className="ob2-steps">
@@ -3448,123 +6173,292 @@ export default function NewOnboarding() {
                                         <span className="ob2-step-label">{t("onboarding.Welcome")}</span>
                                     </div>
 
-                                    {/* Step 2 – active */}
+                                    {/* Step 2 – done */}
                                     <div className="ob2-step-pill">
-                                        <div className="ob2-step-circle ob2-step-circle--active">2</div>
+                                        <div className="ob2-step-circle ob2-step-circle--done">✓</div>
+                                        <span className="ob2-step-label">{t("onboarding.Product_Type")}</span>
+                                    </div>
+
+                                    {/* Step 3 – done */}
+                                    <div className="ob2-step-pill">
+                                        <div className="ob2-step-circle ob2-step-circle--done">✓</div>
+                                        <span className="ob2-step-label">{t("onboarding.Theme_App_Embed")}</span>
+                                    </div>
+
+                                    {/* Step 4 – active */}
+                                    <div className="ob2-step-pill">
+                                        <div className="ob2-step-circle ob2-step-circle--active">4</div>
                                         <span className="ob2-step-label">
                                             <button className="ob2-step-badge">
-                                                {t("onboarding.Product_Type")}
+                                                {t("onboarding.Live_Test")}
                                             </button>
                                         </span>
                                     </div>
 
-                                    {/* Step 3 */}
+                                    {/* Step 5 */}
                                     <div className="ob2-step-pill">
-                                        <div className="ob2-step-circle ob2-step-circle--inactive">3</div>
-                                        <span className="ob2-step-label">{t("onboarding.Choose_Product")}</span>
-                                    </div>
-
-                                    {/* Step 4 */}
-                                    <div className="ob2-step-pill">
-                                        <div className="ob2-step-circle ob2-step-circle--inactive">4</div>
+                                        <div className="ob2-step-circle ob2-step-circle--inactive">5</div>
                                         <span className="ob2-step-label">{t("onboarding.congratulations")}</span>
                                     </div>
 
                                 </div>
                             </Box>
 
-                            {/* ── Two-column body ── */}
-                            <div className="ob2-layout">
+                            {/* ── Main Layout ── */}
+                            <div className="step4-layout">
 
-                                {/* Left: heading */}
-                                <div className="ob2-col-left">
-                                    <Box padding="600" paddingBlockEnd="500">
-                                        <Text as="h1" variant="heading2xl" fontWeight="bold">
-                                            <span className="ob2-heading">
-                                                {t("onboarding.What_kind_of_products_will_you_be_selling")}
-                                            </span>
-                                        </Text>
-                                    </Box>
+                                {/* ── Left Column ── */}
+                                <div className="step4-left-col">
+                                    {/* Main Heading */}
+                                    <h1 className="step4-heading">
+                                        {t("onboarding.live_test_title")}
+                                        <svg className="step4-sparkle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+                                        </svg>
+                                    </h1>
+
+                                    {/* Description with Sparkle */}
+                                    <p className="step4-description">
+                                        {t("onboarding.live_test_description")}
+                                    </p>
+
+                                    {/* Info Card */}
+                                    <div className="step4-info-card">
+                                        <svg className="step4-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                                            <circle cx="12" cy="13" r="3" />
+                                        </svg>
+                                        <div className="step4-info-content">
+                                            <div className="step4-info-title">{t("onboarding.live_test_info_title")}</div>
+                                            <div className="step4-info-desc">{t("onboarding.live_test_info_desc")}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Product Selector */}
+                                    <div className="step4-product-section">
+                                        <div className="step4-product-selector">
+                                            <select
+                                                className="step4-product-dropdown"
+                                                value={liveTestProduct?.id || ""}
+                                                onChange={(e) => {
+                                                    const productId = e.target.value;
+                                                    const product = selectedProductsOrCollections.find(p => p.id === productId) ||
+                                                        (selectedProductsOrCollections.length > 0 ? selectedProductsOrCollections[0] : null);
+                                                    setLiveTestProduct(product);
+                                                }}
+                                                disabled={selectedProductsOrCollections.length === 0}
+                                            >
+                                                {selectedProductsOrCollections.length === 0 ? (
+                                                    <option>{t("onboarding.no_product_available")}</option>
+                                                ) : (
+                                                    selectedProductsOrCollections.map((product) => (
+                                                        <option key={product.id} value={product.id}>
+                                                            {product.title}
+                                                        </option>
+                                                    ))
+                                                )}
+                                            </select>
+                                            <svg className="step4-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="m6 9 6 6 6-6" />
+                                            </svg>
+                                        </div>
+                                    </div>
+
+                                    {/* Try It Now Button */}
+                                    <button
+                                        className="step4-try-button"
+                                        onClick={() => setIsCameraModalOpen(true)}
+                                        disabled={!liveTestProduct}
+                                    >
+                                        <svg className="step4-try-button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                                            <circle cx="12" cy="13" r="3" />
+                                        </svg>
+                                        {t("onboarding.try_it_now")}
+                                    </button>
+
+                                    {/* Tips Card */}
+                                    <div className="step4-tips-card">
+                                        <div className="step4-tips-header">
+                                            <div className="step4-tips-icon-wrapper">
+                                                <svg className="step4-tips-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
+                                                    <path d="M9 18h6"/>
+                                                    <path d="M10 22h4"/>
+                                                </svg>
+                                            </div>
+                                            <span className="step4-tips-title">{t("onboarding.tips_title")}</span>
+                                        </div>
+                                        <ul className="step4-tips-list">
+                                            <li className="step4-tips-item">
+                                                <svg className="step4-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                    <path d="m9 11 3 3L22 4" />
+                                                </svg>
+                                                {t("onboarding.tip_1")}
+                                            </li>
+                                            <li className="step4-tips-item">
+                                                <svg className="step4-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                    <path d="m9 11 3 3L22 4" />
+                                                </svg>
+                                                {t("onboarding.tip_2")}
+                                            </li>
+                                            <li className="step4-tips-item">
+                                                <svg className="step4-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                    <path d="m9 11 3 3L22 4" />
+                                                </svg>
+                                                {t("onboarding.tip_3")}
+                                            </li>
+                                        </ul>
+                                    </div>
                                 </div>
 
-                                {/* Right: product type grid */}
-                                <div className="ob2-col-right">
-                                    <Box padding="500">
-                                        <div
-                                            style={{
-                                                borderRadius: "16px",
-                                                padding: "20px",
-                                                background: "linear-gradient(135deg, #ffffff 0%, #f8fbfb 100%)",
-                                                boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-                                            }}
-                                        >
-                                            <div className="ob2-grid">
-                                                {productTypes.map((type) => {
-                                                    const isSelected = selectedProductType === type.key;
-                                                    return (
-                                                        <div
-                                                            key={type.key}
-                                                            className={`ob2-card ${isSelected ? "ob2-card--selected" : "ob2-card--unselected"}`}
-                                                            onClick={() => setSelectedProductType(type.key)}
-                                                        >
-                                                            {/* Checkmark badge */}
-                                                            {isSelected && (
-                                                                <div className="ob2-card-check">
-                                                                    <svg
-                                                                        width="12"
-                                                                        height="12"
-                                                                        viewBox="0 0 24 24"
-                                                                        fill="none"
-                                                                        stroke="white"
-                                                                        strokeWidth="3"
-                                                                        strokeLinecap="round"
-                                                                        strokeLinejoin="round"
-                                                                    >
-                                                                        <polyline points="20 6 9 17 4 12" />
-                                                                    </svg>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Icon */}
-                                                            <div className={`ob2-icon-wrap ${isSelected ? "ob2-icon-wrap--selected" : "ob2-icon-wrap--unselected"}`}>
-                                                                <img
-                                                                    src={type.icon}
-                                                                    alt={type.title}
-                                                                    style={{
-                                                                        width: "26px",
-                                                                        height: "26px",
-                                                                        objectFit: "contain",
-                                                                        filter: isSelected ? "brightness(0) invert(1)" : "none",
-                                                                        transition: "all 0.3s ease",
-                                                                    }}
-                                                                />
-                                                            </div>
-
-                                                            {/* Title */}
-                                                            <div className={`ob2-card-title ${isSelected ? "ob2-card-title--selected" : "ob2-card-title--unselected"}`}>
-                                                                {type.title}
-                                                            </div>
-
-                                                            {/* Description */}
-                                                            <div className="ob2-card-desc">{type.desc1}</div>
-
-                                                            {type.desc2 && (
-                                                                <div
-                                                                    className="ob2-card-desc"
-                                                                    style={{ color: "#888888", marginTop: "-2px" }}
-                                                                >
-                                                                    {type.desc2}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
+                                {/* ── Right Column ── */}
+                                <div className="step4-right-col">
+                                    {/* Preview Card */}
+                                    <div className="step4-preview-card">
+                                        <div className="step4-preview-header">
+                                            <div className="step4-preview-title">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                                                    <circle cx="12" cy="13" r="3" />
+                                                </svg>
+                                                {t("onboarding.live_try_on")}
+                                            </div>
+                                            <div className="step4-status-indicator">
+                                                <div className="step4-status-dot"></div>
+                                                {t("onboarding.ready")}
                                             </div>
                                         </div>
-                                    </Box>
+
+                                        <div style={{ position: 'relative' }}>
+                                            {liveTestProduct?.image?.src ? (
+                                                <img
+                                                    src={liveTestProduct.image.src}
+                                                    alt={liveTestProduct.title}
+                                                    className="step4-preview-image"
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextElementSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <div className="step4-preview-placeholder" style={{ display: liveTestProduct?.image?.src ? 'none' : 'flex' }}>
+                                                <div className="step4-preview-placeholder-inner">
+                                                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#DCE3EA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
+                                                    </svg>
+                                                    <div style={{ marginTop: '12px', fontSize: '14px' }}>{t("onboarding.product_preview")}</div>
+                                                </div>
+                                            </div>
+
+                                            {/* Live Status Badge (visible during processing) */}
+                                            {isCameraModalOpen && (
+                                                <div className="step4-live-status">
+                                                    <div className="step4-live-status-dot"></div>
+                                                    {t("onboarding.working_on_your_look")}
+                                                </div>
+                                            )}
+
+                                            {/* Floating Actions */}
+                                            <div className="step4-floating-actions">
+                                                <button
+                                                    className="step4-floating-btn"
+                                                    onClick={() => {
+                                                        // Refresh functionality if needed
+                                                    }}
+                                                    title={t("onboarding.refresh")}
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                                                        <path d="M21 3v5h-5" />
+                                                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                                                        <path d="M8 16H3v5" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    className="step4-floating-btn"
+                                                    onClick={() => {
+                                                        // Switch to next product if available
+                                                        if (selectedProductsOrCollections.length > 1) {
+                                                            const currentIndex = selectedProductsOrCollections.findIndex(p => p.id === liveTestProduct?.id);
+                                                            const nextIndex = (currentIndex + 1) % selectedProductsOrCollections.length;
+                                                            setLiveTestProduct(selectedProductsOrCollections[nextIndex]);
+                                                        }
+                                                    }}
+                                                    title={t("onboarding.change_apparel")}
+                                                    disabled={selectedProductsOrCollections.length <= 1}
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
+                                                        <path d="m9 22 1-7" />
+                                                        <path d="m16 22-1-7" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Feedback Section */}
+                                        <div className="step4-feedback-section">
+                                            <div className="step4-feedback-title">{t("onboarding.how_did_it_go")}</div>
+                                            <div className="step4-feedback-buttons">
+                                                <button
+                                                    className={`step4-feedback-btn positive ${testFeedback === 'positive' ? 'selected' : ''}`}
+                                                    onClick={() => {
+                                                        setTestFeedback('positive');
+                                                        setShowPhotoTip(false);
+                                                    }}
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+                                                    </svg>
+                                                    {t("onboarding.looks_great")}
+                                                </button>
+                                                <button
+                                                    className={`step4-feedback-btn negative ${testFeedback === 'negative' ? 'selected' : ''}`}
+                                                    onClick={() => {
+                                                        setTestFeedback('negative');
+                                                        setShowPhotoTip(true);
+                                                    }}
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+                                                    </svg>
+                                                    {t("onboarding.needs_better_photo")}
+                                                </button>
+                                            </div>
+                                            {showPhotoTip && (
+                                                <div style={{ marginTop: '16px', fontSize: '13px', color: '#667085', lineHeight: '1.5' }}>
+                                                    💡 {t("onboarding.photo_tip_message")}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
 
                             </div>
+
+                            {/* ── Camera Modal ── */}
+                            {isCameraModalOpen && (
+                                <Modal
+                                    open={isCameraModalOpen}
+                                    onClose={() => setIsCameraModalOpen(false)}
+                                    title={t("onboarding.live_test_camera_title")}
+                                    large
+                                >
+                                    <Modal.Section>
+                                        <div style={{ width: "100%", height: "500px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                            <iframe
+                                                src={`/api/try-on-session?product_id=${liveTestProduct?.id || ''}`}
+                                                className="step4-camera-iframe"
+                                                title={t("onboarding.live_test_camera")}
+                                            />
+                                        </div>
+                                    </Modal.Section>
+                                </Modal>
+                            )}
 
                             {/* ── Footer navigation ── */}
                             <Box padding="600" paddingBlockStart="400">
@@ -3574,7 +6468,6 @@ export default function NewOnboarding() {
                                     <button
                                         className="ob2-btn ob2-btn-prev"
                                         onClick={handleBack}
-                                        disabled={currentStep === 4 || isFinishingOnboarding}
                                     >
                                         <span>‹</span>
                                         {t("onboarding.Previous")}
@@ -3585,4893 +6478,32 @@ export default function NewOnboarding() {
                                         <div className="ob2-dots">
                                             <div className="ob2-dot ob2-dot--active" />
                                             <div className="ob2-dot ob2-dot--active" />
-                                            <div className="ob2-dot ob2-dot--inactive" />
+                                            <div className="ob2-dot ob2-dot--active" />
+                                            <div className="ob2-dot ob2-dot--active" />
                                             <div className="ob2-dot ob2-dot--inactive" />
                                         </div>
-                                        <span className="ob2-progress-label">2/4</span>
+                                        <span className="ob2-progress-label">4/5</span>
                                     </div>
 
-                                    {/* Right Side Buttons */}
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            gap: "12px",
-                                            alignItems: "center",
-                                        }}
+                                    {/* Continue */}
+                                    <button
+                                        className="ob2-btn ob2-btn-next"
+                                        onClick={handleNext}
                                     >
-                                        {/* Skip Onboarding */}
-                                        <button
-                                            className="ob2-btn ob2-btn-skip"
-                                            onClick={handleSkipOnboarding}
-                                            disabled={isFinishingOnboarding}
-                                            style={{
-                                                backgroundColor: "white",
-                                                color: "#303030",
-                                                border: "1.5px solid #d0d0d0",
-                                                opacity: isFinishingOnboarding ? 0.6 : 1,
-                                                cursor: isFinishingOnboarding ? "not-allowed" : "pointer"
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (!isFinishingOnboarding) {
-                                                    e.currentTarget.style.backgroundColor = "#f5f5f5";
-                                                    e.currentTarget.style.borderColor = "#a0a0a0";
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.backgroundColor = "white";
-                                                e.currentTarget.style.borderColor = "#d0d0d0";
-                                            }}
-                                        >
-                                            {t("onboarding.Skip_Onboarding")}
-                                        </button>
-
-                                        {/* Next */}
-                                        <button
-                                            className="ob2-btn ob2-btn-next"
-                                            disabled={!selectedProductType || isFinishingOnboarding}
-                                            onClick={handleNext}
-                                        >
-                                            {isFinishingOnboarding ? (
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <span className="spinner" style={{
-                                                        width: '16px',
-                                                        height: '16px',
-                                                        border: '2px solid rgba(255,255,255,0.3)',
-                                                        borderTop: '2px solid white',
-                                                        borderRadius: '50%',
-                                                        animation: 'spin 0.8s linear infinite'
-                                                    }}></span>
-                                                    {t("settings.email_content.loading")}
-                                                </span>
-                                            ) : (
-                                                t("onboarding.Next_→")
-                                            )}
-                                        </button>
-                                    </div>
+                                        {t("onboarding.Continue")}
+                                    </button>
 
                                 </div>
                             </Box>
 
-                        </BlockStack>
-                    </Card>
-                </Page>
+                        </Card>
+                    </Page>
                 </div>
             </>
         );
     }
 
-    if (currentStep === 3) {
-        // Get product types for display
-        const productTypes = [
-            {
-                key: "file",
-                title: t("onboarding.files"),
-                icon: "📁",
-            },
-            {
-                key: "license",
-                title: t("onboarding.keys_codes"),
-                icon: "🔑",
-            },
-            {
-                key: "pdf",
-                title: t("onboarding.pdf_with_stamping"),
-                icon: "📑",
-            },
-            {
-                key: "links",
-                title: t("onboarding.custom_links"),
-                icon: "🔗",
-            },
-            // {
-            //     key: "mixedContent",
-            //     title: t("onboarding.mixed_delivery"),
-            //     icon: "📦",
-            // },
-            // {
-            //     key: "notSure",
-            //     title: t("onboarding.not_sure"),
-            //     icon: "💬",
-            // },
-        ];
-
-        const selectedType = productTypes.find(
-            (type) => type.key === selectedProductType
-        );
-
-        return (
-            <>
-                <style>
-                    {`
-                        /* ── Wrapper padding for responsive spacing ── */
-                        .onboarding-step-3-wrapper {
-                            padding: 0;
-                        }
-                    `}
-                </style>
-                <div className="onboarding-step-3-wrapper">
-                <Page>
-                <div style={{}}>
-                    <Card className="onboarding-step-3-card">
-                        <BlockStack gap="500">
-                            {/* Header */}
-                            {/* Step Instructions */}
-                            <Box paddingInline="600" paddingBlockEnd="400">
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        gap: "8px",
-                                        flexWrap: "wrap",
-                                    }}
-                                >
-                                    {/* Step 1 */}
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            padding: "6px 12px",
-                                            borderRadius: "20px",
-                                            backgroundColor: "#f5f5f5",
-                                            border: "1px solid #e0e0e0",
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                width: "22px",
-                                                height: "22px",
-                                                borderRadius: "50%",
-                                                backgroundColor: "#088395",
-                                                border: "1.5px solid #09637E",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontWeight: "bold",
-                                                fontSize: "12px",
-                                                color: "white",
-                                            }}
-                                        >
-                                            ✓
-                                        </div>
-                                        <span
-                                            style={{
-                                                fontWeight: "500",
-                                                fontSize: "13px",
-                                            }}
-                                        >
-                                            {t("onboarding.Welcome")}
-                                        </span>
-                                    </div>
-
-                                    {/* Step 2 */}
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            padding: "6px 12px",
-                                            borderRadius: "20px",
-                                            backgroundColor: "#f5f5f5",
-                                            border: "1px solid #e0e0e0",
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                width: "22px",
-                                                height: "22px",
-                                                borderRadius: "50%",
-                                                backgroundColor: "#088395",
-                                                border: "1.5px solid #09637E",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontWeight: "bold",
-                                                fontSize: "12px",
-                                                color: "white",
-                                            }}
-                                        >
-                                            ✓
-                                        </div>
-                                        <span
-                                            style={{
-                                                fontWeight: "500",
-                                                fontSize: "13px",
-                                                whiteSpace: "nowrap",
-                                            }}
-                                        >
-                                            {t("onboarding.Product_Type")}
-                                        </span>
-                                    </div>
-
-                                    {/* Step 3 */}
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            padding: "6px 12px",
-                                            borderRadius: "20px",
-                                            backgroundColor: "#f5f5f5",
-                                            border: "1px solid #e0e0e0",
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                width: "22px",
-                                                height: "22px",
-                                                borderRadius: "50%",
-                                                backgroundColor: "white",
-                                                border: "1.5px solid #09637E",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontWeight: "bold",
-                                                fontSize: "12px",
-                                                color: "#088395",
-                                            }}
-                                        >
-                                            3
-                                        </div>
-                                        <span
-                                            style={{
-                                                fontWeight: "500",
-                                                fontSize: "13px",
-                                            }}
-                                        >
-                                            <button
-                                                style={{
-                                                    backgroundColor: "#088395",
-                                                    color: "white",
-                                                    border: "none",
-                                                    borderRadius: "5px",
-                                                    padding: "4px 10px",
-                                                    fontSize: "12px",
-                                                    fontWeight: "500",
-                                                    cursor: "pointer",
-                                                    whiteSpace: "nowrap",
-                                                }}
-                                            >
-                                                {t("onboarding.Create_Product")}
-                                            </button>
-                                        </span>
-                                    </div>
-
-                                    {/* Step 4 */}
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            padding: "6px 12px",
-                                            borderRadius: "20px",
-                                            backgroundColor: "#f5f5f5",
-                                            border: "1px solid #e0e0e0",
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                width: "22px",
-                                                height: "22px",
-                                                borderRadius: "50%",
-                                                backgroundColor: "white",
-                                                border: "1.5px solid #09637E",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontWeight: "bold",
-                                                fontSize: "12px",
-                                                color: "#088395",
-                                            }}
-                                        >
-                                            4
-                                        </div>
-                                        <span
-                                            style={{
-                                                fontWeight: "500",
-                                                fontSize: "13px",
-                                                whiteSpace: "nowrap",
-                                            }}
-                                        >
-                                            {t("onboarding.congratulations")}
-                                        </span>
-                                    </div>
-                                </div>
-                            </Box>
-
-                            {/* Selected Product Display */}
-
-                            {/* Mock Configuration Section - Replace with real code */}
-                            <Box padding="600" paddingBlockStart="0">
-                                <div
-                                    style={{
-                                        maxWidth: "800px",
-                                        margin: "0 auto",
-                                    }}
-                                >
-                                    {/* Product-specific mock content */}
-
-                                    {selectedProductType === "file" && (
-                                        <div>
-                                            <BlockStack gap="400">
-                                                <Card>
-                                                    <BlockStack gap="300">
-                                                        <Text
-                                                            variant="headingMd"
-                                                            as="h6"
-                                                        >
-                                                            {t(
-                                                                "createdigitalproduct.when_this_shopify_product_is_purchased"
-                                                            )}
-                                                        </Text>
-                                                        {selectedProduct ? (
-                                                            <div
-                                                                style={{
-                                                                    marginTop:
-                                                                        "10px",
-                                                                }}
-                                                            >
-                                                                <InlineGrid
-                                                                    columns="1fr auto"
-                                                                    style={{
-                                                                        marginBottom:
-                                                                            "10px",
-                                                                    }}
-                                                                >
-                                                                    <div>
-                                                                        <InlineStack>
-                                                                            <div>
-                                                                                <Thumbnail
-                                                                                    source={
-                                                                                        selectedProduct
-                                                                                            ?.images[0]
-                                                                                            ?.originalSrc ??
-                                                                                        "https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-image_large.png?v=1530129081"
-                                                                                    }
-                                                                                    alt={
-                                                                                        selectedProduct?.title
-                                                                                    }
-                                                                                    size="large"
-                                                                                />
-                                                                            </div>
-                                                                            <div
-                                                                                style={{
-                                                                                    marginLeft:
-                                                                                        "20px",
-                                                                                }}
-                                                                            >
-                                                                                <div>
-                                                                                    <Link url="#">
-                                                                                        <Text
-                                                                                            variant="headingMd"
-                                                                                            as="h6"
-                                                                                        >
-                                                                                            {
-                                                                                                selectedProduct?.title
-                                                                                            }
-                                                                                        </Text>
-                                                                                    </Link>
-                                                                                    {selectedProduct
-                                                                                        ?.variants
-                                                                                        ?.length >
-                                                                                    1 ? (
-                                                                                        <Text
-                                                                                            variant="bodyLg"
-                                                                                            as="p"
-                                                                                        >
-                                                                                            {t(
-                                                                                                "digtal_product_listing.all_variants"
-                                                                                            )}
-
-                                                                                            (
-                                                                                            {
-                                                                                                selectedProduct
-                                                                                                    .variants
-                                                                                                    .length
-                                                                                            }
-
-                                                                                            )
-                                                                                        </Text>
-                                                                                    ) : (
-                                                                                        selectedProduct.variants.map(
-                                                                                            (
-                                                                                                variant,
-                                                                                                index
-                                                                                            ) => (
-                                                                                                <Text
-                                                                                                    key={
-                                                                                                        variant.id
-                                                                                                    }
-                                                                                                    variant="bodyLg"
-                                                                                                    as="h6"
-                                                                                                >
-                                                                                                    {
-                                                                                                        variant.title
-                                                                                                    }
-                                                                                                </Text>
-                                                                                            )
-                                                                                        )
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                        </InlineStack>
-                                                                    </div>
-                                                                    <div
-                                                                        onClick={
-                                                                            toggleProductPicker
-                                                                        }
-                                                                    >
-                                                                        <Link url="#">
-                                                                            <Text
-                                                                                variant="bodyLg"
-                                                                                as="p"
-                                                                            >
-                                                                                {t(
-                                                                                    "createdigitalproduct.edit_product"
-                                                                                )}
-                                                                            </Text>
-                                                                        </Link>
-                                                                    </div>
-                                                                </InlineGrid>
-                                                            </div>
-                                                        ) : (
-                                                            <div
-                                                                style={{
-                                                                    display:
-                                                                        "flex",
-                                                                    alignItems:
-                                                                        "center",
-                                                                }}
-                                                            >
-                                                                <div
-                                                                    style={{
-                                                                        flex: "78%",
-                                                                    }}
-                                                                >
-                                                                    <TextField
-                                                                        value={
-                                                                            selectedProduct
-                                                                                ? selectedProduct.title
-                                                                                : ""
-                                                                        }
-                                                                        onFocus={
-                                                                            toggleProductPicker
-                                                                        }
-                                                                        placeholder={t(
-                                                                            "createdigitalproduct.search_shopify_products"
-                                                                        )}
-                                                                        fullWidth
-                                                                        readOnly
-                                                                    />
-                                                                </div>
-                                                                <div
-                                                                    style={{
-                                                                        flex: "22%",
-                                                                        marginLeft:
-                                                                            "1rem",
-                                                                    }}
-                                                                >
-                                                                    <Button
-                                                                        onClick={
-                                                                            toggleProductPicker
-                                                                        }
-                                                                    >
-                                                                        {t(
-                                                                            "createdigitalproduct.browse_products"
-                                                                        )}
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        <div>
-                                                            <Text
-                                                                as={"p"}
-                                                                variant={
-                                                                    "bodyMd"
-                                                                }
-                                                            >
-                                                                {t(
-                                                                    "createdigitalproduct.select_shopify_product_or_specific_product"
-                                                                )}
-                                                            </Text>
-                                                        </div>
-                                                    </BlockStack>
-                                                </Card>
-                                                {!isManualDeliveryEnabled && (
-                                                    <Card>
-                                                        <BlockStack gap="300">
-                                                            <Text
-                                                                variant="headingMd"
-                                                                as="h6"
-                                                            >
-                                                                {t(
-                                                                    "createdigitalproduct.provide_the_following_content_to_the_customer"
-                                                                )}
-                                                            </Text>
-
-                                                            {contentType &&
-                                                                contentType.includes(
-                                                                    "files"
-                                                                ) && (
-                                                                    <BlockStack gap="200">
-                                                                        {files.length >
-                                                                            0 &&
-                                                                            files.map(
-                                                                                (
-                                                                                    file,
-                                                                                    index
-                                                                                ) => {
-                                                                                    const exceedMaxSize =
-                                                                                        file.size >
-                                                                                        fileSizeLimit;
-
-                                                                                    return (
-                                                                                        <InlineGrid columns="1fr auto">
-                                                                                            <div>
-                                                                                                <InlineStack>
-                                                                                                    <div>
-                                                                                                        <Card>
-                                                                                                            <BlockStack gap="300">
-                                                                                                                <div
-                                                                                                                    style={{
-                                                                                                                        width: "24px",
-                                                                                                                        height: "24px",
-                                                                                                                    }}
-                                                                                                                >
-                                                                                                                    <svg
-                                                                                                                        xmlns="http://www.w3.org/2000/svg"
-                                                                                                                        viewBox="0 0 20 20"
-                                                                                                                    >
-                                                                                                                        <path
-                                                                                                                            fill-rule="evenodd"
-                                                                                                                            d="M4.843 9.854a3.75 3.75 0 0 0 0 5.303l.147.147a3.543 3.543 0 0 0 5.01 0 .75.75 0 0 0-1.06-1.061 2.043 2.043 0 0 1-2.89 0l-.146-.146a2.25 2.25 0 0 1 0-3.182l5.015-5.015a2.244 2.244 0 0 1 3.173 3.172l-2.286 2.286a.817.817 0 1 1-1.155-1.155l2.25-2.25a.75.75 0 1 0-1.06-1.061l-2.25 2.25a2.317 2.317 0 0 0 3.275 3.277l2.286-2.286a3.744 3.744 0 0 0-5.294-5.294l-5.015 5.015Z"
-                                                                                                                        />
-                                                                                                                    </svg>
-                                                                                                                </div>
-                                                                                                            </BlockStack>
-                                                                                                        </Card>
-                                                                                                    </div>
-                                                                                                    <div
-                                                                                                        style={{
-                                                                                                            marginLeft:
-                                                                                                                "20px",
-                                                                                                        }}
-                                                                                                    >
-                                                                                                        <div>
-                                                                                                            <BlockStack gap="200">
-                                                                                                                <Link url="#">
-                                                                                                                    <Text
-                                                                                                                        variant="bodyMd"
-                                                                                                                        as="p"
-                                                                                                                        fontWeight="bold"
-                                                                                                                        color={
-                                                                                                                            exceedMaxSize
-                                                                                                                                ? "critical"
-                                                                                                                                : ""
-                                                                                                                        }
-                                                                                                                    >
-                                                                                                                        {
-                                                                                                                            file.name
-                                                                                                                        }
-                                                                                                                    </Text>
-                                                                                                                </Link>
-                                                                                                                <Text
-                                                                                                                    variant="bodySm"
-                                                                                                                    as="p"
-                                                                                                                    color={
-                                                                                                                        exceedMaxSize
-                                                                                                                            ? "critical"
-                                                                                                                            : "subdued"
-                                                                                                                    }
-                                                                                                                >
-                                                                                                                    {file.type.toUpperCase()}{" "}
-                                                                                                                    -{" "}
-                                                                                                                    {prettyBytes(
-                                                                                                                        file.size
-                                                                                                                    )}
-                                                                                                                    {exceedMaxSize &&
-                                                                                                                        t(
-                                                                                                                            "createdigitalproduct.file_too_big_it_will_be_ignored"
-                                                                                                                        )}
-                                                                                                                </Text>
-                                                                                                            </BlockStack>
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                </InlineStack>
-                                                                                            </div>
-                                                                                            <div>
-                                                                                                <Button
-                                                                                                    icon={
-                                                                                                        <Icon
-                                                                                                            source={
-                                                                                                                XSmallIcon
-                                                                                                            }
-                                                                                                        />
-                                                                                                    }
-                                                                                                    onClick={() =>
-                                                                                                        handleDeleteFileAtIndex(
-                                                                                                            index,
-                                                                                                            "files"
-                                                                                                        )
-                                                                                                    }
-                                                                                                ></Button>
-                                                                                            </div>
-                                                                                        </InlineGrid>
-                                                                                    );
-                                                                                }
-                                                                            )}
-
-                                                                        {googleDriveLink && (
-                                                                            <InlineGrid columns="1fr auto">
-                                                                                <div>
-                                                                                    <InlineStack>
-                                                                                        <div>
-                                                                                            <Card>
-                                                                                                <BlockStack gap="300">
-                                                                                                    <div
-                                                                                                        style={{
-                                                                                                            width: "24px",
-                                                                                                            height: "24px",
-                                                                                                        }}
-                                                                                                    >
-                                                                                                        <svg
-                                                                                                            xmlns="http://www.w3.org/2000/svg"
-                                                                                                            viewBox="0 0 20 20"
-                                                                                                        >
-                                                                                                            <path
-                                                                                                                fill-rule="evenodd"
-                                                                                                                d="M4.843 9.854a3.75 3.75 0 0 0 0 5.303l.147.147a3.543 3.543 0 0 0 5.01 0 .75.75 0 0 0-1.06-1.061 2.043 2.043 0 0 1-2.89 0l-.146-.146a2.25 2.25 0 0 1 0-3.182l5.015-5.015a2.244 2.244 0 0 1 3.173 3.172l-2.286 2.286a.817.817 0 1 1-1.155-1.155l2.25-2.25a.75.75 0 1 0-1.06-1.061l-2.25 2.25a2.317 2.317 0 0 0 3.275 3.277l2.286-2.286a3.744 3.744 0 0 0-5.294-5.294l-5.015 5.015Z"
-                                                                                                            />
-                                                                                                        </svg>
-                                                                                                    </div>
-                                                                                                </BlockStack>
-                                                                                            </Card>
-                                                                                        </div>
-                                                                                        <div
-                                                                                            style={{
-                                                                                                marginLeft:
-                                                                                                    "20px",
-                                                                                            }}
-                                                                                        >
-                                                                                            <BlockStack gap="200">
-                                                                                                <Link
-                                                                                                    url={
-                                                                                                        googleDriveLink
-                                                                                                    }
-                                                                                                >
-                                                                                                    {
-                                                                                                        googleDriveLink
-                                                                                                    }
-                                                                                                </Link>
-                                                                                            </BlockStack>
-                                                                                        </div>
-                                                                                    </InlineStack>
-                                                                                </div>
-                                                                                <div>
-                                                                                    <Button
-                                                                                        icon={
-                                                                                            <Icon
-                                                                                                source={
-                                                                                                    XSmallIcon
-                                                                                                }
-                                                                                            />
-                                                                                        }
-                                                                                        onClick={() =>
-                                                                                            handleDeleteFileAtIndex(
-                                                                                                null,
-                                                                                                "googleDrive"
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        Delete
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </InlineGrid>
-                                                                        )}
-
-                                                                        <div>
-                                                                            {selectedFileDetails
-                                                                                .filter(
-                                                                                    (
-                                                                                        file
-                                                                                    ) =>
-                                                                                        file.url
-                                                                                )
-                                                                                .map(
-                                                                                    (
-                                                                                        file,
-                                                                                        index
-                                                                                    ) => {
-                                                                                        const isSelected =
-                                                                                            selectedFileIds.includes(
-                                                                                                file.id
-                                                                                            );
-
-                                                                                        return (
-                                                                                            <InlineGrid columns="1fr auto">
-                                                                                                <div>
-                                                                                                    <InlineStack>
-                                                                                                        <div>
-                                                                                                            <Card>
-                                                                                                                <BlockStack gap="300">
-                                                                                                                    <div
-                                                                                                                        style={{
-                                                                                                                            width: "24px",
-                                                                                                                            height: "24px",
-                                                                                                                        }}
-                                                                                                                    >
-                                                                                                                        <svg
-                                                                                                                            xmlns="http://www.w3.org/2000/svg"
-                                                                                                                            viewBox="0 0 20 20"
-                                                                                                                        >
-                                                                                                                            <path
-                                                                                                                                fill-rule="evenodd"
-                                                                                                                                d="M4.843 9.854a3.75 3.75 0 0 0 0 5.303l.147.147a3.543 3.543 0 0 0 5.01 0 .75.75 0 0 0-1.06-1.061 2.043 2.043 0 0 1-2.89 0l-.146-.146a2.25 2.25 0 0 1 0-3.182l5.015-5.015a2.244 2.244 0 0 1 3.173 3.172l-2.286 2.286a.817.817 0 1 1-1.155-1.155l2.25-2.25a.75.75 0 1 0-1.06-1.061l-2.25 2.25a2.317 2.317 0 0 0 3.275 3.277l2.286-2.286a3.744 3.744 0 0 0-5.294-5.294l-5.015 5.015Z"
-                                                                                                                            />
-                                                                                                                        </svg>
-                                                                                                                    </div>
-                                                                                                                </BlockStack>
-                                                                                                            </Card>
-                                                                                                        </div>
-                                                                                                        <div
-                                                                                                            style={{
-                                                                                                                marginLeft:
-                                                                                                                    "20px",
-                                                                                                            }}
-                                                                                                        >
-                                                                                                            <div>
-                                                                                                                <BlockStack gap="200">
-                                                                                                                    <Link url="#">
-                                                                                                                        <Text
-                                                                                                                            variant="bodyMd"
-                                                                                                                            as="p"
-                                                                                                                            fontWeight="bold"
-                                                                                                                            color={
-                                                                                                                                isSelected
-                                                                                                                                    ? "critical"
-                                                                                                                                    : ""
-                                                                                                                            }
-                                                                                                                        >
-                                                                                                                            {
-                                                                                                                                file.fileName
-                                                                                                                            }
-                                                                                                                        </Text>
-                                                                                                                    </Link>
-                                                                                                                    <Text
-                                                                                                                        variant="bodySm"
-                                                                                                                        as="p"
-                                                                                                                        color={
-                                                                                                                            isSelected
-                                                                                                                                ? "critical"
-                                                                                                                                : "subdued"
-                                                                                                                        }
-                                                                                                                    >
-                                                                                                                        {file.mimeType.toUpperCase()}{" "}
-                                                                                                                        -{" "}
-                                                                                                                        {prettyBytes(
-                                                                                                                            file.byteSize
-                                                                                                                        )}
-                                                                                                                    </Text>
-                                                                                                                </BlockStack>
-                                                                                                            </div>
-                                                                                                        </div>
-                                                                                                    </InlineStack>
-                                                                                                </div>
-                                                                                                <div>
-                                                                                                    <Button
-                                                                                                        icon={
-                                                                                                            <Icon
-                                                                                                                source={
-                                                                                                                    XSmallIcon
-                                                                                                                }
-                                                                                                            />
-                                                                                                        }
-                                                                                                        onClick={() =>
-                                                                                                            handleDeleteFileAtIndex(
-                                                                                                                index,
-                                                                                                                "orders"
-                                                                                                            )
-                                                                                                        }
-                                                                                                    ></Button>
-                                                                                                </div>
-                                                                                            </InlineGrid>
-                                                                                        );
-                                                                                    }
-                                                                                )}
-                                                                        </div>
-
-                                                                        {saving && (
-                                                                            <div>
-                                                                                <Text
-                                                                                    as={
-                                                                                        "h5"
-                                                                                    }
-                                                                                >
-                                                                                    {t(
-                                                                                        "createdigitalproduct.files_are_uploading_please_wait"
-                                                                                    )}
-                                                                                </Text>
-                                                                                <ProgressBar
-                                                                                    progress={
-                                                                                        progress
-                                                                                    }
-                                                                                />
-                                                                            </div>
-                                                                        )}
-                                                                    </BlockStack>
-                                                                )}
-
-                                                            {selectedProduct ? (
-                                                                <div>
-                                                                    <Modal.Section>
-                                                                        <Tabs
-                                                                            tabs={
-                                                                                mainTabs
-                                                                            }
-                                                                            selected={
-                                                                                selectedMainTab
-                                                                            }
-                                                                            onSelect={
-                                                                                handleTabChange
-                                                                            }
-                                                                        >
-                                                                            {selectedMainTab ===
-                                                                                0 && (
-                                                                                <BlockStack gap="400">
-                                                                                    <DropZone
-                                                                                        label={
-                                                                                            fileLabelText
-                                                                                        }
-                                                                                        onDrop={
-                                                                                            handleDropZoneDrop
-                                                                                        }
-                                                                                    >
-                                                                                        <DropZone.FileUpload
-                                                                                            actionTitle={t(
-                                                                                                "createdigitalproduct.add_files"
-                                                                                            )}
-                                                                                        />
-                                                                                    </DropZone>
-
-                                                                                    {files.length >
-                                                                                        0 && (
-                                                                                        <BlockStack gap="200">
-                                                                                            {files.map(
-                                                                                                (
-                                                                                                    file,
-                                                                                                    index
-                                                                                                ) => {
-                                                                                                    const exceedMaxSize =
-                                                                                                        file.size >
-                                                                                                        fileSizeLimit;
-
-                                                                                                    return (
-                                                                                                        <InlineStack
-                                                                                                            key={
-                                                                                                                index
-                                                                                                            }
-                                                                                                            gap="200"
-                                                                                                            blockAlign="center"
-                                                                                                        >
-                                                                                                            <Button
-                                                                                                                icon={
-                                                                                                                    <Icon
-                                                                                                                        source={
-                                                                                                                            XSmallIcon
-                                                                                                                        }
-                                                                                                                    />
-                                                                                                                }
-                                                                                                                onClick={() =>
-                                                                                                                    handleDeleteFileAtIndex(
-                                                                                                                        index,
-                                                                                                                        "files"
-                                                                                                                    )
-                                                                                                                }
-                                                                                                            ></Button>
-
-                                                                                                            <BlockStack>
-                                                                                                                <Text
-                                                                                                                    variant="bodyMd"
-                                                                                                                    as="p"
-                                                                                                                    fontWeight="bold"
-                                                                                                                    color={
-                                                                                                                        exceedMaxSize
-                                                                                                                            ? "critical"
-                                                                                                                            : ""
-                                                                                                                    }
-                                                                                                                >
-                                                                                                                    {
-                                                                                                                        file.name
-                                                                                                                    }
-                                                                                                                </Text>
-                                                                                                                <Text
-                                                                                                                    variant="bodySm"
-                                                                                                                    as="p"
-                                                                                                                    color={
-                                                                                                                        exceedMaxSize
-                                                                                                                            ? "critical"
-                                                                                                                            : "subdued"
-                                                                                                                    }
-                                                                                                                >
-                                                                                                                    {prettyBytes(
-                                                                                                                        file.size
-                                                                                                                    )}{" "}
-                                                                                                                    {exceedMaxSize
-                                                                                                                        ? t(
-                                                                                                                              "createdigitalproduct.file_too_big_it_will_be_ignored"
-                                                                                                                          )
-                                                                                                                        : ""}
-                                                                                                                </Text>
-                                                                                                            </BlockStack>
-                                                                                                        </InlineStack>
-                                                                                                    );
-                                                                                                }
-                                                                                            )}
-                                                                                        </BlockStack>
-                                                                                    )}
-                                                                                </BlockStack>
-                                                                            )}
-                                                                            {selectedMainTab ===
-                                                                                1 && (
-                                                                                <>
-                                                                                    <div
-                                                                                        style={{
-                                                                                            padding:
-                                                                                                "16px",
-                                                                                        }}
-                                                                                    >
-                                                                                        <TextField
-                                                                                            label={t(
-                                                                                                "createdigitalproduct.google_drive_file_folder_link"
-                                                                                            )}
-                                                                                            value={
-                                                                                                googleDriveLink
-                                                                                            }
-                                                                                            onChange={
-                                                                                                handleGoogleDriveLinkChange
-                                                                                            }
-                                                                                            placeholder={t("createdigitalproduct.enter_google_drive_file_or_folder_link")}
-                                                                                        />
-                                                                                        <div
-                                                                                            style={{
-                                                                                                marginTop:
-                                                                                                    "5px",
-                                                                                            }}
-                                                                                        ></div>
-                                                                                        <Text
-                                                                                            variant="bodySm"
-                                                                                            tone="subdued"
-                                                                                            style={{
-                                                                                                marginTop:
-                                                                                                    "8px",
-                                                                                            }}
-                                                                                        >
-                                                                                            {t(
-                                                                                                "createdigitalproduct.google_drive_help_text"
-                                                                                            )}
-                                                                                        </Text>
-                                                                                    </div>
-                                                                                </>
-                                                                            )}
-                                                                        </Tabs>
-                                                                    </Modal.Section>
-                                                                </div>
-                                                            ) : (
-                                                                <div>
-                                                                    <Text
-                                                                        variant="bodyLg"
-                                                                        as="p"
-                                                                    >
-                                                                        {t(
-                                                                            "createdigitalproduct.add_shopify_product_to_attached_content"
-                                                                        )}
-                                                                    </Text>
-                                                                </div>
-                                                            )}
-                                                        </BlockStack>
-                                                    </Card>
-                                                )}
-                                                {/* <Card>
-                                                    {userPlan === "free" && (
-                                                        <div
-                                                            style={{
-                                                                marginTop:
-                                                                    "10px",
-                                                            }}
-                                                        >
-                                                            <Banner
-                                                                tone="warning"
-                                                                title={t(
-                                                                    "editdigitalproduct.upgrade_your_plan"
-                                                                )}
-                                                            >
-                                                                <Text
-                                                                    variant="bodyMd"
-                                                                    as="p"
-                                                                >
-                                                                    {t(
-                                                                        "createdigitalproduct.upgrade_to_paid_plan_to_enable_auto_fulfill"
-                                                                    )}
-                                                                </Text>
-                                                                <div
-                                                                    style={{
-                                                                        marginTop:
-                                                                            "5px",
-                                                                    }}
-                                                                ></div>
-                                                                <Button
-                                                                    variant="primary"
-                                                                    onClick={
-                                                                        handlePricing
-                                                                    }
-                                                                >
-                                                                    {t(
-                                                                        "createdigitalproduct.upgrade_now"
-                                                                    )}
-                                                                </Button>
-                                                            </Banner>
-                                                        </div>
-                                                    )}
-                                                    <div
-                                                        style={{
-                                                            marginTop: "10px",
-                                                        }}
-                                                    ></div>
-
-                                                    <Text
-                                                        variant="headingMd"
-                                                        as="h6"
-                                                    >
-                                                        {t(
-                                                            "createdigitalproduct.auto_fulfill_optional"
-                                                        )}
-                                                    </Text>
-                                                    <div
-                                                        style={{
-                                                            marginTop: "10px",
-                                                        }}
-                                                    >
-                                                        <Checkbox
-                                                            checked={
-                                                                autoFulfill
-                                                            }
-                                                            label={t(
-                                                                "createdigitalproduct.auto_fulfill_this_product_on_shopify_orders"
-                                                            )}
-                                                            onChange={
-                                                                handleAutoFulfillCheckbox
-                                                            }
-                                                            disabled={
-                                                                userPlan ===
-                                                                "free"
-                                                            }
-                                                        />
-                                                        <div
-                                                            style={{
-                                                                marginLeft: 25,
-                                                            }}
-                                                        >
-                                                            <Text
-                                                                as={"p"}
-                                                                variant={
-                                                                    "bodyMd"
-                                                                }
-                                                            >
-                                                                {t(
-                                                                    "createdigitalproduct.automatically_fulfill_the"
-                                                                )}
-                                                            </Text>
-                                                        </div>
-                                                    </div>
-                                                </Card> */}
-                                            </BlockStack>
-                                        </div>
-                                    )}
-
-
-
-                                    {selectedProductType === "license" && (
-                                        <div
-                                            style={{
-                                                backgroundColor: "white",
-                                                borderRadius: "8px",
-                                                padding: "24px",
-                                            }}
-                                        >
-                                            <BlockStack gap="400">
-                                                <Card>
-                                                    <BlockStack gap="300">
-                                                        <Text
-                                                            variant="headingMd"
-                                                            as="h6"
-                                                        >
-                                                            {t(
-                                                                "createdigitalproduct.when_this_shopify_product_is_purchased"
-                                                            )}
-                                                        </Text>
-                                                        {selectedProduct ? (
-                                                            <div
-                                                                style={{
-                                                                    marginTop:
-                                                                        "10px",
-                                                                }}
-                                                            >
-                                                                <InlineGrid
-                                                                    columns="1fr auto"
-                                                                    style={{
-                                                                        marginBottom:
-                                                                            "10px",
-                                                                    }}
-                                                                >
-                                                                    <div>
-                                                                        <InlineStack>
-                                                                            <div>
-                                                                                <Thumbnail
-                                                                                    source={
-                                                                                        selectedProduct
-                                                                                            ?.images[0]
-                                                                                            ?.originalSrc ??
-                                                                                        "https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-image_large.png?v=1530129081"
-                                                                                    }
-                                                                                    alt={
-                                                                                        selectedProduct?.title
-                                                                                    }
-                                                                                    size="large"
-                                                                                />
-                                                                            </div>
-                                                                            <div
-                                                                                style={{
-                                                                                    marginLeft:
-                                                                                        "20px",
-                                                                                }}
-                                                                            >
-                                                                                <div>
-                                                                                    <Link url="#">
-                                                                                        <Text
-                                                                                            variant="headingMd"
-                                                                                            as="h6"
-                                                                                        >
-                                                                                            {
-                                                                                                selectedProduct?.title
-                                                                                            }
-                                                                                        </Text>
-                                                                                    </Link>
-                                                                                    {selectedProduct
-                                                                                        ?.variants
-                                                                                        ?.length >
-                                                                                    1 ? (
-                                                                                        <Text
-                                                                                            variant="bodyLg"
-                                                                                            as="p"
-                                                                                        >
-                                                                                            {t(
-                                                                                                "digtal_product_listing.all_variants"
-                                                                                            )}
-
-                                                                                            (
-                                                                                            {
-                                                                                                selectedProduct
-                                                                                                    .variants
-                                                                                                    .length
-                                                                                            }
-
-                                                                                            )
-                                                                                        </Text>
-                                                                                    ) : (
-                                                                                        selectedProduct.variants.map(
-                                                                                            (
-                                                                                                variant,
-                                                                                                index
-                                                                                            ) => (
-                                                                                                <Text
-                                                                                                    key={
-                                                                                                        variant.id
-                                                                                                    }
-                                                                                                    variant="bodyLg"
-                                                                                                    as="h6"
-                                                                                                >
-                                                                                                    {
-                                                                                                        variant.title
-                                                                                                    }
-                                                                                                </Text>
-                                                                                            )
-                                                                                        )
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                        </InlineStack>
-                                                                    </div>
-                                                                    <div
-                                                                        onClick={
-                                                                            toggleProductPicker
-                                                                        }
-                                                                    >
-                                                                        <Link url="#">
-                                                                            <Text
-                                                                                variant="bodyLg"
-                                                                                as="p"
-                                                                            >
-                                                                                {t(
-                                                                                    "createdigitalproduct.edit_product"
-                                                                                )}
-                                                                            </Text>
-                                                                        </Link>
-                                                                    </div>
-                                                                </InlineGrid>
-                                                            </div>
-                                                        ) : (
-                                                            <div
-                                                                style={{
-                                                                    display:
-                                                                        "flex",
-                                                                    alignItems:
-                                                                        "center",
-                                                                }}
-                                                            >
-                                                                <div
-                                                                    style={{
-                                                                        flex: "78%",
-                                                                    }}
-                                                                >
-                                                                    <TextField
-                                                                        value={
-                                                                            selectedProduct
-                                                                                ? selectedProduct.title
-                                                                                : ""
-                                                                        }
-                                                                        onFocus={
-                                                                            toggleProductPicker
-                                                                        }
-                                                                        placeholder={t(
-                                                                            "createdigitalproduct.search_shopify_products"
-                                                                        )}
-                                                                        fullWidth
-                                                                        readOnly
-                                                                    />
-                                                                </div>
-                                                                <div
-                                                                    style={{
-                                                                        flex: "22%",
-                                                                        marginLeft:
-                                                                            "1rem",
-                                                                    }}
-                                                                >
-                                                                    <Button
-                                                                        onClick={
-                                                                            toggleProductPicker
-                                                                        }
-                                                                    >
-                                                                        {t(
-                                                                            "createdigitalproduct.browse_products"
-                                                                        )}
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        <div>
-                                                            <Text
-                                                                as={"p"}
-                                                                variant={
-                                                                    "bodyMd"
-                                                                }
-                                                            >
-                                                                {t(
-                                                                    "createdigitalproduct.select_shopify_product_or_specific_product"
-                                                                )}
-                                                            </Text>
-                                                        </div>
-                                                    </BlockStack>
-                                                </Card>
-                                                {!isManualDeliveryEnabled && (
-                                                    <Card>
-                                                        <BlockStack gap="300">
-                                                            <Text
-                                                                variant="headingMd"
-                                                                as="h6"
-                                                            >
-                                                                {t(
-                                                                    "createdigitalproduct.provide_the_following_content_to_the_customer"
-                                                                )}
-                                                            </Text>
-
-                                                            {contentType &&
-                                                                contentType.includes(
-                                                                    "license"
-                                                                ) && (
-                                                                    <BlockStack gap="200">
-                                                                        {newLicenses.length >
-                                                                            0 && (
-                                                                            <>
-                                                                                {newLicenses.map(
-                                                                                    (
-                                                                                        license,
-                                                                                        index
-                                                                                    ) => {
-                                                                                        return (
-                                                                                            <div
-                                                                                                style={{
-                                                                                                    marginTop:
-                                                                                                        "10px",
-                                                                                                }}
-                                                                                                key={
-                                                                                                    index
-                                                                                                }
-                                                                                            >
-                                                                                                <Text
-                                                                                                    variant="headingMd"
-                                                                                                    as="h6"
-                                                                                                >
-                                                                                                    {t(
-                                                                                                        "createdigitalproduct.license_keys_codes"
-                                                                                                    )}
-                                                                                                </Text>
-                                                                                                <BlockStack spacing="tight">
-                                                                                                    <Text
-                                                                                                        variant="bodyLg"
-                                                                                                        as="p"
-                                                                                                    >
-                                                                                                        {t(
-                                                                                                            "createdigitalproduct.title"
-                                                                                                        )}
-
-                                                                                                        :{" "}
-                                                                                                        {
-                                                                                                            license.title
-                                                                                                        }
-                                                                                                    </Text>
-                                                                                                    <Text
-                                                                                                        variant="bodyLg"
-                                                                                                        as="p"
-                                                                                                    >
-                                                                                                        {t(
-                                                                                                            "createdigitalproduct.license_type"
-                                                                                                        )}
-
-                                                                                                        :{" "}
-                                                                                                        {license.licenseType ===
-                                                                                                        "automated"
-                                                                                                            ? "Automated"
-                                                                                                            : "Manual"}
-                                                                                                    </Text>
-                                                                                                    {license.licenseType ===
-                                                                                                        "automated" && (
-                                                                                                        <BlockStack gap="200">
-                                                                                                            <InlineGrid columns="1fr auto">
-                                                                                                                <Text
-                                                                                                                    variant="bodyLg"
-                                                                                                                    as="p"
-                                                                                                                >
-                                                                                                                    {t(
-                                                                                                                        "createdigitalproduct.prefix"
-                                                                                                                    )}
-
-                                                                                                                    :{" "}
-                                                                                                                    {
-                                                                                                                        license.prefix
-                                                                                                                    }
-
-                                                                                                                    ,
-                                                                                                                    {t(
-                                                                                                                        "createdigitalproduct.code_length"
-                                                                                                                    )}
-
-                                                                                                                    :{" "}
-                                                                                                                    {
-                                                                                                                        license.codeLength
-                                                                                                                    }
-
-                                                                                                                    ,
-                                                                                                                    {t(
-                                                                                                                        "createdigitalproduct.suffix"
-                                                                                                                    )}
-
-                                                                                                                    :{" "}
-                                                                                                                    {
-                                                                                                                        license.suffix
-                                                                                                                    }
-
-                                                                                                                    ,
-                                                                                                                    {t(
-                                                                                                                        "createdigitalproduct.total_length"
-                                                                                                                    )}
-
-                                                                                                                    :{" "}
-                                                                                                                    {
-                                                                                                                        license.totalCodes
-                                                                                                                    }
-                                                                                                                </Text>
-                                                                                                                <div>
-                                                                                                                    <Button
-                                                                                                                        icon={
-                                                                                                                            <Icon
-                                                                                                                                source={
-                                                                                                                                    XSmallIcon
-                                                                                                                                }
-                                                                                                                            />
-                                                                                                                        }
-                                                                                                                        onClick={() =>
-                                                                                                                            handleDeleteNewLicenseAtIndex(
-                                                                                                                                index
-                                                                                                                            )
-                                                                                                                        }
-                                                                                                                    ></Button>
-                                                                                                                </div>
-                                                                                                            </InlineGrid>
-                                                                                                        </BlockStack>
-                                                                                                    )}
-                                                                                                    {license.licenseType ===
-                                                                                                        "manual" && (
-                                                                                                        <>
-                                                                                                            {license.manual_codes_type ==
-                                                                                                                "csv" &&
-                                                                                                                license.licenseFiles &&
-                                                                                                                license.licenseFiles.map(
-                                                                                                                    (
-                                                                                                                        file,
-                                                                                                                        index
-                                                                                                                    ) => (
-                                                                                                                        <BlockStack
-                                                                                                                            key={
-                                                                                                                                index
-                                                                                                                            }
-                                                                                                                            gap="200"
-                                                                                                                        >
-                                                                                                                            <InlineGrid columns="1fr auto">
-                                                                                                                                <div>
-                                                                                                                                    <InlineStack>
-                                                                                                                                        <Card>
-                                                                                                                                            <BlockStack gap="300">
-                                                                                                                                                <div
-                                                                                                                                                    style={{
-                                                                                                                                                        width: "24px",
-                                                                                                                                                        height: "24px",
-                                                                                                                                                    }}
-                                                                                                                                                >
-                                                                                                                                                    <svg
-                                                                                                                                                        xmlns="http://www.w3.org/2000/svg"
-                                                                                                                                                        viewBox="0 0 20 20"
-                                                                                                                                                    >
-                                                                                                                                                        <path
-                                                                                                                                                            fillRule="evenodd"
-                                                                                                                                                            d="M4.843 9.854a3.75 3.75 0 0 0 0 5.303l.147.147a3.543 3.543 0 0 0 5.01 0 .75.75 0 0 0-1.06-1.061 2.043 2.043 0 0 1-2.89 0l-.146-.146a2.25 2.25 0 0 1 0-3.182l5.015-5.015a2.244 2.244 0 0 1 3.173 3.172l-2.286 2.286a.817.817 0 1 1-1.155-1.155l2.25-2.25a.75.75 0 1 0-1.06-1.061l-2.25 2.25a2.317 2.317 0 0 0 3.275 3.277l2.286-2.286a3.744 3.744 0 0 0-5.294-5.294l-5.015 5.015Z"
-                                                                                                                                                        />
-                                                                                                                                                    </svg>
-                                                                                                                                                </div>
-                                                                                                                                            </BlockStack>
-                                                                                                                                        </Card>
-                                                                                                                                        <div
-                                                                                                                                            style={{
-                                                                                                                                                marginLeft:
-                                                                                                                                                    "20px",
-                                                                                                                                            }}
-                                                                                                                                        >
-                                                                                                                                            <BlockStack gap="200">
-                                                                                                                                                <Link
-                                                                                                                                                    url="#"
-                                                                                                                                                    target="_blank"
-                                                                                                                                                    rel="noopener noreferrer"
-                                                                                                                                                >
-                                                                                                                                                    <Text
-                                                                                                                                                        variant="bodyMd"
-                                                                                                                                                        as="p"
-                                                                                                                                                        fontWeight="bold"
-                                                                                                                                                        color={
-                                                                                                                                                            exceedMaxSizeForLicense
-                                                                                                                                                                ? "critical"
-                                                                                                                                                                : ""
-                                                                                                                                                        }
-                                                                                                                                                    >
-                                                                                                                                                        {
-                                                                                                                                                            file.name
-                                                                                                                                                        }
-                                                                                                                                                    </Text>
-                                                                                                                                                </Link>
-                                                                                                                                                <Text
-                                                                                                                                                    variant="bodySm"
-                                                                                                                                                    as="p"
-                                                                                                                                                    color={
-                                                                                                                                                        exceedMaxSizeForLicense
-                                                                                                                                                            ? "critical"
-                                                                                                                                                            : "subdued"
-                                                                                                                                                    }
-                                                                                                                                                >
-                                                                                                                                                    {prettyBytes(
-                                                                                                                                                        file.size
-                                                                                                                                                    )}
-                                                                                                                                                    {exceedMaxSizeForLicense &&
-                                                                                                                                                        t(
-                                                                                                                                                            "createdigitalproduct.file_too_big_it_will_be_ignored"
-                                                                                                                                                        )}
-                                                                                                                                                </Text>
-                                                                                                                                            </BlockStack>
-                                                                                                                                        </div>
-                                                                                                                                    </InlineStack>
-                                                                                                                                </div>
-                                                                                                                                <div>
-                                                                                                                                    <Button
-                                                                                                                                        icon={
-                                                                                                                                            <Icon
-                                                                                                                                                source={
-                                                                                                                                                    XSmallIcon
-                                                                                                                                                }
-                                                                                                                                            />
-                                                                                                                                        }
-                                                                                                                                        onClick={() =>
-                                                                                                                                            handleDeleteNewLicenseAtIndex(
-                                                                                                                                                index
-                                                                                                                                            )
-                                                                                                                                        }
-                                                                                                                                    />
-                                                                                                                                </div>
-                                                                                                                            </InlineGrid>
-                                                                                                                        </BlockStack>
-                                                                                                                    )
-                                                                                                                )}
-
-                                                                                                            {license.manual_codes_type ==
-                                                                                                                "paste_text" && (
-                                                                                                                <BlockStack
-                                                                                                                    key={
-                                                                                                                        index
-                                                                                                                    }
-                                                                                                                    gap="200"
-                                                                                                                >
-                                                                                                                    <InlineGrid columns="1fr auto">
-                                                                                                                        <div>
-                                                                                                                            <Text
-                                                                                                                                variant="bodyLg"
-                                                                                                                                as="p"
-                                                                                                                            >
-                                                                                                                                {t(
-                                                                                                                                    "createdigitalproduct.paste_keys_codes"
-                                                                                                                                )}
-
-                                                                                                                                :{" "}
-                                                                                                                                {
-                                                                                                                                    license.pasteKeysValue
-                                                                                                                                }
-                                                                                                                            </Text>
-                                                                                                                        </div>
-                                                                                                                        <div>
-                                                                                                                            <Button
-                                                                                                                                icon={
-                                                                                                                                    <Icon
-                                                                                                                                        source={
-                                                                                                                                            XSmallIcon
-                                                                                                                                        }
-                                                                                                                                    />
-                                                                                                                                }
-                                                                                                                                onClick={() =>
-                                                                                                                                    handleDeleteNewLicenseAtIndex(
-                                                                                                                                        index
-                                                                                                                                    )
-                                                                                                                                }
-                                                                                                                            />
-                                                                                                                        </div>
-                                                                                                                    </InlineGrid>
-                                                                                                                </BlockStack>
-                                                                                                            )}
-                                                                                                        </>
-                                                                                                    )}
-                                                                                                </BlockStack>
-                                                                                            </div>
-                                                                                        );
-                                                                                    }
-                                                                                )}
-                                                                            </>
-                                                                        )}
-                                                                        <>
-                                                                            {selectedLicenseIds.map(
-                                                                                (
-                                                                                    selectedLicenseId,
-                                                                                    index
-                                                                                ) => {
-                                                                                    const selectedLicense =
-                                                                                        allLicenses.find(
-                                                                                            (
-                                                                                                license
-                                                                                            ) =>
-                                                                                                license.id ===
-                                                                                                selectedLicenseId
-                                                                                        );
-                                                                                    if (
-                                                                                        !selectedLicense
-                                                                                    )
-                                                                                        return null;
-
-                                                                                    return (
-                                                                                        <div
-                                                                                            style={{
-                                                                                                marginTop:
-                                                                                                    "10px",
-                                                                                            }}
-                                                                                            key={
-                                                                                                selectedLicense.id
-                                                                                            }
-                                                                                        >
-                                                                                            <Text
-                                                                                                variant="headingMd"
-                                                                                                as="h6"
-                                                                                            >
-                                                                                                {t(
-                                                                                                    "createdigitalproduct.license_keys_codes"
-                                                                                                )}
-                                                                                            </Text>
-                                                                                            <BlockStack spacing="tight">
-                                                                                                <Text
-                                                                                                    variant="bodyLg"
-                                                                                                    as="p"
-                                                                                                >
-                                                                                                    {t(
-                                                                                                        "createdigitalproduct.title"
-                                                                                                    )}
-
-                                                                                                    :{" "}
-                                                                                                    {
-                                                                                                        selectedLicense.title
-                                                                                                    }
-                                                                                                </Text>
-                                                                                                <Text
-                                                                                                    variant="bodyLg"
-                                                                                                    as="p"
-                                                                                                >
-                                                                                                    {t(
-                                                                                                        "digtal_product_listing.active"
-                                                                                                    )}
-
-                                                                                                    :{" "}
-                                                                                                    {selectedLicense.license_type ===
-                                                                                                    "automated"
-                                                                                                        ? "Automated"
-                                                                                                        : "Manual"}
-                                                                                                </Text>
-                                                                                                <Text
-                                                                                                    variant="bodyLg"
-                                                                                                    as="p"
-                                                                                                >
-                                                                                                    {t(
-                                                                                                        "createdigitalproduct.codes_remaining"
-                                                                                                    )}
-
-                                                                                                    :{" "}
-                                                                                                    {
-                                                                                                        selectedLicense.codes_remaining
-                                                                                                    }
-                                                                                                </Text>
-                                                                                                {selectedLicense.license_type ===
-                                                                                                    "automated" && (
-                                                                                                    <BlockStack gap="200">
-                                                                                                        <InlineGrid columns="1fr auto">
-                                                                                                            <Text
-                                                                                                                variant="bodyLg"
-                                                                                                                as="p"
-                                                                                                            >
-                                                                                                                {t(
-                                                                                                                    "createdigitalproduct.prefix"
-                                                                                                                )}
-
-                                                                                                                :{" "}
-                                                                                                                {
-                                                                                                                    selectedLicense.prefix
-                                                                                                                }
-
-                                                                                                                ,
-                                                                                                                {t(
-                                                                                                                    "createdigitalproduct.code_length"
-                                                                                                                )}
-
-                                                                                                                :{" "}
-                                                                                                                {
-                                                                                                                    selectedLicense.code_length
-                                                                                                                }
-
-                                                                                                                ,
-                                                                                                                {t(
-                                                                                                                    "createdigitalproduct.suffix"
-                                                                                                                )}
-
-                                                                                                                :{" "}
-                                                                                                                {
-                                                                                                                    selectedLicense.suffix
-                                                                                                                }
-
-                                                                                                                ,
-                                                                                                                {t(
-                                                                                                                    "createdigitalproduct.total_length"
-                                                                                                                )}{" "}
-                                                                                                                {
-                                                                                                                    selectedLicense.total_codes
-                                                                                                                }
-                                                                                                            </Text>
-                                                                                                            <div>
-                                                                                                                <Button
-                                                                                                                    icon={
-                                                                                                                        <Icon
-                                                                                                                            source={
-                                                                                                                                XSmallIcon
-                                                                                                                            }
-                                                                                                                        />
-                                                                                                                    }
-                                                                                                                    onClick={() =>
-                                                                                                                        handleDeleteExistingLicenseAtIndex(
-                                                                                                                            index
-                                                                                                                        )
-                                                                                                                    }
-                                                                                                                ></Button>
-                                                                                                            </div>
-                                                                                                        </InlineGrid>
-                                                                                                    </BlockStack>
-                                                                                                )}
-                                                                                                {selectedLicense.license_type ===
-                                                                                                    "manual" && (
-                                                                                                    <>
-                                                                                                        {selectedLicense.manual_codes_type ==
-                                                                                                            "csv" &&
-                                                                                                            selectedLicense.file && (
-                                                                                                                <BlockStack gap="200">
-                                                                                                                    <InlineGrid columns="1fr auto">
-                                                                                                                        <div>
-                                                                                                                            <InlineStack>
-                                                                                                                                <Card>
-                                                                                                                                    <BlockStack gap="300">
-                                                                                                                                        <div
-                                                                                                                                            style={{
-                                                                                                                                                width: "24px",
-                                                                                                                                                height: "24px",
-                                                                                                                                            }}
-                                                                                                                                        >
-                                                                                                                                            <svg
-                                                                                                                                                xmlns="http://www.w3.org/2000/svg"
-                                                                                                                                                viewBox="0 0 20 20"
-                                                                                                                                            >
-                                                                                                                                                <path
-                                                                                                                                                    fillRule="evenodd"
-                                                                                                                                                    d="M4.843 9.854a3.75 3.75 0 0 0 0 5.303l.147.147a3.543 3.543 0 0 0 5.01 0 .75.75 0 0 0-1.06-1.061 2.043 2.043 0 0 1-2.89 0l-.146-.146a2.25 2.25 0 0 1 0-3.182l5.015-5.015a2.244 2.244 0 0 1 3.173 3.172l-2.286 2.286a.817.817 0 1 1-1.155-1.155l2.25-2.25a.75.75 0 1 0-1.06-1.061l-2.25 2.25a2.317 2.317 0 0 0 3.275 3.277l2.286-2.286a3.744 3.744 0 0 0-5.294-5.294l-5.015 5.015Z"
-                                                                                                                                                />
-                                                                                                                                            </svg>
-                                                                                                                                        </div>
-                                                                                                                                    </BlockStack>
-                                                                                                                                </Card>
-                                                                                                                                <div
-                                                                                                                                    style={{
-                                                                                                                                        marginLeft:
-                                                                                                                                            "20px",
-                                                                                                                                    }}
-                                                                                                                                >
-                                                                                                                                    <BlockStack gap="200">
-                                                                                                                                        <Link
-                                                                                                                                            url={
-                                                                                                                                                JSON.parse(
-                                                                                                                                                    selectedLicense.file
-                                                                                                                                                )
-                                                                                                                                                    .url ||
-                                                                                                                                                "#"
-                                                                                                                                            }
-                                                                                                                                            target="_blank"
-                                                                                                                                            rel="noopener noreferrer"
-                                                                                                                                        >
-                                                                                                                                            <Text
-                                                                                                                                                variant="bodyMd"
-                                                                                                                                                as="p"
-                                                                                                                                                fontWeight="bold"
-                                                                                                                                                color={
-                                                                                                                                                    exceedMaxSizeForLicense
-                                                                                                                                                        ? "critical"
-                                                                                                                                                        : ""
-                                                                                                                                                }
-                                                                                                                                            >
-                                                                                                                                                {
-                                                                                                                                                    JSON.parse(
-                                                                                                                                                        selectedLicense.file
-                                                                                                                                                    )
-                                                                                                                                                        .name
-                                                                                                                                                }
-                                                                                                                                            </Text>
-                                                                                                                                        </Link>
-                                                                                                                                        <Text
-                                                                                                                                            variant="bodySm"
-                                                                                                                                            as="p"
-                                                                                                                                            color={
-                                                                                                                                                exceedMaxSizeForLicense
-                                                                                                                                                    ? "critical"
-                                                                                                                                                    : "subdued"
-                                                                                                                                            }
-                                                                                                                                        >
-                                                                                                                                            {prettyBytes(
-                                                                                                                                                JSON.parse(
-                                                                                                                                                    selectedLicense.file
-                                                                                                                                                )
-                                                                                                                                                    .size
-                                                                                                                                            )}
-                                                                                                                                            {exceedMaxSizeForLicense &&
-                                                                                                                                                t(
-                                                                                                                                                    "createdigitalproduct.file_too_big_it_will_be_ignored"
-                                                                                                                                                )}
-                                                                                                                                        </Text>
-                                                                                                                                    </BlockStack>
-                                                                                                                                </div>
-                                                                                                                            </InlineStack>
-                                                                                                                        </div>
-                                                                                                                        <div>
-                                                                                                                            <Button
-                                                                                                                                icon={
-                                                                                                                                    <Icon
-                                                                                                                                        source={
-                                                                                                                                            XSmallIcon
-                                                                                                                                        }
-                                                                                                                                    />
-                                                                                                                                }
-                                                                                                                                onClick={() =>
-                                                                                                                                    handleDeleteExistingLicenseAtIndex(
-                                                                                                                                        index
-                                                                                                                                    )
-                                                                                                                                }
-                                                                                                                            />
-                                                                                                                        </div>
-                                                                                                                    </InlineGrid>
-                                                                                                                </BlockStack>
-                                                                                                            )}
-
-                                                                                                        {selectedLicense.manual_codes_type ==
-                                                                                                            "paste_text" && (
-                                                                                                            <BlockStack gap="200">
-                                                                                                                <InlineGrid columns="1fr auto">
-                                                                                                                    <div>
-                                                                                                                        <Text
-                                                                                                                            variant="bodyLg"
-                                                                                                                            as="p"
-                                                                                                                        >
-                                                                                                                            {t(
-                                                                                                                                "createdigitalproduct.paste_keys_codes"
-                                                                                                                            )}
-
-                                                                                                                            :{" "}
-                                                                                                                            {
-                                                                                                                                selectedLicense.codes_text
-                                                                                                                            }
-                                                                                                                        </Text>
-                                                                                                                    </div>
-                                                                                                                    <div>
-                                                                                                                        <Button
-                                                                                                                            icon={
-                                                                                                                                <Icon
-                                                                                                                                    source={
-                                                                                                                                        XSmallIcon
-                                                                                                                                    }
-                                                                                                                                />
-                                                                                                                            }
-                                                                                                                            onClick={() =>
-                                                                                                                                handleDeleteExistingLicenseAtIndex(
-                                                                                                                                    index
-                                                                                                                                )
-                                                                                                                            }
-                                                                                                                        />
-                                                                                                                    </div>
-                                                                                                                </InlineGrid>
-                                                                                                            </BlockStack>
-                                                                                                        )}
-                                                                                                    </>
-                                                                                                )}
-                                                                                            </BlockStack>
-                                                                                        </div>
-                                                                                    );
-                                                                                }
-                                                                            )}
-                                                                        </>
-                                                                    </BlockStack>
-                                                                )}
-
-                                                            {selectedProduct ? (
-                                                                <div>
-                                                                    <Card>
-                                                                        <div
-                                                                            style={{
-                                                                                marginLeft:
-                                                                                    "23px",
-                                                                                marginRight:
-                                                                                    "23px",
-                                                                                marginTop:
-                                                                                    "5px",
-                                                                            }}
-                                                                        >
-                                                                            <TextField
-                                                                                label={t(
-                                                                                    "createdigitalproduct.title"
-                                                                                )}
-                                                                                value={
-                                                                                    licenseTitle
-                                                                                }
-                                                                                onChange={
-                                                                                    handleLicenseTitleChange
-                                                                                }
-                                                                                autoComplete="off"
-                                                                            />
-                                                                            <div
-                                                                                style={{
-                                                                                    marginTop:
-                                                                                        "30px",
-                                                                                }}
-                                                                            >
-                                                                                <Text
-                                                                                    variant="headingMd"
-                                                                                    as="h6"
-                                                                                >
-                                                                                    {t(
-                                                                                        "createdigitalproduct.license_keys_codes_type"
-                                                                                    )}
-                                                                                </Text>
-                                                                                <BlockStack gap="200">
-                                                                                    <RadioButton
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.automated_key_list"
-                                                                                        )}
-                                                                                        helpText={t(
-                                                                                            "createdigitalproduct.license_keys_auto_generate_info"
-                                                                                        )}
-                                                                                        checked={
-                                                                                            value ===
-                                                                                            "automated"
-                                                                                        }
-                                                                                        id="automated"
-                                                                                        name="keyList"
-                                                                                        onChange={() =>
-                                                                                            handleRadioButtonChange(
-                                                                                                "automated"
-                                                                                            )
-                                                                                        }
-                                                                                    />
-                                                                                    <RadioButton
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.manual_key_list"
-                                                                                        )}
-                                                                                        helpText={t(
-                                                                                            "createdigitalproduct.license_keys_are_assigned_from_a_manually_imported_or_generated_list"
-                                                                                        )}
-                                                                                        checked={
-                                                                                            value ===
-                                                                                            "manual"
-                                                                                        }
-                                                                                        id="manual"
-                                                                                        name="keyList"
-                                                                                        onChange={() =>
-                                                                                            handleRadioButtonChange(
-                                                                                                "manual"
-                                                                                            )
-                                                                                        }
-                                                                                    />
-                                                                                </BlockStack>
-                                                                            </div>
-                                                                            <div
-                                                                                style={{
-                                                                                    marginTop:
-                                                                                        "15px",
-                                                                                }}
-                                                                            >
-                                                                                <Divider />
-                                                                            </div>
-                                                                            {value ===
-                                                                                "automated" && (
-                                                                                <div>
-                                                                                    <div
-                                                                                        style={{
-                                                                                            marginTop:
-                                                                                                "15px",
-                                                                                        }}
-                                                                                    >
-                                                                                        <Text
-                                                                                            variant="headingMd"
-                                                                                            as="h6"
-                                                                                        >
-                                                                                            {t(
-                                                                                                "createdigitalproduct.automated_key_list"
-                                                                                            )}
-                                                                                        </Text>
-                                                                                        <div
-                                                                                            style={{
-                                                                                                color: "gray",
-                                                                                            }}
-                                                                                        >
-                                                                                            <Text
-                                                                                                variant="bodyLg"
-                                                                                                as="p"
-                                                                                            >
-                                                                                                {t(
-                                                                                                    "createdigitalproduct.license_keys_auto_generate_format_info"
-                                                                                                )}
-                                                                                            </Text>
-                                                                                        </div>
-                                                                                    </div>
-
-                                                                                    <div
-                                                                                        style={{
-                                                                                            marginTop:
-                                                                                                "15px",
-                                                                                        }}
-                                                                                    >
-                                                                                        <Text
-                                                                                            variant="headingMd"
-                                                                                            as="h6"
-                                                                                        >
-                                                                                            {t(
-                                                                                                "createdigitalproduct.edit_license_key_format"
-                                                                                            )}
-                                                                                        </Text>
-                                                                                        <div
-                                                                                            style={{
-                                                                                                marginTop:
-                                                                                                    "10px",
-                                                                                            }}
-                                                                                        >
-                                                                                            <InlineStack gap="400">
-                                                                                                <div
-                                                                                                    style={{
-                                                                                                        width: "22%",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <TextField
-                                                                                                        label={t(
-                                                                                                            "createdigitalproduct.prefix"
-                                                                                                        )}
-                                                                                                        value={
-                                                                                                            prefix
-                                                                                                        }
-                                                                                                        onChange={
-                                                                                                            handlePrefixChange
-                                                                                                        }
-                                                                                                        autoComplete="off"
-                                                                                                    />
-                                                                                                </div>
-                                                                                                <div
-                                                                                                    style={{
-                                                                                                        width: "22%",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <TextField
-                                                                                                        label={t(
-                                                                                                            "createdigitalproduct.code_length"
-                                                                                                        )}
-                                                                                                        value={
-                                                                                                            codeLength
-                                                                                                        }
-                                                                                                        onChange={
-                                                                                                            handleCodeLengthChange
-                                                                                                        }
-                                                                                                        min={1}
-                                                                                                        type="number"
-                                                                                                        autoComplete="off"
-                                                                                                    />
-                                                                                                </div>
-                                                                                                <div
-                                                                                                    style={{
-                                                                                                        width: "22%",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <TextField
-                                                                                                        label={t(
-                                                                                                            "createdigitalproduct.suffix"
-                                                                                                        )}
-                                                                                                        value={
-                                                                                                            suffix
-                                                                                                        }
-                                                                                                        onChange={
-                                                                                                            handleSuffixChange
-                                                                                                        }
-                                                                                                        autoComplete="off"
-                                                                                                    />
-                                                                                                </div>
-                                                                                                <div
-                                                                                                    style={{
-                                                                                                        width: "22%",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <TextField
-                                                                                                        label={t(
-                                                                                                            "createdigitalproduct.total_codes"
-                                                                                                        )}
-                                                                                                        value={
-                                                                                                            totalCodes
-                                                                                                        }
-                                                                                                        onChange={
-                                                                                                            handleTotalCodesChange
-                                                                                                        }
-                                                                                                        autoComplete="off"
-                                                                                                        type="number"
-                                                                                                        placeholder="8"
-                                                                                                    />
-                                                                                                </div>
-                                                                                            </InlineStack>
-                                                                                        </div>
-                                                                                        <div
-                                                                                            style={{
-                                                                                                color: "gray",
-                                                                                                marginTop:
-                                                                                                    "10px",
-                                                                                            }}
-                                                                                        >
-                                                                                            <Text
-                                                                                                variant="bodyLg"
-                                                                                                as="p"
-                                                                                            >
-                                                                                                {t(
-                                                                                                    "createdigitalproduct.your_license_keys_will_appear_as"
-                                                                                                )}
-                                                                                                <Text
-                                                                                                    variant="bodyLg"
-                                                                                                    as="span"
-                                                                                                    fontWeight="bold"
-                                                                                                    style={{
-                                                                                                        fontFamily: "monospace",
-                                                                                                        backgroundColor: "#f0f0f0",
-                                                                                                        padding: "4px 8px",
-                                                                                                        borderRadius: "4px",
-                                                                                                        marginLeft: "8px",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    {licensePreview}
-                                                                                                </Text>
-                                                                                            </Text>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-
-                                                                            {value ===
-                                                                                "manual" && (
-                                                                                <>
-                                                                                    <Tabs
-                                                                                        tabs={
-                                                                                            manualLicenseTabs
-                                                                                        }
-                                                                                        selected={
-                                                                                            selectedManualLicenseTab
-                                                                                        }
-                                                                                        onSelect={
-                                                                                            handleManualLicenseTabChange
-                                                                                        }
-                                                                                    >
-                                                                                        {selectedManualLicenseTab ===
-                                                                                            0 && (
-                                                                                            <>
-                                                                                                <div
-                                                                                                    style={{
-                                                                                                        marginLeft:
-                                                                                                            "15px",
-                                                                                                        marginRight:
-                                                                                                            "15px",
-                                                                                                        marginTop:
-                                                                                                            "5px",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <BlockStack spacing="loose">
-                                                                                                        <DropZone
-                                                                                                            label={t(
-                                                                                                                "createdigitalproduct.upload_csv"
-                                                                                                            )}
-                                                                                                            onDrop={
-                                                                                                                handleLicenseDropZoneDrop
-                                                                                                            }
-                                                                                                            accept=".csv"
-                                                                                                            allowMultiple={
-                                                                                                                false
-                                                                                                            }
-                                                                                                        >
-                                                                                                            <DropZone.FileUpload
-                                                                                                                actionTitle={t(
-                                                                                                                    "digtal_product_listing.add_files"
-                                                                                                                )}
-                                                                                                            />
-                                                                                                        </DropZone>
-
-                                                                                                        {attachedLicenseFile && (
-                                                                                                            <BlockStack gap="200">
-                                                                                                                <InlineStack
-                                                                                                                    gap="200"
-                                                                                                                    blockAlign="center"
-                                                                                                                >
-                                                                                                                    <Button
-                                                                                                                        icon={
-                                                                                                                            <Icon
-                                                                                                                                source={
-                                                                                                                                    XSmallIcon
-                                                                                                                                }
-                                                                                                                            />
-                                                                                                                        }
-                                                                                                                        onClick={
-                                                                                                                            handleLicenseDeleteFile
-                                                                                                                        }
-                                                                                                                    />
-                                                                                                                    <BlockStack>
-                                                                                                                        <Text
-                                                                                                                            variation="strong"
-                                                                                                                            fontWeight="bold"
-                                                                                                                            color={
-                                                                                                                                exceedMaxSizeForLicense
-                                                                                                                                    ? "critical"
-                                                                                                                                    : ""
-                                                                                                                            }
-                                                                                                                        >
-                                                                                                                            {
-                                                                                                                                attachedLicenseFile.name
-                                                                                                                            }
-                                                                                                                        </Text>
-                                                                                                                        <Text
-                                                                                                                            variation="subdued"
-                                                                                                                            color={
-                                                                                                                                exceedMaxSizeForLicense
-                                                                                                                                    ? "critical"
-                                                                                                                                    : "subdued"
-                                                                                                                            }
-                                                                                                                        >
-                                                                                                                            {prettyBytes(
-                                                                                                                                attachedLicenseFile.size
-                                                                                                                            )}{" "}
-                                                                                                                            {exceedMaxSizeForLicense &&
-                                                                                                                                t(
-                                                                                                                                    "createdigitalproduct.file_too_big_it_will_be_ignored"
-                                                                                                                                )}
-                                                                                                                        </Text>
-                                                                                                                    </BlockStack>
-                                                                                                                </InlineStack>
-                                                                                                            </BlockStack>
-                                                                                                        )}
-                                                                                                        <div
-                                                                                                            style={{
-                                                                                                                marginTop:
-                                                                                                                    "10px",
-                                                                                                            }}
-                                                                                                        >
-                                                                                                            <Text
-                                                                                                                as={
-                                                                                                                    "p"
-                                                                                                                }
-                                                                                                                variant={
-                                                                                                                    "bodyMd"
-                                                                                                                }
-                                                                                                            >
-                                                                                                                {t(
-                                                                                                                    "createdigitalproduct.ready_to_upload_your_license"
-                                                                                                                )}{" "}
-                                                                                                                <a
-                                                                                                                    href="/license.csv"
-                                                                                                                    download
-                                                                                                                >
-                                                                                                                    {t(
-                                                                                                                        "createdigitalproduct.get_the_template_here"
-                                                                                                                    )}
-                                                                                                                </a>{" "}
-                                                                                                                {t(
-                                                                                                                    "createdigitalproduct.to_get_started"
-                                                                                                                )}
-                                                                                                            </Text>
-                                                                                                        </div>
-                                                                                                    </BlockStack>
-                                                                                                </div>
-                                                                                                <div
-                                                                                                    style={{
-                                                                                                        marginTop:
-                                                                                                            "10px",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <Checkbox
-                                                                                                        label={t(
-                                                                                                            "createdigitalproduct.deliver_keys_codes_in_sequence_order"
-                                                                                                        )}
-                                                                                                        checked={
-                                                                                                            deliverKeysInSequence
-                                                                                                        }
-                                                                                                        onChange={
-                                                                                                            handleDeliverKeysInSequence
-                                                                                                        }
-                                                                                                    />
-                                                                                                </div>
-                                                                                            </>
-                                                                                        )}
-                                                                                        {selectedManualLicenseTab ===
-                                                                                            1 && (
-                                                                                            <div
-                                                                                                style={{
-                                                                                                    marginLeft:
-                                                                                                        "15px",
-                                                                                                    marginRight:
-                                                                                                        "15px",
-                                                                                                    marginTop:
-                                                                                                        "5px",
-                                                                                                }}
-                                                                                            >
-                                                                                                <TextField
-                                                                                                    label={t(
-                                                                                                        "createdigitalproduct.paste_keys_codes"
-                                                                                                    )}
-                                                                                                    value={
-                                                                                                        pasteKeysValue
-                                                                                                    }
-                                                                                                    onChange={
-                                                                                                        handlePasteKeysChange
-                                                                                                    }
-                                                                                                    multiline={
-                                                                                                        4
-                                                                                                    }
-                                                                                                    placeholder={t(
-                                                                                                        "createdigitalproduct.paste_your_license_keys_or_codes_here"
-                                                                                                    )}
-                                                                                                    autoComplete="off"
-                                                                                                    helpText={t(
-                                                                                                        "createdigitalproduct.paste_your_license_keys_each_line"
-                                                                                                    )}
-                                                                                                />
-                                                                                            </div>
-                                                                                        )}
-                                                                                    </Tabs>
-                                                                                    <div
-                                                                                        style={{
-                                                                                            marginTop:
-                                                                                                "0px",
-                                                                                        }}
-                                                                                    ></div>
-                                                                                    <Checkbox
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.send_key_code_multiple_customers"
-                                                                                        )}
-                                                                                        checked={
-                                                                                            sendKeyToMultipleCustomers
-                                                                                        }
-                                                                                        onChange={
-                                                                                            handleSendKeyToMultipleCustomers
-                                                                                        }
-                                                                                    />
-                                                                                </>
-                                                                            )}
-                                                                            <div
-                                                                                style={{
-                                                                                    marginTop:
-                                                                                        "0px",
-                                                                                }}
-                                                                            >
-                                                                                <Checkbox
-                                                                                    label={t(
-                                                                                        "createdigitalproduct.deliver_as_qr_code"
-                                                                                    )}
-                                                                                    checked={
-                                                                                        qrCodeEnabled
-                                                                                    }
-                                                                                    onChange={
-                                                                                        handleQRCode
-                                                                                    }
-                                                                                />
-                                                                            </div>
-
-                                                                            <div
-                                                                                style={{
-                                                                                    marginTop:
-                                                                                        "0px",
-                                                                                }}
-                                                                            >
-                                                                                <Checkbox
-                                                                                    label={t("createdigitalproduct.deliver_as_gift_card_send_key_code_to_gift_recipient")}
-                                                                                    checked={
-                                                                                        giftCardEnabled
-                                                                                    }
-                                                                                    onChange={
-                                                                                        handleGiftCardEnabled
-                                                                                    }
-                                                                                />
-                                                                            </div>
-
-                                                                            {qrCodeEnabled && (
-                                                                                <div
-                                                                                    style={{
-                                                                                        marginTop:
-                                                                                            "0px",
-                                                                                    }}
-                                                                                >
-                                                                                    <Checkbox
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.print_qr_code_on_pdf"
-                                                                                        )}
-                                                                                        checked={
-                                                                                            qrCodePrintOnPDF
-                                                                                        }
-                                                                                        onChange={
-                                                                                            handleQRCodePrintOnPDF
-                                                                                        }
-                                                                                    />
-                                                                                </div>
-                                                                            )}
-
-                                                                            {giftCardEnabled && (
-                                                                                <>
-                                                                                    <div
-                                                                                        style={{
-                                                                                            marginTop:
-                                                                                                "10px",
-                                                                                        }}
-                                                                                    >
-                                                                                        <TextField
-                                                                                            label={t("createdigitalproduct.email_property_name")}
-                                                                                            value={
-                                                                                                giftCardPropertyName
-                                                                                            }
-                                                                                            onChange={
-                                                                                                handleGiftCardPropertyNameChange
-                                                                                            }
-                                                                                            autoComplete="off"
-                                                                                            placeholder={t("createdigitalproduct.enter_email_property_name")}
-                                                                                            helpText={t("createdigitalproduct.specify_property_name_email_address")}
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div
-                                                                                        style={{
-                                                                                            marginTop:
-                                                                                                "10px",
-                                                                                        }}
-                                                                                    >
-                                                                                        <TextField
-                                                                                            label={t("createdigitalproduct.delivery_time_property_name")}
-                                                                                            value={
-                                                                                                giftDeliveryPropertyName
-                                                                                            }
-                                                                                            onChange={
-                                                                                                handleGiftDeliveryPropertyNameChange
-                                                                                            }
-                                                                                            autoComplete="off"
-                                                                                            placeholder={t("createdigitalproduct.enter_gift_delivery_property_name")}
-                                                                                            helpText={t("createdigitalproduct.specify_property_name_datetime_picker")}
-                                                                                        />
-                                                                                    </div>
-                                                                                </>
-                                                                            )}
-
-                                                                            <div
-                                                                                style={{
-                                                                                    marginTop:
-                                                                                        "20px",
-                                                                                }}
-                                                                            >
-                                                                                <TextField
-                                                                                    label={t(
-                                                                                        "createdigitalproduct.deliver_no_of_keys_codes_per_unit"
-                                                                                    )}
-                                                                                    value={
-                                                                                        perUnitNoDelivery ||
-                                                                                        1
-                                                                                    }
-                                                                                    onChange={
-                                                                                        handlePerUnitNoDeliveryChange
-                                                                                    }
-                                                                                    autoComplete="off"
-                                                                                    type="number"
-                                                                                    placeholder="1"
-                                                                                    min="1"
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                    </Card>
-                                                                </div>
-                                                            ) : (
-                                                                <div>
-                                                                    <Text
-                                                                        variant="bodyLg"
-                                                                        as="p"
-                                                                    >
-                                                                        {t(
-                                                                            "createdigitalproduct.add_shopify_product_to_attached_content"
-                                                                        )}
-                                                                    </Text>
-                                                                </div>
-                                                            )}
-                                                        </BlockStack>
-                                                    </Card>
-                                                )}
-
-                                            </BlockStack>
-                                        </div>
-                                    )}
-
-                                    {selectedProductType === "pdf" && (
-                                        <div>
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    flexDirection: isMobile
-                                                        ? "column"
-                                                        : "row",
-                                                    gap: "16px",
-                                                }}
-                                            >
-                                                <div
-                                                    style={{
-                                                        width: isMobile
-                                                            ? "100%"
-                                                            : "64%",
-                                                    }}
-                                                >
-                                                    <BlockStack gap="400">
-                                                        <Card>
-                                                            <BlockStack gap="300">
-                                                                <Text
-                                                                    variant="headingMd"
-                                                                    as="h6"
-                                                                >
-                                                                    {t(
-                                                                        "createdigitalproduct.when_this_shopify_product_is_purchased"
-                                                                    )}
-                                                                </Text>
-                                                                {selectedProduct ? (
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    >
-                                                                        <InlineGrid
-                                                                            columns="1fr auto"
-                                                                            style={{
-                                                                                marginBottom:
-                                                                                    "10px",
-                                                                            }}
-                                                                        >
-                                                                            <div>
-                                                                                <InlineStack>
-                                                                                    <div>
-                                                                                        <Thumbnail
-                                                                                            source={
-                                                                                                selectedProduct
-                                                                                                    .images[0]
-                                                                                                    ?.originalSrc ??
-                                                                                                "https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-image_large.png?v=1530129081"
-                                                                                            }
-                                                                                            alt={
-                                                                                                selectedProduct.title
-                                                                                            }
-                                                                                            size="large"
-                                                                                        />
-                                                                                    </div>
-                                                                                    <div
-                                                                                        style={{
-                                                                                            marginLeft:
-                                                                                                "20px",
-                                                                                        }}
-                                                                                    >
-                                                                                        <div>
-                                                                                            <Link url="#">
-                                                                                                <Text
-                                                                                                    variant="headingMd"
-                                                                                                    as="h6"
-                                                                                                >
-                                                                                                    {
-                                                                                                        selectedProduct.title
-                                                                                                    }
-                                                                                                </Text>
-                                                                                            </Link>
-                                                                                            {selectedProduct
-                                                                                                .variants
-                                                                                                .length >
-                                                                                            1 ? (
-                                                                                                <Text
-                                                                                                    variant="bodyLg"
-                                                                                                    as="p"
-                                                                                                >
-                                                                                                    {t(
-                                                                                                        "digtal_product_listing.all_variants"
-                                                                                                    )}
-
-                                                                                                    (
-                                                                                                    {
-                                                                                                        selectedProduct
-                                                                                                            .variants
-                                                                                                            .length
-                                                                                                    }
-
-                                                                                                    )
-                                                                                                </Text>
-                                                                                            ) : (
-                                                                                                selectedProduct.variants.map(
-                                                                                                    (
-                                                                                                        variant,
-                                                                                                        index
-                                                                                                    ) => (
-                                                                                                        <Text
-                                                                                                            key={
-                                                                                                                variant.id
-                                                                                                            }
-                                                                                                            variant="bodyLg"
-                                                                                                            as="h6"
-                                                                                                        >
-                                                                                                            {
-                                                                                                                variant.title
-                                                                                                            }
-                                                                                                        </Text>
-                                                                                                    )
-                                                                                                )
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </InlineStack>
-                                                                            </div>
-                                                                            <div
-                                                                                onClick={
-                                                                                    toggleProductPicker
-                                                                                }
-                                                                            >
-                                                                                <Link url="#">
-                                                                                    <Text
-                                                                                        variant="bodyLg"
-                                                                                        as="p"
-                                                                                    >
-                                                                                        {t(
-                                                                                            "createdigitalproduct.edit_product"
-                                                                                        )}
-                                                                                    </Text>
-                                                                                </Link>
-                                                                            </div>
-                                                                        </InlineGrid>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div
-                                                                        style={{
-                                                                            display:
-                                                                                "flex",
-                                                                            alignItems:
-                                                                                "center",
-                                                                        }}
-                                                                    >
-                                                                        <div
-                                                                            style={{
-                                                                                flex: "78%",
-                                                                            }}
-                                                                        >
-                                                                            <TextField
-                                                                                value={
-                                                                                    selectedProduct
-                                                                                        ? selectedProduct.title
-                                                                                        : ""
-                                                                                }
-                                                                                onFocus={
-                                                                                    toggleProductPicker
-                                                                                }
-                                                                                placeholder={t(
-                                                                                    "createdigitalproduct.search_shopify_products"
-                                                                                )}
-                                                                                fullWidth
-                                                                                readOnly
-                                                                            />
-                                                                        </div>
-                                                                        <div
-                                                                            style={{
-                                                                                flex: "22%",
-                                                                                marginLeft:
-                                                                                    "1rem",
-                                                                            }}
-                                                                        >
-                                                                            <Button
-                                                                                onClick={
-                                                                                    toggleProductPicker
-                                                                                }
-                                                                            >
-                                                                                {t(
-                                                                                    "createdigitalproduct.browse_products"
-                                                                                )}
-                                                                            </Button>
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                                <div>
-                                                                    <Text
-                                                                        as={"p"}
-                                                                        variant={
-                                                                            "bodyMd"
-                                                                        }
-                                                                    >
-                                                                        {t(
-                                                                            "createdigitalproduct.select_shopify_product_or_specific_product"
-                                                                        )}
-                                                                    </Text>
-                                                                </div>
-                                                            </BlockStack>
-                                                        </Card>
-                                                        {!isManualDeliveryEnabled && (
-                                                            <Card>
-                                                                <BlockStack gap="300">
-                                                                    <Text
-                                                                        variant="headingMd"
-                                                                        as="h6"
-                                                                    >
-                                                                        {t(
-                                                                            "createdigitalproduct.provide_the_following_content_to_the_customer"
-                                                                        )}
-                                                                    </Text>
-
-                                                                    {contentType &&
-                                                                        contentType.includes(
-                                                                            "files"
-                                                                        ) && (
-                                                                            <BlockStack gap="200">
-                                                                                {files.length >
-                                                                                    0 &&
-                                                                                    files.map(
-                                                                                        (
-                                                                                            file,
-                                                                                            index
-                                                                                        ) => {
-                                                                                            const exceedMaxSize =
-                                                                                                file.size >
-                                                                                                fileSizeLimit;
-
-                                                                                            return (
-                                                                                                <InlineGrid columns="1fr auto">
-                                                                                                    <div>
-                                                                                                        <InlineStack>
-                                                                                                            <div>
-                                                                                                                <Card>
-                                                                                                                    <BlockStack gap="300">
-                                                                                                                        <div
-                                                                                                                            style={{
-                                                                                                                                width: "24px",
-                                                                                                                                height: "24px",
-                                                                                                                            }}
-                                                                                                                        >
-                                                                                                                            <svg
-                                                                                                                                xmlns="http://www.w3.org/2000/svg"
-                                                                                                                                viewBox="0 0 20 20"
-                                                                                                                            >
-                                                                                                                                <path
-                                                                                                                                    fill-rule="evenodd"
-                                                                                                                                    d="M4.843 9.854a3.75 3.75 0 0 0 0 5.303l.147.147a3.543 3.543 0 0 0 5.01 0 .75.75 0 0 0-1.06-1.061 2.043 2.043 0 0 1-2.89 0l-.146-.146a2.25 2.25 0 0 1 0-3.182l5.015-5.015a2.244 2.244 0 0 1 3.173 3.172l-2.286 2.286a.817.817 0 1 1-1.155-1.155l2.25-2.25a.75.75 0 1 0-1.06-1.061l-2.25 2.25a2.317 2.317 0 0 0 3.275 3.277l2.286-2.286a3.744 3.744 0 0 0-5.294-5.294l-5.015 5.015Z"
-                                                                                                                                />
-                                                                                                                            </svg>
-                                                                                                                        </div>
-                                                                                                                    </BlockStack>
-                                                                                                                </Card>
-                                                                                                            </div>
-                                                                                                            <div
-                                                                                                                style={{
-                                                                                                                    marginLeft:
-                                                                                                                        "20px",
-                                                                                                                }}
-                                                                                                            >
-                                                                                                                <div>
-                                                                                                                    <BlockStack gap="200">
-                                                                                                                        <Link url="#">
-                                                                                                                            <Text
-                                                                                                                                variant="bodyMd"
-                                                                                                                                as="p"
-                                                                                                                                fontWeight="bold"
-                                                                                                                                color={
-                                                                                                                                    exceedMaxSize
-                                                                                                                                        ? "critical"
-                                                                                                                                        : ""
-                                                                                                                                }
-                                                                                                                            >
-                                                                                                                                {
-                                                                                                                                    file.name
-                                                                                                                                }
-                                                                                                                            </Text>
-                                                                                                                        </Link>
-                                                                                                                        <Text
-                                                                                                                            variant="bodySm"
-                                                                                                                            as="p"
-                                                                                                                            color={
-                                                                                                                                exceedMaxSize
-                                                                                                                                    ? "critical"
-                                                                                                                                    : "subdued"
-                                                                                                                            }
-                                                                                                                        >
-                                                                                                                            {file.type.toUpperCase()}{" "}
-                                                                                                                            -{" "}
-                                                                                                                            {prettyBytes(
-                                                                                                                                file.size
-                                                                                                                            )}
-                                                                                                                            {exceedMaxSize &&
-                                                                                                                                t(
-                                                                                                                                    "createdigitalproduct.file_too_big_it_will_be_ignored"
-                                                                                                                                )}
-                                                                                                                        </Text>
-                                                                                                                    </BlockStack>
-                                                                                                                </div>
-                                                                                                            </div>
-                                                                                                        </InlineStack>
-                                                                                                    </div>
-                                                                                                    <div>
-                                                                                                        <Button
-                                                                                                            icon={
-                                                                                                                <Icon
-                                                                                                                    source={
-                                                                                                                        XSmallIcon
-                                                                                                                    }
-                                                                                                                />
-                                                                                                            }
-                                                                                                            onClick={() =>
-                                                                                                                handleDeleteFileAtIndex(
-                                                                                                                    index,
-                                                                                                                    "files"
-                                                                                                                )
-                                                                                                            }
-                                                                                                        ></Button>
-                                                                                                    </div>
-                                                                                                </InlineGrid>
-                                                                                            );
-                                                                                        }
-                                                                                    )}
-
-                                                                                {googleDriveLink && (
-                                                                                    <InlineGrid columns="1fr auto">
-                                                                                        <div>
-                                                                                            <InlineStack>
-                                                                                                <div>
-                                                                                                    <Card>
-                                                                                                        <BlockStack gap="300">
-                                                                                                            <div
-                                                                                                                style={{
-                                                                                                                    width: "24px",
-                                                                                                                    height: "24px",
-                                                                                                                }}
-                                                                                                            >
-                                                                                                                <svg
-                                                                                                                    xmlns="http://www.w3.org/2000/svg"
-                                                                                                                    viewBox="0 0 20 20"
-                                                                                                                >
-                                                                                                                    <path
-                                                                                                                        fill-rule="evenodd"
-                                                                                                                        d="M4.843 9.854a3.75 3.75 0 0 0 0 5.303l.147.147a3.543 3.543 0 0 0 5.01 0 .75.75 0 0 0-1.06-1.061 2.043 2.043 0 0 1-2.89 0l-.146-.146a2.25 2.25 0 0 1 0-3.182l5.015-5.015a2.244 2.244 0 0 1 3.173 3.172l-2.286 2.286a.817.817 0 1 1-1.155-1.155l2.25-2.25a.75.75 0 1 0-1.06-1.061l-2.25 2.25a2.317 2.317 0 0 0 3.275 3.277l2.286-2.286a3.744 3.744 0 0 0-5.294-5.294l-5.015 5.015Z"
-                                                                                                                    />
-                                                                                                                </svg>
-                                                                                                            </div>
-                                                                                                        </BlockStack>
-                                                                                                    </Card>
-                                                                                                </div>
-                                                                                                <div
-                                                                                                    style={{
-                                                                                                        marginLeft:
-                                                                                                            "20px",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    <BlockStack gap="200">
-                                                                                                        <Link
-                                                                                                            url={
-                                                                                                                googleDriveLink
-                                                                                                            }
-                                                                                                        >
-                                                                                                            {
-                                                                                                                googleDriveLink
-                                                                                                            }
-                                                                                                        </Link>
-                                                                                                    </BlockStack>
-                                                                                                </div>
-                                                                                            </InlineStack>
-                                                                                        </div>
-                                                                                        <div>
-                                                                                            <Button
-                                                                                                icon={
-                                                                                                    <Icon
-                                                                                                        source={
-                                                                                                            XSmallIcon
-                                                                                                        }
-                                                                                                    />
-                                                                                                }
-                                                                                                onClick={() =>
-                                                                                                    handleDeleteFileAtIndex(
-                                                                                                        null,
-                                                                                                        "googleDrive"
-                                                                                                    )
-                                                                                                }
-                                                                                            >
-                                                                                                Delete
-                                                                                            </Button>
-                                                                                        </div>
-                                                                                    </InlineGrid>
-                                                                                )}
-
-                                                                                <div>
-                                                                                    {selectedFileDetails
-                                                                                        .filter(
-                                                                                            (
-                                                                                                file
-                                                                                            ) =>
-                                                                                                file.url
-                                                                                        )
-                                                                                        .map(
-                                                                                            (
-                                                                                                file,
-                                                                                                index
-                                                                                            ) => {
-                                                                                                const isSelected =
-                                                                                                    selectedFileIds.includes(
-                                                                                                        file.id
-                                                                                                    );
-
-                                                                                                return (
-                                                                                                    <InlineGrid columns="1fr auto">
-                                                                                                        <div>
-                                                                                                            <InlineStack>
-                                                                                                                <div>
-                                                                                                                    <Card>
-                                                                                                                        <BlockStack gap="300">
-                                                                                                                            <div
-                                                                                                                                style={{
-                                                                                                                                    width: "24px",
-                                                                                                                                    height: "24px",
-                                                                                                                                }}
-                                                                                                                            >
-                                                                                                                                <svg
-                                                                                                                                    xmlns="http://www.w3.org/2000/svg"
-                                                                                                                                    viewBox="0 0 20 20"
-                                                                                                                                >
-                                                                                                                                    <path
-                                                                                                                                        fill-rule="evenodd"
-                                                                                                                                        d="M4.843 9.854a3.75 3.75 0 0 0 0 5.303l.147.147a3.543 3.543 0 0 0 5.01 0 .75.75 0 0 0-1.06-1.061 2.043 2.043 0 0 1-2.89 0l-.146-.146a2.25 2.25 0 0 1 0-3.182l5.015-5.015a2.244 2.244 0 0 1 3.173 3.172l-2.286 2.286a.817.817 0 1 1-1.155-1.155l2.25-2.25a.75.75 0 1 0-1.06-1.061l-2.25 2.25a2.317 2.317 0 0 0 3.275 3.277l2.286-2.286a3.744 3.744 0 0 0-5.294-5.294l-5.015 5.015Z"
-                                                                                                                                    />
-                                                                                                                                </svg>
-                                                                                                                            </div>
-                                                                                                                        </BlockStack>
-                                                                                                                    </Card>
-                                                                                                                </div>
-                                                                                                                <div
-                                                                                                                    style={{
-                                                                                                                        marginLeft:
-                                                                                                                            "20px",
-                                                                                                                    }}
-                                                                                                                >
-                                                                                                                    <div>
-                                                                                                                        <BlockStack gap="200">
-                                                                                                                            <Link url="#">
-                                                                                                                                <Text
-                                                                                                                                    variant="bodyMd"
-                                                                                                                                    as="p"
-                                                                                                                                    fontWeight="bold"
-                                                                                                                                    color={
-                                                                                                                                        isSelected
-                                                                                                                                            ? "critical"
-                                                                                                                                            : ""
-                                                                                                                                    }
-                                                                                                                                >
-                                                                                                                                    {
-                                                                                                                                        file.fileName
-                                                                                                                                    }
-                                                                                                                                </Text>
-                                                                                                                            </Link>
-                                                                                                                            <Text
-                                                                                                                                variant="bodySm"
-                                                                                                                                as="p"
-                                                                                                                                color={
-                                                                                                                                    isSelected
-                                                                                                                                        ? "critical"
-                                                                                                                                        : "subdued"
-                                                                                                                                }
-                                                                                                                            >
-                                                                                                                                {file.mimeType.toUpperCase()}{" "}
-                                                                                                                                -{" "}
-                                                                                                                                {prettyBytes(
-                                                                                                                                    file.byteSize
-                                                                                                                                )}
-                                                                                                                            </Text>
-                                                                                                                        </BlockStack>
-                                                                                                                    </div>
-                                                                                                                </div>
-                                                                                                            </InlineStack>
-                                                                                                        </div>
-                                                                                                        <div>
-                                                                                                            <Button
-                                                                                                                icon={
-                                                                                                                    <Icon
-                                                                                                                        source={
-                                                                                                                            XSmallIcon
-                                                                                                                        }
-                                                                                                                    />
-                                                                                                                }
-                                                                                                                onClick={() =>
-                                                                                                                    handleDeleteFileAtIndex(
-                                                                                                                        index,
-                                                                                                                        "orders"
-                                                                                                                    )
-                                                                                                                }
-                                                                                                            ></Button>
-                                                                                                        </div>
-                                                                                                    </InlineGrid>
-                                                                                                );
-                                                                                            }
-                                                                                        )}
-                                                                                </div>
-
-                                                                                {saving && (
-                                                                                    <div>
-                                                                                        <Text
-                                                                                            as={
-                                                                                                "h5"
-                                                                                            }
-                                                                                        >
-                                                                                            {t(
-                                                                                                "createdigitalproduct.files_are_uploading_please_wait"
-                                                                                            )}
-                                                                                        </Text>
-                                                                                        <ProgressBar
-                                                                                            progress={
-                                                                                                progress
-                                                                                            }
-                                                                                        />
-                                                                                    </div>
-                                                                                )}
-                                                                            </BlockStack>
-                                                                        )}
-
-                                                                    {selectedProduct ? (
-                                                                        <div>
-                                                                            <Card>
-                                                                                <Tabs
-                                                                                    tabs={
-                                                                                        mainTabs
-                                                                                    }
-                                                                                    selected={
-                                                                                        selectedMainTab
-                                                                                    }
-                                                                                    onSelect={
-                                                                                        handleTabChange
-                                                                                    }
-                                                                                >
-                                                                                    {selectedMainTab ===
-                                                                                        0 && (
-                                                                                        <BlockStack gap="400">
-                                                                                            <DropZone
-                                                                                                label={
-                                                                                                    fileLabelText
-                                                                                                }
-                                                                                                onDrop={
-                                                                                                    handleDropZoneDrop
-                                                                                                }
-                                                                                            >
-                                                                                                <DropZone.FileUpload
-                                                                                                    actionTitle={t(
-                                                                                                        "digtal_product_listing.add_files"
-                                                                                                    )}
-                                                                                                />
-                                                                                            </DropZone>
-
-                                                                                            {files.length >
-                                                                                                0 && (
-                                                                                                <BlockStack gap="200">
-                                                                                                    {files.map(
-                                                                                                        (
-                                                                                                            file,
-                                                                                                            index
-                                                                                                        ) => {
-                                                                                                            const exceedMaxSize =
-                                                                                                                file.size >
-                                                                                                                fileSizeLimit;
-
-                                                                                                            return (
-                                                                                                                <InlineStack
-                                                                                                                    key={
-                                                                                                                        index
-                                                                                                                    }
-                                                                                                                    gap="200"
-                                                                                                                    blockAlign="center"
-                                                                                                                >
-                                                                                                                    <Button
-                                                                                                                        icon={
-                                                                                                                            <Icon
-                                                                                                                                source={
-                                                                                                                                    XSmallIcon
-                                                                                                                                }
-                                                                                                                            />
-                                                                                                                        }
-                                                                                                                        onClick={() =>
-                                                                                                                            handleDeleteFileAtIndex(
-                                                                                                                                index,
-                                                                                                                                "files"
-                                                                                                                            )
-                                                                                                                        }
-                                                                                                                    ></Button>
-
-                                                                                                                    <BlockStack>
-                                                                                                                        <Text
-                                                                                                                            variant="bodyMd"
-                                                                                                                            as="p"
-                                                                                                                            fontWeight="bold"
-                                                                                                                            color={
-                                                                                                                                exceedMaxSize
-                                                                                                                                    ? "critical"
-                                                                                                                                    : ""
-                                                                                                                            }
-                                                                                                                        >
-                                                                                                                            {
-                                                                                                                                file.name
-                                                                                                                            }
-                                                                                                                        </Text>
-                                                                                                                        <Text
-                                                                                                                            variant="bodySm"
-                                                                                                                            as="p"
-                                                                                                                            color={
-                                                                                                                                exceedMaxSize
-                                                                                                                                    ? "critical"
-                                                                                                                                    : "subdued"
-                                                                                                                            }
-                                                                                                                        >
-                                                                                                                            {prettyBytes(
-                                                                                                                                file.size
-                                                                                                                            )}{" "}
-                                                                                                                            {exceedMaxSize
-                                                                                                                                ? t(
-                                                                                                                                      "createdigitalproduct.file_too_big_it_will_be_ignored"
-                                                                                                                                  )
-                                                                                                                                : ""}
-                                                                                                                        </Text>
-                                                                                                                    </BlockStack>
-                                                                                                                </InlineStack>
-                                                                                                            );
-                                                                                                        }
-                                                                                                    )}
-                                                                                                </BlockStack>
-                                                                                            )}
-                                                                                        </BlockStack>
-                                                                                    )}
-                                                                                    {selectedMainTab ===
-                                                                                        1 && (
-                                                                                        <>
-                                                                                            <div
-                                                                                                style={{
-                                                                                                    padding:
-                                                                                                        "16px",
-                                                                                                }}
-                                                                                            >
-                                                                                                <TextField
-                                                                                                    label={t(
-                                                                                                        "createdigitalproduct.google_drive_file_folder_link"
-                                                                                                    )}
-                                                                                                    value={
-                                                                                                        googleDriveLink
-                                                                                                    }
-                                                                                                    onChange={
-                                                                                                        handleGoogleDriveLinkChange
-                                                                                                    }
-                                                                                                    placeholder={t("createdigitalproduct.enter_google_drive_file_or_folder_link")}
-                                                                                                />
-                                                                                                <div
-                                                                                                    style={{
-                                                                                                        marginTop:
-                                                                                                            "5px",
-                                                                                                    }}
-                                                                                                ></div>
-                                                                                                <Text
-                                                                                                    variant="bodySm"
-                                                                                                    tone="subdued"
-                                                                                                    style={{
-                                                                                                        marginTop:
-                                                                                                            "8px",
-                                                                                                    }}
-                                                                                                >
-                                                                                                    {t(
-                                                                                                        "createdigitalproduct.google_drive_help_text"
-                                                                                                    )}
-                                                                                                </Text>
-                                                                                            </div>
-                                                                                        </>
-                                                                                    )}
-                                                                                </Tabs>
-                                                                            </Card>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div>
-                                                                            <Text
-                                                                                variant="bodyLg"
-                                                                                as="p"
-                                                                            >
-                                                                                {t(
-                                                                                    "createdigitalproduct.add_shopify_product_to_attached_content"
-                                                                                )}
-                                                                            </Text>
-                                                                        </div>
-                                                                    )}
-                                                                </BlockStack>
-                                                            </Card>
-                                                        )}
-
-                                                    </BlockStack>
-                                                </div>
-
-                                                <div
-                                                    style={{
-                                                        width: isMobile
-                                                            ? "100%"
-                                                            : "34%",
-                                                    }}
-                                                >
-                                                    <BlockStack gap="400">
-                                                        <Card>
-                                                            {userPlan ===
-                                                                "free" && (
-                                                                <div
-                                                                    style={{
-                                                                        marginTop:
-                                                                            "10px",
-                                                                    }}
-                                                                >
-                                                                    <Banner
-                                                                        tone="warning"
-                                                                        title={t(
-                                                                            "editdigitalproduct.upgrade_your_plan"
-                                                                        )}
-                                                                    >
-                                                                        <Text
-                                                                            variant="bodyMd"
-                                                                            as="p"
-                                                                        >
-                                                                            {t(
-                                                                                "createdigitalproduct.upgrade_to_paid_plan_to_enable_advanced_features_like_pdf_stamping"
-                                                                            )}
-                                                                        </Text>
-                                                                        <div
-                                                                            style={{
-                                                                                marginTop:
-                                                                                    "5px",
-                                                                            }}
-                                                                        ></div>
-                                                                        <Button
-                                                                            variant="primary"
-                                                                            onClick={
-                                                                                handlePricing
-                                                                            }
-                                                                        >
-                                                                            {t(
-                                                                                "createdigitalproduct.upgrade_now"
-                                                                            )}
-                                                                        </Button>
-                                                                    </Banner>
-                                                                </div>
-                                                            )}
-                                                            <Text
-                                                                variant="headingMd"
-                                                                as="h6"
-                                                            >
-                                                                {t(
-                                                                    "createdigitalproduct.pdf_stamping_settings"
-                                                                )}
-                                                            </Text>
-                                                            <div
-                                                                style={{
-                                                                    marginTop:
-                                                                        "10px",
-                                                                }}
-                                                            ></div>
-                                                            <Checkbox
-                                                                label={t(
-                                                                    "createdigitalproduct.enable_pdf_stamping"
-                                                                )}
-                                                                checked={
-                                                                    isPdfStampingEnabled
-                                                                }
-                                                                onChange={
-                                                                    handlePdfStampingEnabledChange
-                                                                }
-                                                                disabled={
-                                                                    userPlan ===
-                                                                    "free"
-                                                                }
-                                                            />
-                                                            <div
-                                                                style={{
-                                                                    marginTop:
-                                                                        "5px",
-                                                                }}
-                                                            ></div>
-                                                            {isPdfStampingEnabled && (
-                                                                <LegacyStack
-                                                                    vertical
-                                                                >
-                                                                    <RadioButton
-                                                                        label={t(
-                                                                            "createdigitalproduct.use_default_template"
-                                                                        )}
-                                                                        id="default-template"
-                                                                        name="template"
-                                                                        checked={
-                                                                            templateChoice ===
-                                                                            "default"
-                                                                        }
-                                                                        onChange={() =>
-                                                                            handleTemplateChoiceChange(
-                                                                                "default"
-                                                                            )
-                                                                        }
-                                                                        disabled={
-                                                                            userPlan ===
-                                                                            "free"
-                                                                        }
-                                                                    />
-                                                                    <RadioButton
-                                                                        label={t(
-                                                                            "createdigitalproduct.use_custom_template"
-                                                                        )}
-                                                                        id="custom-template"
-                                                                        name="template"
-                                                                        checked={
-                                                                            templateChoice ===
-                                                                            "custom"
-                                                                        }
-                                                                        onChange={() =>
-                                                                            handleTemplateChoiceChange(
-                                                                                "custom"
-                                                                            )
-                                                                        }
-                                                                        disabled={
-                                                                            userPlan ===
-                                                                            "free"
-                                                                        }
-                                                                    />
-                                                                    {templateChoice ===
-                                                                        "custom" && (
-                                                                        <>
-                                                                            <div
-                                                                                style={{
-                                                                                    marginTop:
-                                                                                        "10px",
-                                                                                }}
-                                                                            >
-                                                                                <Button
-                                                                                    variant="primary"
-                                                                                    onClick={
-                                                                                        toggleCustomTemplateModal
-                                                                                    }
-                                                                                >
-                                                                                    {t(
-                                                                                        "createdigitalproduct.add_custom_template"
-                                                                                    )}
-                                                                                </Button>
-                                                                            </div>
-                                                                            <div
-                                                                                style={{
-                                                                                    marginTop:
-                                                                                        "10px",
-                                                                                }}
-                                                                            ></div>
-                                                                            <Select
-                                                                                label={t(
-                                                                                    "createdigitalproduct.select_a_pdf_template"
-                                                                                )}
-                                                                                options={
-                                                                                    templateOptions
-                                                                                }
-                                                                                value={String(
-                                                                                    selectedTemplate
-                                                                                )}
-                                                                                onChange={
-                                                                                    handleTemplateChange
-                                                                                }
-                                                                            />
-                                                                        </>
-                                                                    )}
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    >
-                                                                        <Text
-                                                                            variant="bodySm"
-                                                                            as="p"
-                                                                            color="subdued"
-                                                                        >
-                                                                            {t(
-                                                                                "createdigitalproduct.choose_whether_to_use_the_default_template_or_add"
-                                                                            )}
-                                                                        </Text>
-                                                                    </div>
-                                                                </LegacyStack>
-                                                            )}
-                                                            <Modal
-                                                                size="large"
-                                                                open={
-                                                                    isPDFModalOpen
-                                                                }
-                                                                onClose={
-                                                                    toggleCustomTemplateModal
-                                                                }
-                                                                title={t(
-                                                                    "createdigitalproduct.pdf_stamping_template"
-                                                                )}
-                                                                primaryAction={{
-                                                                    content: t(
-                                                                        "createdigitalproduct.add"
-                                                                    ),
-                                                                    onAction:
-                                                                        handleSaveTemplate,
-                                                                    disabled:
-                                                                        templateTitle.trim() ===
-                                                                            "" ||
-                                                                        stampText.trim() ===
-                                                                            "",
-                                                                }}
-                                                                secondaryActions={[
-                                                                    {
-                                                                        content:
-                                                                            isPreviewLoading
-                                                                                ? "Generating..."
-                                                                                : "Preview",
-                                                                        onAction:
-                                                                            handlePreviewTemplate,
-                                                                        disabled:
-                                                                            !previewFile ||
-                                                                            isPreviewLoading,
-                                                                        loading:
-                                                                            isPreviewLoading,
-                                                                    },
-                                                                    {
-                                                                        content:
-                                                                            t(
-                                                                                "digtal_product_listing.cancel"
-                                                                            ),
-                                                                        onAction:
-                                                                            toggleCustomTemplateModal,
-                                                                    },
-                                                                ]}
-                                                            >
-                                                                <Modal.Section>
-                                                                    <LegacyStack
-                                                                        wrap={
-                                                                            false
-                                                                        }
-                                                                        alignment="leading"
-                                                                        spacing="loose"
-                                                                    >
-                                                                        <LegacyStack.Item
-                                                                            fill
-                                                                        >
-                                                                            <FormLayout>
-                                                                                <FormLayout.Group
-                                                                                    condensed
-                                                                                >
-                                                                                    <Select
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.text_size"
-                                                                                        )}
-                                                                                        options={[
-                                                                                            {
-                                                                                                label: "2",
-                                                                                                value: "2",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "4",
-                                                                                                value: "4",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "6",
-                                                                                                value: "6",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "8",
-                                                                                                value: "8",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "10",
-                                                                                                value: "10",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "12",
-                                                                                                value: "12",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "14",
-                                                                                                value: "14",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "16",
-                                                                                                value: "16",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "18",
-                                                                                                value: "18",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "20",
-                                                                                                value: "20",
-                                                                                            },
-                                                                                        ]}
-                                                                                        value={
-                                                                                            textSize
-                                                                                        }
-                                                                                        onChange={
-                                                                                            setTextSize
-                                                                                        }
-                                                                                    />
-                                                                                    <div>
-                                                                                        <Text
-                                                                                            variant="bodySm"
-                                                                                            as="p"
-                                                                                        >
-                                                                                            {t(
-                                                                                                "createdigitalproduct.text_color"
-                                                                                            )}
-                                                                                        </Text>
-                                                                                        <div
-                                                                                            style={{
-                                                                                                display:
-                                                                                                    "flex",
-                                                                                                marginTop:
-                                                                                                    "5px",
-                                                                                            }}
-                                                                                        >
-                                                                                            <PopoverPicker
-                                                                                                color={
-                                                                                                    textColor
-                                                                                                }
-                                                                                                onChange={
-                                                                                                    setTextColor
-                                                                                                }
-                                                                                            />
-                                                                                            <div
-                                                                                                style={{
-                                                                                                    width: "-webkit-fill-available",
-                                                                                                }}
-                                                                                            >
-                                                                                                <TextField
-                                                                                                    // label="Text Color"
-                                                                                                    value={
-                                                                                                        textColor
-                                                                                                    }
-                                                                                                    onChange={
-                                                                                                        setTextColor
-                                                                                                    }
-                                                                                                    autoComplete="off"
-                                                                                                    placeholder={t("createdigitalproduct.enter_text_color_eg_ff5733")}
-                                                                                                />
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </FormLayout.Group>
-                                                                            </FormLayout>
-                                                                        </LegacyStack.Item>
-                                                                    </LegacyStack>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    ></div>
-                                                                    <LegacyStack
-                                                                        wrap={
-                                                                            false
-                                                                        }
-                                                                        alignment="leading"
-                                                                        spacing="loose"
-                                                                    >
-                                                                        <LegacyStack.Item
-                                                                            fill
-                                                                        >
-                                                                            <FormLayout>
-                                                                                <FormLayout.Group
-                                                                                    condensed
-                                                                                >
-                                                                                    <Select
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.alignment"
-                                                                                        )}
-                                                                                        options={[
-                                                                                            {
-                                                                                                label: t(
-                                                                                                    "createdigitalproduct.left"
-                                                                                                ),
-                                                                                                value: "left",
-                                                                                            },
-                                                                                            {
-                                                                                                label: t(
-                                                                                                    "createdigitalproduct.center"
-                                                                                                ),
-                                                                                                value: "center",
-                                                                                            },
-                                                                                            {
-                                                                                                label: t(
-                                                                                                    "createdigitalproduct.right"
-                                                                                                ),
-                                                                                                value: "right",
-                                                                                            },
-                                                                                        ]}
-                                                                                        value={
-                                                                                            alignment
-                                                                                        }
-                                                                                        onChange={
-                                                                                            setAlignment
-                                                                                        }
-                                                                                    />
-                                                                                    <Select
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.font"
-                                                                                        )}
-                                                                                        options={[
-                                                                                            {
-                                                                                                label: "Arial",
-                                                                                                value: "arial",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "Times New Roman",
-                                                                                                value: "times",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "Courier",
-                                                                                                value: "courier",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "Sans Serif",
-                                                                                                value: "sans-serif",
-                                                                                            },
-                                                                                        ]}
-                                                                                        value={
-                                                                                            font
-                                                                                        }
-                                                                                        onChange={
-                                                                                            setFont
-                                                                                        }
-                                                                                    />
-                                                                                </FormLayout.Group>
-                                                                            </FormLayout>
-                                                                        </LegacyStack.Item>
-                                                                    </LegacyStack>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    ></div>
-                                                                    <LegacyStack
-                                                                        wrap={
-                                                                            false
-                                                                        }
-                                                                        alignment="leading"
-                                                                        spacing="loose"
-                                                                    >
-                                                                        <LegacyStack.Item
-                                                                            fill
-                                                                        >
-                                                                            <FormLayout>
-                                                                                <FormLayout.Group
-                                                                                    condensed
-                                                                                >
-                                                                                    <Select
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.page_size"
-                                                                                        )}
-                                                                                        options={[
-                                                                                            {
-                                                                                                label: "A4",
-                                                                                                value: "A4",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "Letter",
-                                                                                                value: "Letter",
-                                                                                            },
-                                                                                        ]}
-                                                                                        value={
-                                                                                            pageSize
-                                                                                        }
-                                                                                        onChange={
-                                                                                            setPageSize
-                                                                                        }
-                                                                                    />
-                                                                                    <Select
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.page_layout"
-                                                                                        )}
-                                                                                        options={[
-                                                                                            {
-                                                                                                label: "Portrait",
-                                                                                                value: "portrait",
-                                                                                            },
-                                                                                            {
-                                                                                                label: "Landscape",
-                                                                                                value: "landscape",
-                                                                                            },
-                                                                                        ]}
-                                                                                        value={
-                                                                                            pageLayout
-                                                                                        }
-                                                                                        onChange={
-                                                                                            setPageLayout
-                                                                                        }
-                                                                                    />
-                                                                                </FormLayout.Group>
-                                                                            </FormLayout>
-                                                                        </LegacyStack.Item>
-                                                                    </LegacyStack>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    ></div>
-                                                                    <LegacyStack
-                                                                        wrap={
-                                                                            false
-                                                                        }
-                                                                        alignment="leading"
-                                                                        spacing="loose"
-                                                                    >
-                                                                        <LegacyStack.Item
-                                                                            fill
-                                                                        >
-                                                                            <FormLayout>
-                                                                                <FormLayout.Group
-                                                                                    condensed
-                                                                                >
-                                                                                    <TextField
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.vertical_adjustment_margin_from_bottom"
-                                                                                        )}
-                                                                                        type="number"
-                                                                                        value={
-                                                                                            verticalAdjustment
-                                                                                        }
-                                                                                        onChange={
-                                                                                            setVerticalAdjustment
-                                                                                        }
-                                                                                        autoComplete="off"
-                                                                                        placeholder="e.g. 5"
-                                                                                    />
-                                                                                    <TextField
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.pages_to_stamp"
-                                                                                        )}
-                                                                                        value={
-                                                                                            pagesToStamp
-                                                                                        }
-                                                                                        onChange={
-                                                                                            setPagesToStamp
-                                                                                        }
-                                                                                        autoComplete="off"
-                                                                                        placeholder="e.g. 1, 2 or all"
-                                                                                    />
-                                                                                </FormLayout.Group>
-                                                                            </FormLayout>
-                                                                        </LegacyStack.Item>
-                                                                    </LegacyStack>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    ></div>
-                                                                    <TextField
-                                                                        label={t(
-                                                                            "createdigitalproduct.stamp_text"
-                                                                        )}
-                                                                        multiline={
-                                                                            4
-                                                                        }
-                                                                        value={
-                                                                            stampText
-                                                                        }
-                                                                        onChange={
-                                                                            setStampText
-                                                                        }
-                                                                        autoComplete="off"
-                                                                        placeholder="Prepared exclusively for {order.receiver_email}. Order: {order.id}"
-                                                                    />
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    >
-                                                                        <Text
-                                                                            as="p"
-                                                                            variant="bodyMd"
-                                                                        >
-                                                                            {t(
-                                                                                "createdigitalproduct.pdf_options"
-                                                                            )}
-                                                                        </Text>
-                                                                    </div>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "5px",
-                                                                        }}
-                                                                    >
-                                                                        <Checkbox
-                                                                            checked={
-                                                                                allowPrinting
-                                                                            }
-                                                                            onChange={
-                                                                                setAllowPrinting
-                                                                            }
-                                                                            label={t(
-                                                                                "createdigitalproduct.allow_printing"
-                                                                            )}
-                                                                        />
-                                                                    </div>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "5px",
-                                                                        }}
-                                                                    >
-                                                                        <Checkbox
-                                                                            checked={
-                                                                                allowCopy
-                                                                            }
-                                                                            onChange={
-                                                                                setAllowCopy
-                                                                            }
-                                                                            label={t(
-                                                                                "createdigitalproduct.allow_contents_to_be_copied_to_clipboard"
-                                                                            )}
-                                                                        />
-                                                                    </div>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "5px",
-                                                                            display:
-                                                                                "none",
-                                                                        }}
-                                                                    >
-                                                                        <Checkbox
-                                                                            checked={
-                                                                                passwordProtect
-                                                                            }
-                                                                            onChange={
-                                                                                setPasswordProtect
-                                                                            }
-                                                                            label={t(
-                                                                                "createdigitalproduct.password_protect_pdf"
-                                                                            )}
-                                                                        />
-                                                                    </div>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    ></div>
-                                                                    <TextField
-                                                                        label={t(
-                                                                            "createdigitalproduct.template_title"
-                                                                        )}
-                                                                        value={
-                                                                            templateTitle
-                                                                        }
-                                                                        onChange={
-                                                                            setTemplateTitle
-                                                                        }
-                                                                        autoComplete="off"
-                                                                        placeholder={t(
-                                                                            "createdigitalproduct.enter_a_title_for_your_pdf_template"
-                                                                        )}
-                                                                    />
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    ></div>
-                                                                    <div>
-                                                                        <Text
-                                                                            as="h3"
-                                                                            variant="headingMd"
-                                                                        >
-                                                                            Preview
-                                                                            Template
-                                                                        </Text>
-                                                                        <div
-                                                                            style={{
-                                                                                marginTop:
-                                                                                    "5px",
-                                                                            }}
-                                                                        >
-                                                                            <input
-                                                                                type="file"
-                                                                                accept=".pdf"
-                                                                                onChange={
-                                                                                    handlePreviewFileChange
-                                                                                }
-                                                                                style={{
-                                                                                    display:
-                                                                                        "none",
-                                                                                }}
-                                                                                id="preview-pdf-input"
-                                                                            />
-                                                                            <Button
-                                                                                onClick={() =>
-                                                                                    document
-                                                                                        .getElementById(
-                                                                                            "preview-pdf-input"
-                                                                                        )
-                                                                                        .click()
-                                                                                }
-                                                                            >
-                                                                                Choose
-                                                                                PDF
-                                                                                for
-                                                                                Preview
-                                                                            </Button>
-                                                                            {previewFile && (
-                                                                                <Text
-                                                                                    as="span"
-                                                                                    variant="bodySm"
-                                                                                    tone="subdued"
-                                                                                    style={{
-                                                                                        marginLeft:
-                                                                                            "10px",
-                                                                                    }}
-                                                                                >
-                                                                                    {
-                                                                                        previewFile.name
-                                                                                    }
-                                                                                </Text>
-                                                                            )}
-                                                                        </div>
-                                                                        <div
-                                                                            style={{
-                                                                                marginTop:
-                                                                                    "5px",
-                                                                            }}
-                                                                        >
-                                                                            <Text
-                                                                                as="p"
-                                                                                variant="bodySm"
-                                                                                tone="subdued"
-                                                                            >
-                                                                                Select
-                                                                                a
-                                                                                PDF
-                                                                                file
-                                                                                to
-                                                                                preview
-                                                                                how
-                                                                                your
-                                                                                template
-                                                                                will
-                                                                                look
-                                                                                when
-                                                                                applied
-                                                                            </Text>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    ></div>
-                                                                    <Text
-                                                                        as="h3"
-                                                                        variant="headingMd"
-                                                                    >
-                                                                        {t(
-                                                                            "createdigitalproduct.stamping_variables"
-                                                                        )}
-                                                                    </Text>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    ></div>
-                                                                    <Text
-                                                                        as="p"
-                                                                        variant="bodyLg"
-                                                                    >
-                                                                        {t(
-                                                                            "createdigitalproduct.below_are_the_available_stamping_variables"
-                                                                        )}
-                                                                    </Text>
-                                                                    <div
-                                                                        style={{
-                                                                            marginTop:
-                                                                                "10px",
-                                                                        }}
-                                                                    ></div>
-                                                                    <Text
-                                                                        as="p"
-                                                                        variant="bodyLg"
-                                                                    >
-                                                                        <code
-                                                                            style={{
-                                                                                color: "#D5006D",
-                                                                            }}
-                                                                        >{`{order.receiver_name}`}</code>{" "}
-                                                                        {t(
-                                                                            "createdigitalproduct.receiver_name_customer_name"
-                                                                        )}
-                                                                    </Text>
-                                                                    <Text
-                                                                        as="p"
-                                                                        variant="bodyLg"
-                                                                    >
-                                                                        <code
-                                                                            style={{
-                                                                                color: "#D5006D",
-                                                                            }}
-                                                                        >{`{order.receiver_email}`}</code>{" "}
-                                                                        {t(
-                                                                            "createdigitalproduct.receiver_email_customer_email"
-                                                                        )}
-                                                                    </Text>
-                                                                    <Text
-                                                                        as="p"
-                                                                        variant="bodyLg"
-                                                                    >
-                                                                        <code
-                                                                            style={{
-                                                                                color: "#D5006D",
-                                                                            }}
-                                                                        >{`{order.id}`}</code>{" "}
-                                                                        {t(
-                                                                            "createdigitalproduct.order_id_pdf"
-                                                                        )}
-                                                                    </Text>
-                                                                    <Text
-                                                                        as="p"
-                                                                        variant="bodyLg"
-                                                                    >
-                                                                        <code
-                                                                            style={{
-                                                                                color: "#D5006D",
-                                                                            }}
-                                                                        >{`{order.date}`}</code>{" "}
-                                                                        {t(
-                                                                            "createdigitalproduct.order_date"
-                                                                        )}
-                                                                    </Text>
-                                                                    <Text
-                                                                        as="p"
-                                                                        variant="bodyLg"
-                                                                    >
-                                                                        <code
-                                                                            style={{
-                                                                                color: "#D5006D",
-                                                                            }}
-                                                                        >{`{product.name}`}</code>{" "}
-                                                                        {t(
-                                                                            "createdigitalproduct.stamped_product_name"
-                                                                        )}
-                                                                    </Text>
-                                                                </Modal.Section>
-                                                            </Modal>
-                                                        </Card>
-                                                    </BlockStack>
-                                                </div>
-                                            </div>
-
-                                            <div
-                                                style={{
-                                                    marginTop: isMobile
-                                                        ? "20px"
-                                                        : "10px",
-                                                }}
-                                            ></div>
-                                        </div>
-                                    )}
-
-                                    {selectedProductType === "links" && (
-                                        <div>
-                                            <BlockStack gap="400">
-                                                <Card>
-                                                    <BlockStack gap="300">
-                                                        <Text
-                                                            variant="headingMd"
-                                                            as="h6"
-                                                        >
-                                                            {t(
-                                                                "createdigitalproduct.when_this_shopify_product_is_purchased"
-                                                            )}
-                                                        </Text>
-                                                        {selectedProduct ? (
-                                                            <div
-                                                                style={{
-                                                                    marginTop:
-                                                                        "10px",
-                                                                }}
-                                                            >
-                                                                <InlineGrid
-                                                                    columns="1fr auto"
-                                                                    style={{
-                                                                        marginBottom:
-                                                                            "10px",
-                                                                    }}
-                                                                >
-                                                                    <div>
-                                                                        <InlineStack>
-                                                                            <div>
-                                                                                <Thumbnail
-                                                                                    source={
-                                                                                        selectedProduct
-                                                                                            ?.images[0]
-                                                                                            ?.originalSrc ??
-                                                                                        "https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-image_large.png?v=1530129081"
-                                                                                    }
-                                                                                    alt={
-                                                                                        selectedProduct?.title
-                                                                                    }
-                                                                                    size="large"
-                                                                                />
-                                                                            </div>
-                                                                            <div
-                                                                                style={{
-                                                                                    marginLeft:
-                                                                                        "20px",
-                                                                                }}
-                                                                            >
-                                                                                <div>
-                                                                                    <Link url="#">
-                                                                                        <Text
-                                                                                            variant="headingMd"
-                                                                                            as="h6"
-                                                                                        >
-                                                                                            {
-                                                                                                selectedProduct?.title
-                                                                                            }
-                                                                                        </Text>
-                                                                                    </Link>
-                                                                                    {selectedProduct
-                                                                                        ?.variants
-                                                                                        ?.length >
-                                                                                    1 ? (
-                                                                                        <Text
-                                                                                            variant="bodyLg"
-                                                                                            as="p"
-                                                                                        >
-                                                                                            {t(
-                                                                                                "digtal_product_listing.all_variants"
-                                                                                            )}
-
-                                                                                            (
-                                                                                            {
-                                                                                                selectedProduct
-                                                                                                    .variants
-                                                                                                    .length
-                                                                                            }
-
-                                                                                            )
-                                                                                        </Text>
-                                                                                    ) : (
-                                                                                        selectedProduct.variants.map(
-                                                                                            (
-                                                                                                variant,
-                                                                                                index
-                                                                                            ) => (
-                                                                                                <Text
-                                                                                                    key={
-                                                                                                        variant.id
-                                                                                                    }
-                                                                                                    variant="bodyLg"
-                                                                                                    as="h6"
-                                                                                                >
-                                                                                                    {
-                                                                                                        variant.title
-                                                                                                    }
-                                                                                                </Text>
-                                                                                            )
-                                                                                        )
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                        </InlineStack>
-                                                                    </div>
-                                                                    <div
-                                                                        onClick={
-                                                                            toggleProductPicker
-                                                                        }
-                                                                    >
-                                                                        <Link url="#">
-                                                                            <Text
-                                                                                variant="bodyLg"
-                                                                                as="p"
-                                                                            >
-                                                                                {t(
-                                                                                    "createdigitalproduct.edit_product"
-                                                                                )}
-                                                                            </Text>
-                                                                        </Link>
-                                                                    </div>
-                                                                </InlineGrid>
-                                                            </div>
-                                                        ) : (
-                                                            <div
-                                                                style={{
-                                                                    display:
-                                                                        "flex",
-                                                                    alignItems:
-                                                                        "center",
-                                                                }}
-                                                            >
-                                                                <div
-                                                                    style={{
-                                                                        flex: "78%",
-                                                                    }}
-                                                                >
-                                                                    <TextField
-                                                                        value={
-                                                                            selectedProduct
-                                                                                ? selectedProduct.title
-                                                                                : ""
-                                                                        }
-                                                                        onFocus={
-                                                                            toggleProductPicker
-                                                                        }
-                                                                        placeholder={t(
-                                                                            "createdigitalproduct.search_shopify_products"
-                                                                        )}
-                                                                        fullWidth
-                                                                        readOnly
-                                                                    />
-                                                                </div>
-                                                                <div
-                                                                    style={{
-                                                                        flex: "22%",
-                                                                        marginLeft:
-                                                                            "1rem",
-                                                                    }}
-                                                                >
-                                                                    <Button
-                                                                        onClick={
-                                                                            toggleProductPicker
-                                                                        }
-                                                                    >
-                                                                        {t(
-                                                                            "createdigitalproduct.browse_products"
-                                                                        )}
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        <div>
-                                                            <Text
-                                                                as={"p"}
-                                                                variant={
-                                                                    "bodyMd"
-                                                                }
-                                                            >
-                                                                {t(
-                                                                    "createdigitalproduct.select_shopify_product_or_specific_product"
-                                                                )}
-                                                            </Text>
-                                                        </div>
-                                                    </BlockStack>
-                                                </Card>
-                                                {!isManualDeliveryEnabled && (
-                                                    <Card>
-                                                        <BlockStack gap="300">
-                                                            <Text
-                                                                variant="headingMd"
-                                                                as="h6"
-                                                            >
-                                                                {t(
-                                                                    "createdigitalproduct.provide_the_following_content_to_the_customer"
-                                                                )}
-                                                            </Text>
-
-                                                            {contentType &&
-                                                                contentType.includes(
-                                                                    "custom_link"
-                                                                ) && (
-                                                                    <BlockStack gap="300">
-                                                                        {newCustoms.length >
-                                                                            0 && (
-                                                                            <>
-                                                                                {newCustoms.map(
-                                                                                    (
-                                                                                        link,
-                                                                                        index
-                                                                                    ) => {
-                                                                                        return (
-                                                                                            <BlockStack gap="200">
-                                                                                                <InlineGrid columns="1fr auto">
-                                                                                                    <div
-                                                                                                        style={{
-                                                                                                            marginTop:
-                                                                                                                "10px",
-                                                                                                        }}
-                                                                                                        key={
-                                                                                                            index
-                                                                                                        }
-                                                                                                    >
-                                                                                                        <Text
-                                                                                                            variant="headingMd"
-                                                                                                            as="h6"
-                                                                                                        >
-                                                                                                            {t(
-                                                                                                                "createdigitalproduct.custom_link"
-                                                                                                            )}
-                                                                                                        </Text>
-                                                                                                        <BlockStack gap="200">
-                                                                                                            <Text
-                                                                                                                variant="bodyLg"
-                                                                                                                as="p"
-                                                                                                            >
-                                                                                                                {t(
-                                                                                                                    "createdigitalproduct.title"
-                                                                                                                )}
-
-                                                                                                                :{" "}
-                                                                                                                {
-                                                                                                                    link.title
-                                                                                                                }
-                                                                                                            </Text>
-                                                                                                            <Text
-                                                                                                                variant="bodyLg"
-                                                                                                                as="p"
-                                                                                                            >
-                                                                                                                Link:{" "}
-                                                                                                                <Link
-                                                                                                                    url="#"
-                                                                                                                    target="_blank"
-                                                                                                                    rel="noopener noreferrer"
-                                                                                                                >
-                                                                                                                    {
-                                                                                                                        link.redirectURL
-                                                                                                                    }
-                                                                                                                </Link>
-                                                                                                            </Text>
-                                                                                                            <Text
-                                                                                                                variant="bodyLg"
-                                                                                                                as="p"
-                                                                                                            >
-                                                                                                                {t(
-                                                                                                                    "createdigitalproduct.link_detail"
-                                                                                                                )}
-
-                                                                                                                :{" "}
-                                                                                                                {
-                                                                                                                    link.linkDetail
-                                                                                                                }
-                                                                                                            </Text>
-                                                                                                        </BlockStack>
-                                                                                                    </div>
-                                                                                                    <div>
-                                                                                                        <Button
-                                                                                                            icon={
-                                                                                                                <Icon
-                                                                                                                    source={
-                                                                                                                        XSmallIcon
-                                                                                                                    }
-                                                                                                                />
-                                                                                                            }
-                                                                                                            onClick={() =>
-                                                                                                                handleDeleteNewLinkAtIndex(
-                                                                                                                    index
-                                                                                                                )
-                                                                                                            }
-                                                                                                        ></Button>
-                                                                                                    </div>
-                                                                                                </InlineGrid>
-                                                                                            </BlockStack>
-                                                                                        );
-                                                                                    }
-                                                                                )}
-                                                                            </>
-                                                                        )}
-                                                                        <>
-                                                                            {selectedCustomIds.map(
-                                                                                (
-                                                                                    selectedCustomId,
-                                                                                    index
-                                                                                ) => {
-                                                                                    const selectedCustom =
-                                                                                        customs.find(
-                                                                                            (
-                                                                                                custom
-                                                                                            ) =>
-                                                                                                custom.id ===
-                                                                                                selectedCustomId
-                                                                                        );
-                                                                                    if (
-                                                                                        !selectedCustom
-                                                                                    )
-                                                                                        return null;
-
-                                                                                    return (
-                                                                                        <BlockStack gap="200">
-                                                                                            <InlineGrid columns="1fr auto">
-                                                                                                <div
-                                                                                                    style={{
-                                                                                                        marginTop:
-                                                                                                            "10px",
-                                                                                                    }}
-                                                                                                    key={
-                                                                                                        selectedCustom.id
-                                                                                                    }
-                                                                                                >
-                                                                                                    <Text
-                                                                                                        variant="headingMd"
-                                                                                                        as="h6"
-                                                                                                    >
-                                                                                                        {t(
-                                                                                                            "createdigitalproduct.custom_link"
-                                                                                                        )}
-                                                                                                    </Text>
-                                                                                                    <BlockStack gap="200">
-                                                                                                        <Text
-                                                                                                            variant="bodyLg"
-                                                                                                            as="p"
-                                                                                                        >
-                                                                                                            {t(
-                                                                                                                "createdigitalproduct.title"
-                                                                                                            )}
-
-                                                                                                            :{" "}
-                                                                                                            {
-                                                                                                                selectedCustom.title
-                                                                                                            }
-                                                                                                        </Text>
-                                                                                                        <Text
-                                                                                                            variant="bodyLg"
-                                                                                                            as="p"
-                                                                                                        >
-                                                                                                            {t(
-                                                                                                                "createdigitalproduct.link"
-                                                                                                            )}
-
-                                                                                                            :{" "}
-                                                                                                            <Link
-                                                                                                                url="#"
-                                                                                                                target="_blank"
-                                                                                                                rel="noopener noreferrer"
-                                                                                                            >
-                                                                                                                {
-                                                                                                                    selectedCustom.redirect_url
-                                                                                                                }
-                                                                                                            </Link>
-                                                                                                        </Text>
-                                                                                                        <Text
-                                                                                                            variant="bodyLg"
-                                                                                                            as="p"
-                                                                                                        >
-                                                                                                            {t(
-                                                                                                                "createdigitalproduct.link_detail"
-                                                                                                            )}
-
-                                                                                                            :{" "}
-                                                                                                            {
-                                                                                                                selectedCustom.link_details
-                                                                                                            }
-                                                                                                        </Text>
-                                                                                                    </BlockStack>
-                                                                                                </div>
-                                                                                                <div>
-                                                                                                    <Button
-                                                                                                        icon={
-                                                                                                            <Icon
-                                                                                                                source={
-                                                                                                                    XSmallIcon
-                                                                                                                }
-                                                                                                            />
-                                                                                                        }
-                                                                                                        onClick={() =>
-                                                                                                            handleDeleteSelectedLinkAtIndex(
-                                                                                                                index
-                                                                                                            )
-                                                                                                        }
-                                                                                                    ></Button>
-                                                                                                </div>
-                                                                                            </InlineGrid>
-                                                                                        </BlockStack>
-                                                                                    );
-                                                                                }
-                                                                            )}
-                                                                        </>
-                                                                    </BlockStack>
-                                                                )}
-
-                                                            {selectedProduct ? (
-                                                                <div>
-                                                                    <div>
-                                                                        <Card>
-                                                                            <div
-                                                                                style={{
-                                                                                    marginLeft:
-                                                                                        "23px",
-                                                                                    marginRight:
-                                                                                        "23px",
-                                                                                    marginTop:
-                                                                                        "5px",
-                                                                                }}
-                                                                            >
-                                                                                <TextField
-                                                                                    label={t(
-                                                                                        "createdigitalproduct.title"
-                                                                                    )}
-                                                                                    value={
-                                                                                        title
-                                                                                    }
-                                                                                    onChange={
-                                                                                        handleTitleChange
-                                                                                    }
-                                                                                    autoComplete="off"
-                                                                                />
-
-                                                                                <div
-                                                                                    style={{
-                                                                                        marginTop:
-                                                                                            "10px",
-                                                                                    }}
-                                                                                >
-                                                                                    <TextField
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.redirects_to_url"
-                                                                                        )}
-                                                                                        value={
-                                                                                            redirectURL
-                                                                                        }
-                                                                                        onChange={
-                                                                                            handleRedirectURLChange
-                                                                                        }
-                                                                                        autoComplete="off"
-                                                                                        placeholder="https://example.com/file.pdf"
-                                                                                    />
-                                                                                </div>
-
-                                                                                <div
-                                                                                    style={{
-                                                                                        marginTop:
-                                                                                            "10px",
-                                                                                    }}
-                                                                                >
-                                                                                    <TextField
-                                                                                        label={t(
-                                                                                            "createdigitalproduct.link_details_optional"
-                                                                                        )}
-                                                                                        value={
-                                                                                            linkDetail
-                                                                                        }
-                                                                                        onChange={
-                                                                                            handleLinkDetailChange
-                                                                                        }
-                                                                                        autoComplete="off"
-                                                                                        multiline={
-                                                                                            4
-                                                                                        }
-                                                                                        placeholder={t(
-                                                                                            "createdigitalproduct.enter_additional_link_details_here"
-                                                                                        )}
-                                                                                    />
-                                                                                    <Text
-                                                                                        variant="bodyMd"
-                                                                                        as="p"
-                                                                                        color="subdued"
-                                                                                    >
-                                                                                        {t(
-                                                                                            "createdigitalproduct.if_you_have_logins_details_or_other_details_about_link_then_add_here"
-                                                                                        )}
-                                                                                    </Text>
-                                                                                </div>
-                                                                            </div>
-                                                                        </Card>
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                <div>
-                                                                    <Text
-                                                                        variant="bodyLg"
-                                                                        as="p"
-                                                                    >
-                                                                        {t(
-                                                                            "createdigitalproduct.add_shopify_product_to_attached_content"
-                                                                        )}
-                                                                    </Text>
-                                                                </div>
-                                                            )}
-                                                        </BlockStack>
-                                                    </Card>
-                                                )}
-
-                                            </BlockStack>
-                                        </div>
-                                    )}
-
-
-                                </div>
-                            </Box>
-
-                            {/* Footer Navigation */}
-                            <Box padding={isMobile ? "400" : "600"} paddingBlockStart={isMobile ? "300" : "400"}>
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: isMobile ? "column" : "row",
-                                        alignItems: "center",
-                                        justifyContent: isMobile ? "center" : "space-between",
-                                        width: "100%",
-                                        gap: isMobile ? "16px" : "0",
-                                    }}
-                                >
-                                    {/* Previous Button */}
-                                    <button
-                                        disabled={currentStep === 4}
-                                        style={{
-                                            backgroundColor: "white",
-                                            color: currentStep === 4 ? "#a0a0a0" : "#303030",
-                                            border: "1.5px solid #d0d0d0",
-                                            borderRadius: "8px",
-                                            padding: isMobile ? "10px 20px" : "12px 24px",
-                                            fontSize: isMobile ? "14px" : "15px",
-                                            fontWeight: "500",
-                                            cursor: currentStep === 4 ? "not-allowed" : "pointer",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            transition: "all 0.2s",
-                                            opacity: currentStep === 4 ? 0.5 : 1,
-                                            width: isMobile ? "100%" : "auto",
-                                            justifyContent: "center",
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            if (currentStep !== 4) {
-                                                e.currentTarget.style.backgroundColor =
-                                                    "#f5f5f5";
-                                                e.currentTarget.style.borderColor =
-                                                    "#a0a0a0";
-                                            }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor =
-                                                "white";
-                                            e.currentTarget.style.borderColor =
-                                                "#d0d0d0";
-                                        }}
-                                        onClick={handleBack}
-                                    >
-                                        <span>‹</span>
-                                        {t("onboarding.Previous")}
-                                    </button>
-
-                                    {/* Progress Indicator */}
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            flexDirection: isMobile ? "column" : "row",
-                                            alignItems: "center",
-                                            gap: isMobile ? "6px" : "12px",
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: isMobile ? "4px" : "6px",
-                                            }}
-                                        >
-                                            <div
-                                                style={{
-                                                    width: isMobile ? "24px" : "32px",
-                                                    height: isMobile ? "4px" : "5px",
-                                                    backgroundColor: "#09637E",
-                                                    borderRadius: "3px",
-                                                }}
-                                            ></div>
-                                            <div
-                                                style={{
-                                                    width: isMobile ? "24px" : "32px",
-                                                    height: isMobile ? "4px" : "5px",
-                                                    backgroundColor: "#09637E",
-                                                    borderRadius: "3px",
-                                                }}
-                                            ></div>
-                                            <div
-                                                style={{
-                                                    width: isMobile ? "24px" : "32px",
-                                                    height: isMobile ? "4px" : "5px",
-                                                    backgroundColor: "#09637E",
-                                                    borderRadius: "3px",
-                                                }}
-                                            ></div>
-
-                                            <div
-                                                style={{
-                                                    width: isMobile ? "24px" : "32px",
-                                                    height: isMobile ? "4px" : "5px",
-                                                    backgroundColor: "#e0e0e0",
-                                                    borderRadius: "3px",
-                                                }}
-                                            ></div>
-                                        </div>
-                                        <div
-                                            style={{
-                                                fontSize: isMobile ? "14px" : "16px",
-                                                fontWeight: "600",
-                                                color: "#09637E",
-                                            }}
-                                        >
-                                            3/4
-                                        </div>
-                                    </div>
-
-                                    {/* Next Button */}
-                                    <button
-                                            disabled={
-                                                !selectedProduct ||
-                                                (selectedProductType === "file" &&
-                                                    files.length === 0 &&
-                                                    !googleDriveLink) ||
-                                                (selectedProductType ===
-                                                    "license" &&
-                                                    isLicenseActionDisabled()) ||
-                                                (selectedProductType === "pdf" &&
-                                                    (!isPdfStampingEnabled ||
-                                                        (files.length === 0 &&
-                                                            !googleDriveLink))) ||
-                                                (selectedProductType === "links" &&
-                                                    isCustomLinksActionDisabled()) ||
-                                                (selectedProductType ===
-                                                    "mixedContent" &&
-                                                    isMixedContentActionDisabled())
-                                            }
-                                            style={{
-                                                backgroundColor:
-                                                    !selectedProduct ||
-                                                    (selectedProductType ===
-                                                        "file" &&
-                                                        files.length === 0 &&
-                                                        !googleDriveLink) ||
-                                                    (selectedProductType ===
-                                                        "license" &&
-                                                        isLicenseActionDisabled()) ||
-                                                    (selectedProductType ===
-                                                        "pdf" &&
-                                                        (!isPdfStampingEnabled ||
-                                                            (files.length === 0 &&
-                                                                !googleDriveLink))) ||
-                                                    (selectedProductType ===
-                                                        "links" &&
-                                                        isCustomLinksActionDisabled()) ||
-                                                    (selectedProductType ===
-                                                        "mixedContent" &&
-                                                        isMixedContentActionDisabled())
-                                                        ? "#cccccc"
-                                                        : "#088395",
-                                                color: "white",
-                                                border: "none",
-                                                borderRadius: "8px",
-                                                padding: isMobile ? "10px 24px" : "12px 28px",
-                                                fontSize: isMobile ? "14px" : "15px",
-                                                fontWeight: "500",
-                                                cursor:
-                                                    !selectedProduct ||
-                                                    (selectedProductType ===
-                                                        "file" &&
-                                                        files.length === 0 &&
-                                                        !googleDriveLink) ||
-                                                    (selectedProductType ===
-                                                        "license" &&
-                                                        isLicenseActionDisabled()) ||
-                                                    (selectedProductType ===
-                                                        "pdf" &&
-                                                        (!isPdfStampingEnabled ||
-                                                            (files.length === 0 &&
-                                                                !googleDriveLink))) ||
-                                                    (selectedProductType ===
-                                                        "links" &&
-                                                        isCustomLinksActionDisabled()) ||
-                                                    (selectedProductType ===
-                                                        "mixedContent" &&
-                                                        isMixedContentActionDisabled())
-                                                        ? "not-allowed"
-                                                        : "pointer",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "6px",
-                                                transition: "all 0.2s",
-                                                opacity:
-                                                    !selectedProduct ||
-                                                    (selectedProductType ===
-                                                        "file" &&
-                                                        files.length === 0 &&
-                                                        !googleDriveLink) ||
-                                                    (selectedProductType ===
-                                                        "license" &&
-                                                        isLicenseActionDisabled()) ||
-                                                    (selectedProductType ===
-                                                        "pdf" &&
-                                                        (!isPdfStampingEnabled ||
-                                                            (files.length === 0 &&
-                                                                !googleDriveLink))) ||
-                                                    (selectedProductType ===
-                                                        "links" &&
-                                                        isCustomLinksActionDisabled()) ||
-                                                    (selectedProductType ===
-                                                        "mixedContent" &&
-                                                        isMixedContentActionDisabled())
-                                                        ? 0.6
-                                                        : 1,
-                                                width: isMobile ? "100%" : "auto",
-                                                justifyContent: "center",
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (
-                                                    selectedProduct &&
-                                                    ((selectedProductType ===
-                                                        "file" &&
-                                                        (files.length > 0 ||
-                                                            googleDriveLink)) ||
-                                                        (selectedProductType ===
-                                                            "license" &&
-                                                            !isLicenseActionDisabled()) ||
-                                                        (selectedProductType ===
-                                                            "pdf" &&
-                                                            isPdfStampingEnabled &&
-                                                            (files.length > 0 ||
-                                                                googleDriveLink)) ||
-                                                        (selectedProductType ===
-                                                            "links" &&
-                                                            !isCustomLinksActionDisabled()) ||
-                                                        (selectedProductType ===
-                                                            "mixedContent" &&
-                                                            !isMixedContentActionDisabled()) ||
-                                                        selectedProductType ===
-                                                            "notSure")
-                                                ) {
-                                                    e.currentTarget.style.backgroundColor =
-                                                        "#09637E";
-                                                    e.currentTarget.style.transform =
-                                                        "translateY(-1px)";
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                if (
-                                                    selectedProduct &&
-                                                    ((selectedProductType ===
-                                                        "file" &&
-                                                        (files.length > 0 ||
-                                                            googleDriveLink)) ||
-                                                        (selectedProductType ===
-                                                            "license" &&
-                                                            !isLicenseActionDisabled()) ||
-                                                        (selectedProductType ===
-                                                            "pdf" &&
-                                                            isPdfStampingEnabled &&
-                                                            (files.length > 0 ||
-                                                                googleDriveLink)) ||
-                                                        (selectedProductType ===
-                                                            "links" &&
-                                                            !isCustomLinksActionDisabled()) ||
-                                                        (selectedProductType ===
-                                                            "mixedContent" &&
-                                                            !isMixedContentActionDisabled()) ||
-                                                        selectedProductType ===
-                                                            "notSure")
-                                                ) {
-                                                    e.currentTarget.style.backgroundColor =
-                                                        "#088395";
-                                                    e.currentTarget.style.transform =
-                                                        "translateY(0)";
-                                                }
-                                            }}
-                                            onClick={async () => {
-                                                await handleSave();
-                                                handleNext();
-                                            }}
-                                        >
-                                            {t("onboarding.Next_→")}
-                                        </button>
-                                </div>
-                            </Box>
-                        </BlockStack>
-                    </Card>
-                </div>
-            </Page>
-            </div>
-        </>
-        );
-    }
-
-   if (currentStep === 4) {
+    if (currentStep === 5) {
         return (
             <>
                 <style>
@@ -8481,6 +6513,16 @@ export default function NewOnboarding() {
                             50%  { opacity: 1; transform: scale(1.05); }
                             70%  { transform: scale(0.9); }
                             100% { transform: scale(1); }
+                        }
+
+                        @keyframes slideUp {
+                            from { opacity: 0; transform: translateY(20px); }
+                            to { opacity: 1; transform: translateY(0); }
+                        }
+
+                        @keyframes pulse {
+                            0%, 100% { transform: scale(1); }
+                            50% { transform: scale(1.05); }
                         }
 
                         /* ── Step breadcrumb ── */
@@ -8543,208 +6585,567 @@ export default function NewOnboarding() {
                             white-space: nowrap;
                         }
 
-                        /* ── Confetti emoji ── */
-                        .ob4-confetti {
-                            font-size: clamp(40px, 8vw, 60px);
-                            margin-top: 40px;
-                            margin-bottom: 20px;
-                            display: block;
+                        /* ── Main two-column layout ── */
+                        .step5-layout {
+                            display: grid;
+                            grid-template-columns: 34fr 66fr;
+                            gap: 24px;
+                            max-width: 1400px;
+                            margin: 0 auto;
+                            animation: slideUp 0.4s ease-out;
+                            align-items: stretch;
+                        }
+
+                        /* ── Left column ── */
+                        .step5-left-col {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 24px;
+                        }
+
+                        .step5-left-col > .Card,
+                        .step5-right-col > .Card {
+                            height: 100%;
+                            display: flex;
+                            flex-direction: column;
+                        }
+
+                        /* ── Celebration section ── */
+                        .step5-celebration {
+                            text-align: center;
+                            padding: 16px 20px;
+                        }
+
+                        .step5-celebration-emoji {
+                            font-size: 32px;
+                            margin-bottom: 8px;
                             animation: bounceIn 0.6s ease-out;
                         }
 
-                        /* ── Quick-start cards grid ── */
-                        .ob4-cards {
-                            display: grid;
-                            grid-template-columns: repeat(3, 1fr);
-                            gap: 16px;
+                        .step5-celebration-title {
+                            font-size: 18px;
+                            font-weight: 700;
+                            color: #12324B;
+                            line-height: 1.2;
+                            letter-spacing: -0.6px;
+                            margin-bottom: 8px;
                         }
 
-                        .ob4-card {
-                            border: 1.5px solid #e0e0e0;
-                            border-radius: 12px;
+                        .step5-celebration-desc {
+                            font-size: 13px;
+                            color: #667085;
+                            line-height: 1.4;
+                        }
+
+                        /* ── Summary card ── */
+                        .step5-summary-card {
+                            background: white;
+                            border-radius: 16px;
                             padding: 24px;
-                            background-color: white;
-                            cursor: pointer;
-                            transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+                            margin-top:8px;
+                            border: 1px solid #DCE3EA;
+                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
                         }
 
-                        .ob4-card:hover {
-                            border-color: #ff9980;
-                            transform: translateY(-4px);
-                            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+                        .step5-card-title {
+                            font-size: 18px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 20px;
+                            letter-spacing: -0.3px;
                         }
 
-                        .ob4-card-icon {
-                            font-size: clamp(28px, 5vw, 40px);
-                            margin-bottom: 12px;
-                            display: block;
-                        }
-
-                        /* ── Footer bar ── */
-                        .ob4-footer {
+                        .step5-summary-row {
                             display: flex;
                             align-items: center;
-                            justify-content: space-between;
-                            flex-wrap: wrap;
                             gap: 12px;
-                            width: 100%;
+                            padding: 12px 0;
+                            border-bottom: 1px solid #F0F2F5;
                         }
 
-                        /* ── Shared nav button base ── */
-                        .ob4-btn {
-                            border-radius: 8px;
-                            padding: 12px 24px;
-                            font-size: 15px;
-                            font-weight: 500;
-                            cursor: pointer;
+                        .step5-summary-row:last-child {
+                            border-bottom: none;
+                        }
+
+                        .step5-summary-icon {
+                            width: 40px;
+                            height: 40px;
+                            border-radius: 50%;
                             display: flex;
                             align-items: center;
-                            gap: 6px;
-                            transition: all 0.2s;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        }
+
+                        .step5-summary-icon.teal {
+                            background-color: #E0F2F1;
+                        }
+
+                        .step5-summary-icon.blue {
+                            background-color: #EAF6FD;
+                        }
+
+                        .step5-summary-icon.purple {
+                            background-color: #F3E8FF;
+                        }
+
+                        .step5-summary-content {
+                            flex: 1;
+                        }
+
+                        .step5-summary-label {
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #12324B;
+                        }
+
+                        .step5-summary-desc {
+                            font-size: 13px;
+                            color: #667085;
+                            margin-top: 2px;
+                        }
+
+                        .step5-summary-badge {
+                            padding: 4px 12px;
+                            border-radius: 16px;
+                            font-size: 12px;
+                            font-weight: 600;
                             white-space: nowrap;
                         }
 
-                        .ob4-btn-prev {
+                        .step5-summary-badge.success {
+                            background-color: #DDF8EA;
+                            color: #1F8A4D;
+                        }
+
+                        .step5-summary-badge.active {
+                            background-color: #DDF8EA;
+                            color: #1F8A4D;
+                        }
+
+                        .step5-summary-badge.completed {
+                            background-color: #E0F2F1;
+                            color: #088395;
+                        }
+
+                        /* ── Ready card ── */
+                        .step5-ready-card {
+                            background: linear-gradient(135deg, #ECF8FF 0%, #E0F2F1 100%);
+                            border-radius: 16px;
+                            padding: 12px;
+                            margin-top: 10px;
+                            border: 1px solid #B8E4E9;
+                        }
+
+                        .step5-ready-content {
+                            display: flex;
+                            align-items: flex-start;
+                            gap: 10px;
+                        }
+
+                        .step5-ready-icon {
+                            width: 33px;
+                            height: 33px;
+                            border-radius: 50%;
+                            background-color: #0F8B8D;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex-shrink: 0;
+                        }
+
+                        .step5-ready-text {
+                            flex: 1;
+                        }
+
+                        .step5-ready-title {
+                            font-size: 17px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 4px;
+                        }
+
+                        .step5-ready-desc {
+                            font-size: 15px;
+                            color: #667085;
+                            line-height: 1.4;
+                        }
+
+                        /* ── Right column ── */
+                        .step5-right-col {
+                            display: flex;
+                            flex-direction: column;
+                        }
+
+                        .step5-heading {
+                            font-size: 24px;
+                            font-weight: 700;
+                            color: #12324B;
+                            line-height: 1.2;
+                            letter-spacing: -0.8px;
+                            margin-bottom: 12px;
+                        }
+
+                        .step5-subheading {
+                            font-size: 15px;
+                            color: #667085;
+                            line-height: 1.5;
+                            margin-bottom: 32px;
+                        }
+
+                        /* ── Billing toggle ── */
+                        .step5-billing-toggle {
+                            display: inline-flex;
+                            background-color: #F0F2F5;
+                            border-radius: 10px;
+                            padding: 4px;
+                            margin-bottom: 32px;
+                        }
+
+                        .step5-toggle-option {
+                            padding: 10px 24px;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #667085;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            border: none;
+                            background: transparent;
+                        }
+
+                        .step5-toggle-option:hover {
+                            color: #12324B;
+                        }
+
+                        .step5-toggle-option.active {
                             background-color: white;
-                            color: #303030;
-                            border: 1.5px solid #d0d0d0;
+                            color: #0F8B8D;
+                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
                         }
 
-                        .ob4-btn-prev:hover:not(:disabled) {
-                            background-color: #f5f5f5;
-                            border-color: #a0a0a0;
+                        .step5-toggle-discount {
+                            background-color: #DDF8EA;
+                            color: #1F8A4D;
+                            padding: 2px 8px;
+                            border-radius: 12px;
+                            font-size: 11px;
+                            margin-left: 4px;
                         }
 
-                        .ob4-btn-prev:disabled {
+                        /* ── Plan cards ── */
+                        .step5-plan-cards {
+                            display: grid;
+                            grid-template-columns: repeat(3, 1fr);
+                            gap: 16px;
+                            margin-bottom: 24px;
+                        }
+
+                        .step5-plan-card {
+                            background: white;
+                            border: 2px solid #DCE3EA;
+                            border-radius: 16px;
+                            padding: 24px;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            position: relative;
+                            display: flex;
+                            flex-direction: column;
+                        }
+
+                        .step5-plan-card:hover {
+                            border-color: #0F8B8D;
+                            box-shadow: 0 4px 16px rgba(15, 139, 141, 0.12);
+                            transform: translateY(-2px);
+                        }
+
+                        .step5-plan-card.selected {
+                            border-color: #0F8B8D;
+                            box-shadow: 0 4px 20px rgba(15, 139, 141, 0.2);
+                        }
+
+                        .step5-plan-badge {
+                            position: absolute;
+                            top: -10px;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            padding: 4px 12px;
+                            border-radius: 12px;
+                            font-size: 12px;
+                            font-weight: 600;
+                            white-space: nowrap;
+                        }
+
+                        .step5-plan-badge.recommended {
+                            background-color: #E0F2F1;
+                            color: #088395;
+                            border: 1px solid #B8E4E9;
+                        }
+
+                        .step5-plan-badge.popular {
+                            background-color: #DDF8EA;
+                            color: #1F8A4D;
+                            border: 1px solid #B8E4E9;
+                        }
+
+                        .step5-plan-name {
+                            font-size: 18px;
+                            font-weight: 600;
+                            color: #12324B;
+                            margin-bottom: 8px;
+                        }
+
+                        .step5-plan-price {
+                            font-size: 28px;
+                            font-weight: 700;
+                            color: #0F8B8D;
+                            margin-bottom: 4px;
+                        }
+
+                        .step5-plan-subtitle {
+                            font-size: 13px;
+                            font-weight: 500;
+                            color: #667085;
+                            margin-bottom: 12px;
+                        }
+
+                        .step5-plan-features {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 8px;
+                            flex: 1;
+                        }
+
+                        .step5-plan-feature {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            font-size: 13px;
+                            color: #667085;
+                        }
+
+                        .step5-plan-feature svg {
+                            width: 16px;
+                            height: 16px;
+                            color: #1F8A4D;
+                            flex-shrink: 0;
+                        }
+
+                        .step5-plan-bottom {
+                            margin-top: 16px;
+                            padding-top: 16px;
+                            border-top: 1px solid #F0F2F5;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
+
+                        .step5-plan-selected {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            color: #088395;
+                            font-weight: 600;
+                            font-size: 14px;
+                        }
+
+                        .step5-plan-radio {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            color: #667085;
+                            font-size: 14px;
+                            font-weight: 500;
+                        }
+
+                        .step5-radio-circle {
+                            width: 20px;
+                            height: 20px;
+                            border: 2px solid #DCE3EA;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step5-plan-card.selected .step5-radio-circle {
+                            border-color: #0F8B8D;
+                            background-color: #0F8B8D;
+                        }
+
+                        .step5-radio-inner {
+                            width: 8px;
+                            height: 8px;
+                            background-color: white;
+                            border-radius: 50%;
+                            opacity: 0;
+                            transition: all 0.2s ease;
+                        }
+
+                        .step5-plan-card.selected .step5-radio-inner {
+                            opacity: 1;
+                        }
+
+                        /* ── Bottom message ── */
+                        .step5-bottom-message {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                            padding: 16px;
+                            background-color: #F8F9FA;
+                            border-radius: 12px;
+                            margin-bottom: 24px;
+                        }
+
+                        .step5-bottom-message svg {
+                            width: 16px;
+                            height: 16px;
+                            color: #667085;
+                        }
+
+                        .step5-bottom-message-text {
+                            font-size: 14px;
+                            color: #667085;
+                        }
+
+                        /* ── Footer navigation ── */
+                        .step5-footer {
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            padding-top: 24px;
+                            border-top: 1px solid #DCE3EA;
+                        }
+
+                        .step5-btn {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 8px;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            font-size: 15px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            border: none;
+                        }
+
+                        .step5-btn-prev {
+                            background-color: white;
+                            color: #12324B;
+                            border: 1.5px solid #DCE3EA;
+                        }
+
+                        .step5-btn-prev:hover:not(:disabled) {
+                            background-color: #F8F9FA;
+                            border-color: #C1C8CD;
+                        }
+
+                        .step5-btn-prev:disabled {
                             opacity: 0.5;
                             cursor: not-allowed;
                         }
 
-                        .ob4-btn-dashboard {
-                            background-color: #088395;
+                        .step5-btn-dashboard {
+                            background-color: #0F8B8D;
                             color: white;
-                            border: none;
-                            padding: 12px 32px;
-                            font-weight: 600;
+                            padding: 12px 28px;
                         }
 
-                        .ob4-btn-dashboard:hover {
-                            transform: translateY(-2px);
-                            box-shadow: 0 4px 12px rgba(255, 153, 128, 0.4);
+                        .step5-btn-dashboard:hover {
+                            background-color: #0C7778;
+                            transform: translateY(-1px);
+                            box-shadow: 0 4px 12px rgba(15, 139, 141, 0.25);
                         }
 
                         /* ── Progress dots ── */
-                        .ob4-progress {
+                        .step5-progress {
                             display: flex;
                             align-items: center;
-                            gap: 12px;
-                            flex-wrap: wrap;
-                            justify-content: center;
+                            gap: 8px;
                         }
 
-                        .ob4-dots {
-                            display: flex;
-                            align-items: center;
-                            gap: 6px;
-                        }
-
-                        .ob4-dot {
+                        .step5-dot {
                             width: 32px;
                             height: 5px;
                             border-radius: 3px;
-                            background-color: #09637E;
+                            background-color: #0F8B8D;
                         }
 
-                        .ob4-progress-label {
-                            font-size: 16px;
+                        .step5-progress-label {
+                            font-size: 14px;
                             font-weight: 600;
-                            color: #09637E;
-                            white-space: nowrap;
+                            color: #0F8B8D;
                         }
 
-                        /* ── Tablet (≤ 768px) ── */
-                        @media (max-width: 768px) {
-                            .ob4-cards {
+                        /* ── Responsive ── */
+                        @media (max-width: 1024px) {
+                            .step5-layout {
+                                grid-template-columns: 1fr;
+                                gap: 32px;
+                            }
+
+                            .step5-plan-cards {
                                 grid-template-columns: repeat(2, 1fr);
                             }
-
-                            .ob4-dot {
-                                width: 24px !important;
-                                height: 4px !important;
-                            }
                         }
 
-                        /* ── Mobile (≤ 480px) ── */
-                        @media (max-width: 480px) {
-                            .ob4-cards {
+                        @media (max-width: 768px) {
+                            .step5-celebration-emoji {
+                                font-size: 48px;
+                            }
+
+                            .step5-celebration-title {
+                                font-size: 24px;
+                            }
+
+                            .step5-heading {
+                                font-size: 28px;
+                            }
+
+                            .step5-plan-cards {
                                 grid-template-columns: 1fr;
                             }
 
-                            .ob4-footer {
+                            .step5-footer {
                                 flex-direction: column;
-                                align-items: stretch;
+                                gap: 16px;
                             }
 
-                            .ob4-btn {
+                            .step5-btn {
                                 width: 100%;
                                 justify-content: center;
                             }
 
-                            .ob4-progress {
+                            .step5-progress {
                                 justify-content: center;
                             }
-
-                            .ob4-dot {
-                                width: 20px !important;
-                                height: 3px !important;
-                            }
                         }
 
-                        /* ── Very small screens (≤ 360px) ── */
-                        @media (max-width: 360px) {
-                            .ob4-steps {
-                                gap: 6px;
-                            }
-
-                            .ob4-step-pill {
-                                padding: 4px 8px;
-                            }
-
-                            .ob4-step-label,
-                            .ob4-step-badge {
-                                font-size: 11px;
-                            }
-                        }
-
-                        /* ── Wrapper padding for responsive spacing ── */
-                        .onboarding-step-4-wrapper {
+                        /* ── Wrapper padding ── */
+                        .onboarding-step-5-wrapper {
                             padding: 0;
+                            max-width: 100%;
+                            overflow-x: hidden;
                         }
 
-                        /* ── Extra small screens (≤ 495px) - Add side padding ── */
-                        @media (max-width: 495px) {
-                            .onboarding-step-4-wrapper {
-                                padding: 0;
-                            }
-
-                            .ob4-steps {
-                                padding: 0 8px;
-                            }
+                        /* ── Card container width ── */
+                        .onboarding-step-5-wrapper .Card {
+                            max-width: 100%;
                         }
                     `}
                 </style>
 
-                <div className="onboarding-step-4-wrapper">
-                <Page>
-                    <Card>
-                        <BlockStack gap="500">
-
-                            {/* ── Congratulations hero ── */}
-                            <Box padding="600">
-                                <div style={{ textAlign: "center" }}>
+                <div className="onboarding-step-5-wrapper">
+                    <Page fullWidth>
+                        <div style={{ maxWidth: "100%", margin: "0 auto" }}>
+                            <Card>
+                                <div style={{ padding: "24px" }}>
 
                                     {/* Step breadcrumb */}
-                                    <Box paddingInline="600" paddingBlockEnd="400">
+                                    <Box paddingBlockEnd="400">
                                         <div className="ob4-steps">
 
                                             {/* Step 1 – done */}
@@ -8762,12 +7163,18 @@ export default function NewOnboarding() {
                                             {/* Step 3 – done */}
                                             <div className="ob4-step-pill">
                                                 <div className="ob4-step-circle ob4-step-circle--done">✓</div>
-                                                <span className="ob4-step-label">{t("onboarding.Create_Product")}</span>
+                                                <span className="ob4-step-label">{t("onboarding.Theme_App_Embed")}</span>
                                             </div>
 
-                                            {/* Step 4 – active */}
+                                            {/* Step 4 – done */}
                                             <div className="ob4-step-pill">
-                                                <div className="ob4-step-circle ob4-step-circle--active">4</div>
+                                                <div className="ob4-step-circle ob4-step-circle--done">✓</div>
+                                                <span className="ob4-step-label">{t("onboarding.Live_Test")}</span>
+                                            </div>
+
+                                            {/* Step 5 – active */}
+                                            <div className="ob4-step-pill">
+                                                <div className="ob4-step-circle ob4-step-circle--active">5</div>
                                                 <span className="ob4-step-label">
                                                     <button className="ob4-step-badge">
                                                         {t("onboarding.congratulations")}
@@ -8778,221 +7185,471 @@ export default function NewOnboarding() {
                                         </div>
                                     </Box>
 
-                                    {/* Confetti */}
-                                    <span className="ob4-confetti">🎉</span>
+                                    {/* Main two-column layout */}
+                                    <div className="step5-layout">
 
-                                    {/* Heading */}
-                                    <Text as="h1" variant="heading2xl" fontWeight="bold">
-                                        {t("onboarding.congratulations")}
-                                    </Text>
+                                        {/* Left Column */}
+                                        <div className="step5-left-col">
 
-                                    {/* Subheading */}
-                                    <div style={{ marginTop: "16px" }}>
-                                        <Text as="p" variant="headingLg" tone="subdued">
-                                            {t("onboarding.You_all_set_up_and_ready_to_go")}
-                                        </Text>
-                                    </div>
+                                            {/* Left Column Card */}
+                                            <Card>
+                                                <div style={{ padding: "0px" }}>
+                                                    {/* Celebration Section */}
+                                                    <div className="step5-celebration">
+                                                        <div className="step5-celebration-emoji">🎉</div>
+                                                        <h1 className="step5-celebration-title">
+                                                            {t("onboarding.You_all_set_up_and_ready_to_go")}
+                                                        </h1>
+                                                        <p className="step5-celebration-desc">
+                                                            {t("onboarding.step5_celebration_desc")}
+                                                        </p>
+                                                    </div>
 
-                                </div>
-                            </Box>
+                                                    {/* Setup Summary Card */}
+                                                    <div className="step5-summary-card">
+                                                        <h3 className="step5-card-title">{t("onboarding.setup_summary")}</h3>
 
-                            {/* ── What's next cards ── */}
-                            <Box padding="600" paddingBlockStart="400">
-                                <div style={{ marginBottom: "24px" }}>
-                                    <Text as="h2" variant="headingLg" fontWeight="semibold">
-                                        {t("onboarding.What_next")}
-                                    </Text>
-                                </div>
+                                                        {/* Products enabled */}
+                                                        <div className="step5-summary-row">
+                                                            <div className="step5-summary-icon teal">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#088395" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                                                    <line x1="12" y1="22.08" x2="12" y2="12" />
+                                                                </svg>
+                                                            </div>
+                                                            <div className="step5-summary-content">
+                                                                <div className="step5-summary-label">
+                                                                    {productCount === 1 ? t("onboarding.product_enabled") : t("onboarding.products_enabled")}
+                                                                </div>
+                                                                <div className="step5-summary-desc">
+                                                                    {productCount} {productCount === 1 ? t("onboarding.product_enabled") : t("onboarding.products_enabled")}
+                                                                </div>
+                                                            </div>
+                                                            <span className="step5-summary-badge active">{t("onboarding.active")}</span>
+                                                        </div>
 
-                                <div className="ob4-cards">
+                                                        {/* Theme app embed */}
+                                                        <div className="step5-summary-row">
+                                                            <div className="step5-summary-icon blue">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#088395" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <polyline points="16 18 22 12 16 6" />
+                                                                    <polyline points="8 6 2 12 8 18" />
+                                                                </svg>
+                                                            </div>
+                                                            <div className="step5-summary-content">
+                                                                <div className="step5-summary-label">{t("onboarding.theme_embed_status")}</div>
+                                                                <div className="step5-summary-desc">
+                                                                    {t("onboarding.try-on_live_discription")}
+                                                                </div>
+                                                            </div>
+                                                            <span className="step5-summary-badge success">{t("onboarding.active")}</span>
+                                                        </div>
 
-                                    {/* Card 1 – Edit Delivery Email */}
-                                    <div
-                                        className="ob4-card"
-                                        onClick={handleCreateNewProduct}
-                                    >
-                                        <span className="ob4-card-icon">✉️</span>
-                                        <Text as="h3" variant="headingMd" fontWeight="semibold">
-                                            {t("settings.email_content.Customize_Email_Design")}
-                                        </Text>
-                                    </div>
+                                                        {/* Live test completed */}
+                                                        <div className="step5-summary-row">
+                                                            <div className="step5-summary-icon purple">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#088395" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                                                                    <circle cx="12" cy="13" r="3" />
+                                                                </svg>
+                                                            </div>
+                                                            <div className="step5-summary-content">
+                                                                <div className="step5-summary-label">{t("onboarding.Live_Test")}</div>
+                                                                <div className="step5-summary-desc">
+                                                                    {liveTestProduct ? liveTestProduct.title : t("onboarding.live_test_title")}
+                                                                </div>
+                                                            </div>
+                                                            <span className="step5-summary-badge completed">{t("onboarding.test_completed")}</span>
+                                                        </div>
+                                                    </div>
 
-                                    {/* Card 2 – Read Documentation */}
-                                    <div
-                                        className="ob4-card"
-                                        onClick={() =>
-                                            window.open(
-                                                "https://conversionproplus.com/guide",
-                                                "_blank",
-                                                "noopener,noreferrer"
-                                            )
-                                        }
-                                    >
-                                        <span className="ob4-card-icon">📚</span>
-                                        <Text as="h3" variant="headingMd" fontWeight="semibold">
-                                            {t("onboarding.Read_Documentation")}
-                                        </Text>
-                                    </div>
-
-                                    {/* Card 3 – Get Support */}
-                                    <div
-                                        className="ob4-card"
-                                        onClick={() => window.$crisp.push(["do", "chat:open"])}
-                                    >
-                                        <span className="ob4-card-icon">💬</span>
-                                        <Text as="h3" variant="headingMd" fontWeight="semibold">
-                                            {t("onboarding.Get_Support")}
-                                        </Text>
-                                    </div>
-
-                                </div>
-                            </Box>
-
-                            {/* ── Footer navigation ── */}
-                            <Box padding="600" paddingBlockStart="400">
-                                <div className="ob4-footer">
-
-                                    {/* Previous */}
-                                    <button
-                                        className="ob4-btn ob4-btn-prev"
-                                        onClick={handleBack}
-                                        disabled={currentStep === 4}
-                                    >
-                                        <span>‹</span>
-                                        {t("onboarding.Previous")}
-                                    </button>
-
-                                    {/* Progress – all 4 active */}
-                                    <div className="ob4-progress">
-                                        <div className="ob4-dots">
-                                            <div className="ob4-dot" />
-                                            <div className="ob4-dot" />
-                                            <div className="ob4-dot" />
-                                            <div className="ob4-dot" />
+                                                    {/* Ready Card */}
+                                                    <div className="step5-ready-card">
+                                                        <div className="step5-ready-content">
+                                                            <div className="step5-ready-icon">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <circle cx="12" cy="12" r="10" />
+                                                                    <path d="M12 16v-4" />
+                                                                    <path d="M12 8h.01" />
+                                                                </svg>
+                                                            </div>
+                                                            <div className="step5-ready-text">
+                                                                <div className="step5-ready-title">{t("onboarding.you_are_ready_go")}</div>
+                                                                <div className="step5-ready-desc">
+                                                                    {t("onboarding.you_are_ready_go_desc")}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </Card>
                                         </div>
-                                        <span className="ob4-progress-label">4/4</span>
+
+                                        {/* Right Column */}
+                                        <div className="step5-right-col">
+                                            <Card>
+                                                <div style={{ padding: "0px" }}>
+                                                    <h1 className="step5-heading">{t("onboarding.choose_your_plan")}</h1>
+                                                    <p className="step5-subheading">{t("onboarding.plan_selection_subtitle")}</p>
+
+                                                    {/* Billing Toggle */}
+                                                    <div className="step5-billing-toggle">
+                                                        <button
+                                                            className={`step5-toggle-option ${true ? 'active' : ''}`}
+                                                            onClick={() => { }}
+                                                        >
+                                                            {t("plans.monthly.title")}
+                                                        </button>
+                                                        <button
+                                                            className={`step5-toggle-option ${false ? 'active' : ''}`}
+                                                            onClick={() => { }}
+                                                        >
+                                                            {t("plans.yearly.title")}
+                                                            <span className="step5-toggle-discount">{t("onboarding.save_20_percent")}</span>
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Plan Cards */}
+                                                    <div className="step5-plan-cards">
+
+                                                        {/* Starter Plan */}
+                                                        <div
+                                                            className={`step5-plan-card ${selectedPlan === "starter" ? "selected" : ""}`}
+                                                            onClick={() => setSelectedPlan("starter")}
+                                                        >
+                                                            {selectedPlan === "starter" && (
+                                                                <div className="step5-plan-badge recommended">{t("onboarding.recommended")}</div>
+                                                            )}
+                                                            <div className="step5-plan-name">{t("onboarding.starter_plan")}</div>
+                                                            <div className="step5-plan-price">{t("onboarding.starter_price")}</div>
+                                                            <div className="step5-plan-subtitle">{t("onboarding.starter_sessions")}</div>
+                                                            <div className="step5-plan-features">
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.all_core_features")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.up_to_50_sessions")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.standard_quality")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.email_support")}
+                                                                </div>
+                                                            </div>
+                                                            <div className="step5-plan-bottom">
+                                                                {selectedPlan === "starter" ? (
+                                                                    <div className="step5-plan-selected">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                                            <polyline points="22 4 12 14.01 9 11.01" />
+                                                                        </svg>
+                                                                        {t("onboarding.selected")}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="step5-plan-radio">
+                                                                        <div className="step5-radio-circle">
+                                                                            <div className="step5-radio-inner"></div>
+                                                                        </div>
+                                                                        {t("onboarding.choose_plan_btn")}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Growth Plan */}
+                                                        <div
+                                                            className={`step5-plan-card ${selectedPlan === "growth" ? "selected" : ""}`}
+                                                            onClick={() => setSelectedPlan("growth")}
+                                                        >
+                                                            <div className="step5-plan-badge popular">{t("onboarding.popular")}</div>
+                                                            <div className="step5-plan-name">{t("onboarding.growth_plan")}</div>
+                                                            <div className="step5-plan-price">{t("onboarding.growth_price")}</div>
+                                                            <div className="step5-plan-subtitle">{t("onboarding.growth_sessions")}</div>
+                                                            <div className="step5-plan-features">
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.all_core_features")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.up_to_500_sessions")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.high_quality")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.priority_support")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.usage_analytics")}
+                                                                </div>
+                                                            </div>
+                                                            <div className="step5-plan-bottom">
+                                                                {selectedPlan === "growth" ? (
+                                                                    <div className="step5-plan-selected">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                                            <polyline points="22 4 12 14.01 9 11.01" />
+                                                                        </svg>
+                                                                        {t("onboarding.selected")}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="step5-plan-radio">
+                                                                        <div className="step5-radio-circle">
+                                                                            <div className="step5-radio-inner"></div>
+                                                                        </div>
+                                                                        {t("onboarding.choose_plan_btn")}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Scale Plan */}
+                                                        <div
+                                                            className={`step5-plan-card ${selectedPlan === "scale" ? "selected" : ""}`}
+                                                            onClick={() => setSelectedPlan("scale")}
+                                                        >
+                                                            <div className="step5-plan-name">{t("onboarding.scale_plan")}</div>
+                                                            <div className="step5-plan-price">{t("onboarding.scale_price")}</div>
+                                                            <div className="step5-plan-subtitle">{t("onboarding.unlimited_sessions")}</div>
+                                                            <div className="step5-plan-features">
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.all_core_features")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.unlimited_sessions_short")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.highest_quality")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.priority_support")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.usage_analytics")}
+                                                                </div>
+                                                                <div className="step5-plan-feature">
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                    {t("onboarding.early_access_features")}
+                                                                </div>
+                                                            </div>
+                                                            <div className="step5-plan-bottom">
+                                                                {selectedPlan === "scale" ? (
+                                                                    <div className="step5-plan-selected">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                                            <polyline points="22 4 12 14.01 9 11.01" />
+                                                                        </svg>
+                                                                        {t("onboarding.selected")}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="step5-plan-radio">
+                                                                        <div className="step5-radio-circle">
+                                                                            <div className="step5-radio-inner"></div>
+                                                                        </div>
+                                                                        {t("onboarding.choose_plan_btn")}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                                                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                                        </svg>
+                                                        <span style={{ fontSize: '13px', color: '#667085' }}>{t("onboarding.free_trial_note")}</span>
+                                                    </div>
+
+                                                </div>
+                                            </Card>
+
+                                        </div>
                                     </div>
 
-                                    {/* Go to Dashboard */}
-                                    <button
-                                        className="ob4-btn ob4-btn-dashboard"
-                                        onClick={() => {
-                                            sessionStorage.setItem("onboardingJustCompleted", "true");
-                                            navigate("/");
-                                        }}
-                                    >
-                                        {t("onboarding.Go_to_Dashboard")}
-                                        <span>🚀</span>
-                                    </button>
+
+                                    {/* Footer Navigation */}
+                                    <div className="step5-footer">
+
+                                        {/* Previous Button */}
+                                        <button
+                                            className="step5-btn step5-btn-prev"
+                                            onClick={handleBack}
+                                            disabled={currentStep === 1}
+                                        >
+                                            <span>←</span>
+                                            {t("onboarding.Previous")}
+                                        </button>
+
+                                        {/* Progress Indicator */}
+                                        <div className="step5-progress">
+                                            <div className="step5-dot"></div>
+                                            <div className="step5-dot"></div>
+                                            <div className="step5-dot"></div>
+                                            <div className="step5-dot"></div>
+                                            <div className="step5-dot"></div>
+                                            <span className="step5-progress-label">5/5</span>
+                                        </div>
+
+                                        {/* Go to Dashboard Button */}
+                                        <button
+                                            className="step5-btn step5-btn-dashboard"
+                                            onClick={async () => {
+                                                // Set onboarding completed flag
+                                                try {
+                                                    await fetch("/api/complete-onboarding", {
+                                                        method: "POST",
+                                                        headers: {
+                                                            "Content-Type": "application/json",
+                                                        },
+                                                        body: JSON.stringify({
+                                                            selectedPlan: selectedPlan,
+                                                            productsEnabled: productCount,
+                                                            themeEmbedActive: isThemeEmbedActive,
+                                                            testCompleted: testFeedback !== null,
+                                                        }),
+                                                    });
+                                                    console.log("Onboarding completed successfully");
+                                                } catch (error) {
+                                                    console.error("Error completing onboarding:", error);
+                                                }
+
+                                                sessionStorage.setItem("onboardingJustCompleted", "true");
+                                                sessionStorage.setItem("selectedPlan", selectedPlan);
+                                                navigate("/");
+                                            }}
+                                        >
+                                            {t("onboarding.go_to_dashboard")}
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                                                <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                                                <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                                                <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+                                            </svg>
+                                        </button>
+
+                                    </div>
 
                                 </div>
-                            </Box>
-
-                        </BlockStack>
-                    </Card>
-                </Page>
+                            </Card>
+                        </div>
+                    </Page>
                 </div>
             </>
         );
     }
 
- return (
-    <div
-        style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            minHeight: "100vh",
-            backgroundColor: "#f8ebeb",
-            padding: "10px",
-        }}
-    >
-        <div style={{ maxWidth: "600px", width: "100%" }}>
-            <Card padding="0">  {/* ← zero out Polaris Card's built-in padding */}
-                <div style={{ padding: "40px 48px" }}>  {/* ← top/bottom: 40px, sides: 48px */}
-                    <div style={{ marginBottom: "32px" }}>
-                        <ProgressBar progress={progress} size="small" />
-                    </div>
-
-                    <div
-                        style={{
-                            textAlign: "center",
-                            marginBottom: "32px",
-                        }}
-                    >
-                        <div
-                            style={{
-                                fontSize: "24px",
-                                fontWeight: "600",
-                                marginBottom: "16px",
-                                color: "#202223",
-                            }}
-                        >
-                            {steps[currentStep - 1].title}
+    return (
+        <div
+            style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                minHeight: "100vh",
+                backgroundColor: "#f8ebeb",
+                padding: "10px",
+            }}
+        >
+            <div style={{ maxWidth: "600px", width: "100%" }}>
+                <Card padding="0">  {/* ← zero out Polaris Card's built-in padding */}
+                    <div style={{ padding: "40px 48px" }}>  {/* ← top/bottom: 40px, sides: 48px */}
+                        <div style={{ marginBottom: "32px" }}>
+                            <ProgressBar progress={progress} size="small" />
                         </div>
-                        <Text variant="bodyL" as="p" tone="subdued">
-                            {steps[currentStep - 1].description}
-                        </Text>
-                    </div>
 
-                    {steps[currentStep - 1].image && (
                         <div
                             style={{
-                                marginBottom: "32px",
                                 textAlign: "center",
+                                marginBottom: "32px",
                             }}
                         >
-                            <img
-                                src={steps[currentStep - 1].image}
-                                alt={steps[currentStep - 1].title}
+                            <div
                                 style={{
-                                    maxWidth: "100%",
-                                    maxHeight: "300px",
-                                    borderRadius: "8px",
+                                    fontSize: "24px",
+                                    fontWeight: "600",
+                                    marginBottom: "16px",
+                                    color: "#202223",
                                 }}
-                            />
+                            >
+                                {steps[currentStep - 1].title}
+                            </div>
+                            <Text variant="bodyL" as="p" tone="subdued">
+                                {steps[currentStep - 1].description}
+                            </Text>
                         </div>
-                    )}
 
-                    <div
-                        style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            gap: "12px",
-                            marginTop: "32px",
-                        }}
-                    >
-                        <div style={{ flex: 1 }}>
-                            <Button
-                                fullWidth
-                                onClick={handleBack}
-                                variant="secondary"
-                                disabled={currentStep === 1}
+                        {steps[currentStep - 1].image && (
+                            <div
+                                style={{
+                                    marginBottom: "32px",
+                                    textAlign: "center",
+                                }}
                             >
-                                {t("onboarding.Previous")}
-                            </Button>
+                                <img
+                                    src={steps[currentStep - 1].image}
+                                    alt={steps[currentStep - 1].title}
+                                    style={{
+                                        maxWidth: "100%",
+                                        maxHeight: "300px",
+                                        borderRadius: "8px",
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                gap: "12px",
+                                marginTop: "32px",
+                            }}
+                        >
+                            <div style={{ flex: 1 }}>
+                                <Button
+                                    fullWidth
+                                    onClick={handleBack}
+                                    variant="secondary"
+                                    disabled={currentStep === 1}
+                                >
+                                    {t("onboarding.Previous")}
+                                </Button>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <Button
+                                    fullWidth
+                                    onClick={handleNext}
+                                    variant="primary"
+                                >
+                                    {t("onboarding.Continue")}
+                                </Button>
+                            </div>
                         </div>
-                        <div style={{ flex: 1 }}>
-                            <Button
-                                fullWidth
-                                onClick={handleNext}
-                                variant="primary"
-                            >
-                                {currentStep === totalSteps
-                                    ? "Get Started"
-                                    : "Next"}
-                            </Button>
+
+                        <div style={{ textAlign: "center", marginTop: "16px" }}>
+                            <Text variant="bodySm" as="p" tone="subdued">
+                                Step {currentStep} of {totalSteps}
+                            </Text>
                         </div>
                     </div>
-
-                    <div style={{ textAlign: "center", marginTop: "16px" }}>
-                        <Text variant="bodySm" as="p" tone="subdued">
-                            Step {currentStep} of {totalSteps}
-                        </Text>
-                    </div>
-                </div>
-            </Card>
+                </Card>
+            </div>
         </div>
-    </div>
-);
+    );
 }
