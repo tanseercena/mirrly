@@ -1303,7 +1303,7 @@ export default function NewOnboarding() {
     const handleResourcePickerOpen = async () => {
         try {
             const selected = await shopify.resourcePicker({
-                type: ['product', 'collection'],
+                type: 'collection',
                 action: 'select',
                 multiple: true,
             });
