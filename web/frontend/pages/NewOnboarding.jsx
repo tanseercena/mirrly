@@ -99,42 +99,12 @@ export default function NewOnboarding() {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [files, setFiles] = useState([]);
     const [sampleFiles, setSampleFiles] = useState([]);
-    const [licenseFiles, setLicenseFiles] = useState([]);
-    const [attachedLicenseFile, setAttachedLicenseFile] = useState(null);
-    const [licenses, setLicenses] = useState([]);
-    const [customs, setCustoms] = useState([]);
-    const [orders, setOrders] = useState([]);
     // const [filterLicenseValue, setFilterLicenseValue] = useState("");
     // const [filterCustomValue, setFilterCustomValue] = useState("");
-    const [selectedFileIds, setSelectedFileIds] = useState([]); // Track selected file IDs across all pages
-    const [selectedFileDetails, setSelectedFileDetails] = useState([]); // Track full details of selected files
-    const [selectedMainTab, setSelectedMainTab] = useState(0);
-    const [selectedLicenseIds, setSelectedLicenseIds] = useState([]);
-    const [licenseKeysPerUnit, setLicenseKeysPerUnit] = useState({});
-    const [selectAll, setSelectAll] = useState(false);
-    const [selectedLicenseTab, setSelectedLicenseTab] = useState(0);
-    const [selectedManualLicenseTab, setSelectedManualLicenseTab] = useState(0);
-    const [selectedCustomIds, setSelectedCustomIds] = useState([]);
-    const [selectAllForCustom, setSelectAllForCustom] = useState(false);
-    const [selectedCustomTab, setSelectedCustomTab] = useState(0);
-    const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
-    const [isCustomLinkModalOpen, setIsCustomLinkModalOpen] = useState(false);
+    const [selectedMainTab, setSelectedMainTab] = useState(1);
     const [tagInputValue, setTagInputValue] = useState("");
     const [tags, setTags] = useState([]);
-    // Add state to track all licenses across all pages
-    const [allLicenses, setAllLicenses] = useState([]);
     const [isPageLoading, setIsPageLoading] = useState(false);
-
-    const [title, setTitle] = useState("");
-    const [redirectURL, setRedirectURL] = useState("");
-    const [linkDetail, setLinkDetail] = useState("");
-    const [licenseTitle, setLicenseTitle] = useState("");
-    const [value, setValue] = useState("automated");
-    const [prefix, setPrefix] = useState("");
-    const [codeLength, setCodeLength] = useState("");
-    const [suffix, setSuffix] = useState("");
-    const [licensePreview, setLicensePreview] = useState('FWUE2TEX');
-    const [totalCodes, setTotalCodes] = useState("");
     const [contentType, setContentType] = useState([]);
     const [saving, setSaving] = useState(false);
     const [userPlan, setUserPlan] = useState("free");
@@ -148,23 +118,12 @@ export default function NewOnboarding() {
 
     // Track loading states for all essential data
     const [isStoreLoaded, setIsStoreLoaded] = useState(false);
-    const [isPdfTemplatesLoaded, setIsPdfTemplatesLoaded] = useState(false);
     const [isNewUserChecked, setIsNewUserChecked] = useState(false);
     const [isUserPlanLoaded, setIsUserPlanLoaded] = useState(false);
-    const [isEmailTemplatesLoaded, setIsEmailTemplatesLoaded] = useState(false);
-    const [isCurrentFilesLoaded, setIsCurrentFilesLoaded] = useState(false);
     const [isLimitExceededModalActive, setIsLimitExceededModalActive] =
         useState(false);
-    const [currentPageFiles, setCurrentPageFiles] = useState(1);
-    const [currentPageLicenses, setCurrentPageLicenses] = useState(1);
-    const [currentPageCustoms, setCurrentPageCustoms] = useState(1);
-    const [totalFiles, setTotalFiles] = useState(0);
-    const [totalLicenses, setTotalLicenses] = useState(0);
-    const [totalCustoms, setTotalCustoms] = useState(0);
     const itemsPerPage = 10;
     const [productMessage, setProductMessage] = useState("");
-    const [newLicenses, setNewLicenses] = useState([]);
-    const [newCustoms, setNewCustoms] = useState([]);
     const [qrCodeEnabled, setQrCodeEnabled] = useState(false);
     const [qrCodePrintOnPDF, setQRCodePrintOnPDF] = useState(false);
     const [giftCardEnabled, setGiftCardEnabled] = useState(false);
@@ -228,7 +187,7 @@ export default function NewOnboarding() {
         year: selectedDate.getFullYear(),
     });
     const datePickerRef = useRef(null);
-    const formattedValue = selectedDate.toISOString().slice(0, 10);
+    //const formattedValue = selectedDate.toISOString().slice(0, 10);
     const [progress, setProgress] = useState(0);
     const [selectedOptions, setSelectedOptions] = useState([]);
     const [inputValue, setInputValue] = useState("");
@@ -236,11 +195,6 @@ export default function NewOnboarding() {
     const [selectedLicenseOptions, setSelectedLicenseOptions] = useState([]);
     const [inputLicenseValue, setInputLicenseValue] = useState("");
     const [searchLicenseOptions, setSearchLicenseOptions] = useState([]);
-    const [selectedCustomLinkOptions, setSelectedCustomLinkOptions] = useState(
-        []
-    );
-    const [inputCustomLinkValue, setInputCustomLinkValue] = useState("");
-    const [searchCustomLinkOptions, setSearchCustomLinkOptions] = useState([]);
 
     const [emailTemplateType, setEmailTemplateType] = useState("");
     const [emailTemplateId, setEmailTemplateId] = useState();
@@ -264,25 +218,11 @@ export default function NewOnboarding() {
     const [passwordProtect, setPasswordProtect] = useState(false);
     const [templateTitle, setTemplateTitle] = useState("");
     const [PDFTemplateId, setPDFTemplateId] = useState(null);
-    const [pdfTemplates, setPdfTemplates] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState("");
     const [previewFile, setPreviewFile] = useState(null);
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
     const [googleDriveLink, setGoogleDriveLink] = useState("");
 
-    // function isNodeWithinPopover(node) {
-    //     return datePickerRef?.current
-    //         ? nodeContainsDescendant(datePickerRef.current, node)
-    //         : false;
-    // }
-
-    const handlePdfStampingEnabledChange = (checked) => {
-        setIsPdfStampingEnabled(checked);
-    };
-
-    const handleTemplateChoiceChange = (newTemplateChoice) => {
-        setTemplateChoice(newTemplateChoice);
-    };
 
     const checkNewUsers = async () => {
         try {
@@ -299,253 +239,16 @@ export default function NewOnboarding() {
         }
     };
 
-    // const handleEmailTemplateCustom = () => {
-    //     setEmailTemplateType("custom");
-    //     if (emailTemplates?.length > 0) {
-    //         setEmailTemplateId(emailTemplates[0].id);
-    //     }
-    // };
-
-    const toggleCustomTemplateModal = () => {
-        setIsPDFModalOpen(!isPDFModalOpen);
-    };
-
-    const handlePreviewFileChange = (event) => {
-        const file = event.target.files[0];
-        if (file && file.type === "application/pdf") {
-            setPreviewFile(file);
-        } else if (file) {
-            // Show error toast or alert for invalid file type
-            alert("Please select a valid PDF file");
-            event.target.value = ""; // Clear the input
-        }
-    };
-
-    const handlePreviewTemplate = async () => {
-        if (!previewFile) {
-            alert("Please select a PDF file first");
-            return;
-        }
-
-        setIsPreviewLoading(true);
-
-        try {
-            const formData = new FormData();
-            formData.append("pdf_file", previewFile);
-            formData.append("text_size", textSize);
-            formData.append("text_color", textColor);
-            formData.append("alignment", alignment);
-            formData.append("font", font);
-            formData.append("page_size", pageSize);
-            formData.append("page_layout", pageLayout);
-            formData.append("vertical_adjustment", verticalAdjustment);
-            formData.append("pages_to_stamp", pagesToStamp);
-            formData.append("stamp_text", stampText);
-            formData.append("allow_printing", allowPrinting);
-            formData.append("allow_copying", allowCopy);
-            formData.append("password_protect", passwordProtect);
-
-            const response = await fetch("/api/preview-pdf-template", {
-                method: "POST",
-                body: formData,
-            });
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "preview.pdf";
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            } else {
-                const errorData = await response.json();
-                alert(
-                    "Error generating preview: " +
-                    (errorData.message || "Unknown error")
-                );
-            }
-        } catch (error) {
-            console.error("Preview error:", error);
-            alert("Error generating preview. Please try again.");
-        } finally {
-            setIsPreviewLoading(false);
-        }
-    };
-
-    const handleSaveTemplate = async () => {
-        const pdfTemplateData = {
-            text_size: textSize,
-            text_color: textColor,
-            alignment,
-            font,
-            page_size: pageSize,
-            page_layout: pageLayout,
-            vertical_adjustment: verticalAdjustment,
-            pages_to_stamp: pagesToStamp,
-            stamp_text: stampText,
-            allow_printing: allowPrinting,
-            allow_copying: allowCopy,
-            password_protect: passwordProtect,
-        };
-
-        try {
-            const response = await fetch("/api/save-pdf-template", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    pdf_stamping: pdfTemplateData,
-                    title: templateTitle,
-                }),
-            });
-
-            if (response.ok) {
-                setStampText("");
-                setAllowPrinting(false);
-                setAllowCopy(false);
-                setTemplateTitle("");
-                const data = await response.json();
-
-                const pdfTemplateId = String(data.template.id);
-                const newTemplateTitle = data.template.title;
-
-                setPDFTemplateId(pdfTemplateId);
-                setSelectedTemplate(pdfTemplateId);
-
-                setPdfTemplates((prevTemplates) => [
-                    ...prevTemplates,
-                    { id: pdfTemplateId, title: newTemplateTitle },
-                ]);
-
-                console.log("PDF Template saved:", data);
-                shopify.toast.show(
-                    t("createdigitalproduct.pdf_template_saved_successfully")
-                );
-            } else {
-                throw new Error("Failed to save PDF template");
-            }
-        } catch (error) {
-            console.error("Error saving template:", error);
-            shopify.toast.show(
-                t(
-                    "createdigitalproduct.failed_to_save_pdf_template_please_try_again"
-                ),
-                { isError: true, duration: 9999999 }
-            );
-        } finally {
-            setIsPDFModalOpen(false);
-        }
-    };
 
     useEffect(() => {
         // Check new user status on initial load (needed for step 1)
         checkNewUsers();
+    }, []);
 
-        // Only fetch PDF templates after user moves past step 1
-        if (currentStep <= 1) return;
-
-        const fetchPdfTemplates = async () => {
-            try {
-                const response = await fetch("/api/get-pdf-template");
-                const data = await response.json();
-
-                if (data.success) {
-                    setPdfTemplates(data.data);
-                } else {
-                    console.log(
-                        "Failed to fetch templates, no success flag in response."
-                    );
-                }
-            } catch (error) {
-                console.error("Error fetching PDF templates:", error);
-            } finally {
-                setIsPdfTemplatesLoaded(true);
-            }
-        };
-
-        fetchPdfTemplates();
-    }, [currentStep]);
-
-    const handleTemplateChange = (value) => {
-        setSelectedTemplate(String(value));
-        setPDFTemplateId(String(value));
-    };
 
     const templateOptions = [
         { label: t("createdigitalproduct.select_custom_template"), value: "" },
-        ...pdfTemplates.map((template) => ({
-            label: template.title,
-            value: String(template.id),
-        })),
     ];
-
-    const handleTitleChange = (newValue) => {
-        setTitle(newValue);
-    };
-
-    const handleLinkDetailChange = (newValue) => {
-        setLinkDetail(newValue);
-    };
-
-    const handleRedirectURLChange = (newValue) => {
-        setRedirectURL(newValue);
-    };
-
-    const handleLicenseTitleChange = (newValue) => {
-        setLicenseTitle(newValue);
-    };
-
-    const handlePrefixChange = (newValue) => {
-        setPrefix(newValue);
-    };
-
-    const handleCodeLengthChange = (newValue) => {
-        setCodeLength(newValue);
-    };
-
-    const handleSuffixChange = (newValue) => {
-        setSuffix(newValue);
-    };
-
-    const handleTotalCodesChange = (newValue) => {
-        setTotalCodes(newValue);
-    };
-
-    const handlePasteKeysChange = (newValue) => {
-        setPasteKeysValue(newValue);
-    };
-
-    const handleQRCode = (checked) => {
-        setQrCodeEnabled(checked);
-    };
-
-    const handleGiftCardEnabled = (value) => setGiftCardEnabled(value);
-
-    const handleQRCodePrintOnPDF = useCallback((newCheckedState) => {
-        setQRCodePrintOnPDF(newCheckedState);
-    }, []);
-
-    const handleGiftCardPropertyNameChange = (value) =>
-        setGiftCardPropertyName(value);
-
-    const handleGiftDeliveryPropertyNameChange = (value) =>
-        setGiftDeliveryPropertyName(value);
-
-    const handleSendKeyToMultipleCustomers = (checked) => {
-        setSendKeyToMultipleCustomers(checked);
-    };
-
-    const handleDeliverKeysInSequence = (checked) => {
-        setDeliverKeysInSequence(checked);
-    };
-
-    const handlePerUnitNoDeliveryChange = (newValue) => {
-        setPerUnitNoDelivery(newValue);
-    };
 
     const handleRadioButtonChange = useCallback((newValue) => {
         setValue(newValue);
@@ -555,41 +258,7 @@ export default function NewOnboarding() {
         setSelectedMainTab(selectedMainTabIndex);
     }, []);
 
-    // const handleLicenseTabChange = useCallback((selectedLicenseTabIndex) => {
-    //     setSelectedLicenseTab(selectedLicenseTabIndex);
-    // }, []);
 
-    const handleManualLicenseTabChange = useCallback(
-        (selectedManualLicenseTabIndex) => {
-            setSelectedManualLicenseTab(selectedManualLicenseTabIndex);
-        },
-        []
-    );
-
-    const generateLicensePreview = useCallback(() => {
-        if (!prefix && !codeLength && !suffix) {
-            return 'FWUE2TEX';
-        }
-
-        const prefixText = prefix || '';
-        const suffixText = suffix || '';
-        const length = parseInt(codeLength) || 6;
-
-        const characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        let randomCode = '';
-        for (let i = 0; i < length; i++) {
-            randomCode += characters.charAt(Math.floor(Math.random() * characters.length));
-        }
-
-        return `${prefixText}${randomCode}${suffixText}`;
-    }, [prefix, codeLength, suffix]);
-
-    useEffect(() => {
-        if (value === "automated") {
-            const preview = generateLicensePreview();
-            setLicensePreview(preview);
-        }
-    }, [prefix, codeLength, suffix, value, generateLicensePreview]);
 
     // const handleCustomTabChange = useCallback((selectedCustomTabIndex) => {
     //     setSelectedCustomTab(selectedCustomTabIndex);
@@ -602,17 +271,6 @@ export default function NewOnboarding() {
             content: t("createdigitalproduct.google_drive_file"),
         },
     ];
-
-    // const licenseTabs = [
-    //     {
-    //         id: "existingLicenses",
-    //         content: t("createdigitalproduct.from_existing_licenses"),
-    //     },
-    //     {
-    //         id: "newLicense",
-    //         content: t("createdigitalproduct.add_new_license"),
-    //     },
-    // ];
 
     const manualLicenseTabs = [
         { id: "uploadCsv", content: t("createdigitalproduct.upload_csv") },
@@ -726,91 +384,9 @@ export default function NewOnboarding() {
         setIsModalOpen(!isModalOpen);
     };
 
-    const toggleLicenseModal = () => {
-        setIsLicenseModalOpen(!isLicenseModalOpen);
-    };
-
-    const toggleCustomLinkModal = () => {
-        setIsCustomLinkModalOpen(!isCustomLinkModalOpen);
-    };
-
     const toggleFileUpload = () => {
         handleContentTypeChange("files");
         setIsModalOpen(!isModalOpen);
-    };
-
-    // const handleManualDeliveryEnabledChange = (checked) => {
-    //     setIsManualDeliveryEnabled(checked);
-    //     if (checked) {
-    //         setContentType(["manual_delivery"]);
-    //     } else {
-    //         setContentType([]);
-    //     }
-    // };
-
-    const toggleLicenseInput = () => {
-        // In onboarding flow, we're always creating new licenses (no tabs)
-        const newLicense = {
-            title: licenseTitle,
-            licenseType: value,
-            prefix: prefix,
-            codeLength: codeLength,
-            suffix: suffix,
-            totalCodes: totalCodes,
-            licenseFiles:
-                selectedManualLicenseTab === 0 ? licenseFiles : [],
-            pasteKeysValue:
-                selectedManualLicenseTab === 1 ? pasteKeysValue : "",
-            qrCodeEnabled: qrCodeEnabled,
-            qrCodePrintOnPDF: qrCodePrintOnPDF,
-            giftCardEnabled: giftCardEnabled,
-            giftCardPropertyName: giftCardPropertyName,
-            giftDeliveryPropertyName: giftDeliveryPropertyName,
-            sendKeyToMultipleCustomers: sendKeyToMultipleCustomers,
-            deliverKeysInSequence: deliverKeysInSequence,
-            manual_codes_type:
-                selectedManualLicenseTab === 0 ? "csv" : "paste_text",
-            perUnitNoDelivery: perUnitNoDelivery,
-        };
-
-        setNewLicenses((prevLicenses) => [...prevLicenses, newLicense]);
-
-        setLicenseTitle("");
-        setValue("");
-        setPrefix("");
-        setCodeLength("");
-        setSuffix("");
-        setTotalCodes("");
-        setPasteKeysValue("");
-        setLicenseFiles([]);
-        setQrCodeEnabled(false);
-        setQRCodePrintOnPDF(false);
-        setGiftCardEnabled(false);
-        setGiftCardPropertyName("");
-        setGiftDeliveryPropertyName("");
-        setSendKeyToMultipleCustomers(false);
-        setDeliverKeysInSequence(false);
-        setPerUnitNoDelivery(1);
-
-        handleContentTypeChange("license");
-        setIsLicenseModalOpen(!isLicenseModalOpen);
-    };
-
-    const toggleCustomLink = () => {
-        const newCustom = {
-            title: title,
-            redirectURL: redirectURL,
-            linkDetail: linkDetail,
-        };
-
-        setNewCustoms((prevCustoms) => [...prevCustoms, newCustom]);
-
-        setTitle("");
-        setRedirectURL("");
-        setLinkDetail("");
-
-        handleContentTypeChange("custom_link");
-        setIsCustomLinkModalOpen(!isCustomLinkModalOpen);
     };
 
     const handleContentTypeChange = (type) => {
@@ -823,36 +399,6 @@ export default function NewOnboarding() {
             return [...prev, type];
         });
     };
-
-    useEffect(() => {
-        // Only fetch files after user moves past step 1
-        if (currentStep <= 1) return;
-
-        const fetchCurrentFiles = async () => {
-            try {
-                const response = await fetch("/api/get-files");
-                if (response.ok) {
-                    const data = await response.json();
-                    const totalByteSize = data.files.reduce(
-                        (acc, file) => acc + file.byteSize,
-                        0
-                    );
-                    setCurrentFileStorage(totalByteSize);
-                } else {
-                    console.error(
-                        "Failed to fetch files:",
-                        response.statusText
-                    );
-                }
-            } catch (error) {
-                console.error("Error fetching files:", error);
-            } finally {
-                setIsCurrentFilesLoaded(true);
-            }
-        };
-
-        fetchCurrentFiles();
-    }, [currentStep]);
 
     const handleDropZoneDrop = useCallback(
         (dropFiles) => {
@@ -903,14 +449,6 @@ export default function NewOnboarding() {
     //     [sampleFiles]
     // );
 
-    const handleLicenseDropZoneDrop = (files) => {
-        const file = files[0];
-        // setLicenseFiles(file);
-        setAttachedLicenseFile((prev) => file);
-        // setLicenseFiles(prevFiles => [...prevFiles, file]);
-        setLicenseFiles((prevFiles) => [file]);
-    };
-
     const toggleProductPicker = async () => {
         try {
             const selected = await shopify.resourcePicker({
@@ -935,17 +473,11 @@ export default function NewOnboarding() {
                     newFiles.splice(index, 1);
                     return newFiles;
                 });
-            } else if (type === "orders") {
-                setOrders((orders) => {
-                    let newOrders = [...orders];
-                    newOrders.splice(index, 1);
-                    return newOrders;
-                });
             } else if (type === "googleDrive") {
                 setGoogleDriveLink(null);
             }
         },
-        [setFiles, setOrders, setGoogleDriveLink]
+        [setFiles, setGoogleDriveLink]
     );
 
     // const handleDeleteSampleFileAtIndex = useCallback(
@@ -959,48 +491,7 @@ export default function NewOnboarding() {
     //     [sampleFiles]
     // );
 
-    const handleDeleteNewLinkAtIndex = (index) => {
-        // Create a copy of the current state
-        let updatedLinks = [...newCustoms];
-        // Remove the element at the specified index
-        updatedLinks.splice(index, 1);
-        // Update the state with the new array
-        setNewCustoms(updatedLinks);
-    };
 
-    const handleDeleteSelectedLinkAtIndex = (index) => {
-        // Create a copy of the current state
-        let updatedLinks = [...selectedCustomIds];
-        // Remove the element at the specified index
-        updatedLinks.splice(index, 1);
-        // Update the state with the new array
-        setSelectedCustomIds(updatedLinks);
-    };
-
-    const handleLicenseDeleteFile = () => {
-        // setLicenseFiles({ name: '', size: 0 });
-        setAttachedLicenseFile(null);
-        setLicenseFiles([]);
-    };
-
-    const handleDeleteNewLicenseAtIndex = (index) => {
-        // Create a copy of the current state
-        let updatedLicenses = [...newLicenses];
-        // Remove the element at the specified index
-        updatedLicenses.splice(index, 1);
-        // Update the state with the new array
-        setNewLicenses(updatedLicenses);
-    };
-
-    const handleDeleteExistingLicenseAtIndex = (index) => {
-        let deleteLicense = selectedLicenseIds[index];
-        // Create a copy of the current state
-        let updatedLicenses = [...selectedLicenseIds];
-        // Remove the element at the specified index
-        updatedLicenses.splice(index, 1);
-        // Update the state with the new array
-        setSelectedLicenseIds(updatedLicenses);
-    };
 
     // const handleTagInputChange = useCallback((value) => {
     //     setTagInputValue(value);
@@ -1063,51 +554,7 @@ export default function NewOnboarding() {
     // const toggleCurrentPageSelection = () => {
     //     const currentPageIds = orders.map((order) => order.id);
     //     const allCurrentPageSelected = currentPageIds.every((id) =>
-    //         selectedFileIds.includes(id)
-    //     );
-
-    //     if (allCurrentPageSelected) {
-    //         // Remove all current page items from selection
-    //         setSelectedFileIds((prev) =>
-    //             prev.filter((id) => !currentPageIds.includes(id))
-    //         );
-    //         setSelectedFileDetails((prev) =>
-    //             prev.filter((detail) => !currentPageIds.includes(detail.id))
-    //         );
-    //     } else {
-    //         // Add all current page items to selection
-    //         const newIds = currentPageIds.filter(
-    //             (id) => !selectedFileIds.includes(id)
-    //         );
-    //         const newDetails = orders.filter(
-    //             (order) => !selectedFileIds.includes(order.id)
-    //         );
-
-    //         setSelectedFileIds((prev) => [...prev, ...newIds]);
-    //         setSelectedFileDetails((prev) => [...prev, ...newDetails]);
-    //     }
-    // };
-
-    // Calculate selection state for current page
-    console.log("Current orders:", orders); // Debug log
-    const currentPageSelectedIds = orders
-        .map((order) => order.id)
-        .filter((id) => selectedFileIds.includes(id));
-    const allCurrentPageSelected =
-        orders.length > 0 &&
-        orders.every((order) => selectedFileIds.includes(order.id));
-
-    // Clear selections when switching away from existing files tab
-    useEffect(() => {
-        if (selectedMainTab !== 0) {
-            setSelectedFileIds([]);
-            setSelectedFileDetails([]);
-        }
-        // Load files when switching to existing files tab (deferred until step 2)
-        if (currentStep > 1 && selectedMainTab === 0 && orders.length === 0) {
-            fetchFiles();
-        }
-    }, [selectedMainTab, currentStep]);
+    //     });
 
     const dismissToast = useCallback(() => {
         setToast((prevToast) => ({
@@ -1153,240 +600,7 @@ export default function NewOnboarding() {
         }
     };
 
-    const handleInputLicenseChange = async (value) => {
-        setInputLicenseValue(value);
 
-        if (value.length > 2) {
-            setLoading(true);
-
-            try {
-                const response = await fetch(
-                    `/api/search-license?search=${encodeURIComponent(
-                        value
-                    )}&page=1&limit=10`,
-                    {
-                        method: "GET",
-                    }
-                );
-
-                const data = await response.json();
-                if (response.ok) {
-                    setSearchLicenseOptions(
-                        data.licenses.map((item) => ({
-                            label: item.title,
-                            value: item.title,
-                        }))
-                    );
-                } else {
-                    console.error("Error fetching search results");
-                }
-            } catch (error) {
-                console.error("Error fetching search results:", error);
-            } finally {
-                setLoading(false);
-            }
-        } else {
-            setSearchLicenseOptions([]);
-        }
-    };
-
-    const handleInputCustomLinkChange = async (value) => {
-        setInputCustomLinkValue(value);
-
-        if (value.length > 2) {
-            setLoading(true);
-
-            try {
-                const response = await fetch(
-                    `/api/search-custom-link?search=${encodeURIComponent(
-                        value
-                    )}&page=1&limit=10`,
-                    {
-                        method: "GET",
-                    }
-                );
-
-                const data = await response.json();
-                if (response.ok) {
-                    setSearchCustomLinkOptions(
-                        data.customLinks.map((item) => ({
-                            label: item.title,
-                            value: item.title,
-                        }))
-                    );
-                } else {
-                    console.error("Error fetching search results");
-                }
-            } catch (error) {
-                console.error("Error fetching search results:", error);
-            } finally {
-                setLoading(false);
-            }
-        } else {
-            setSearchCustomLinkOptions([]);
-        }
-    };
-
-    // const updateSelection = useCallback(
-    //     (selected) => {
-    //         if (!selected || selected.length === 0) {
-    //             return;
-    //         }
-
-    //         const selectedValue = selected[0];
-    //         const matchedOption = searchOptions.find(
-    //             (option) => option.label === selectedValue
-    //         );
-
-    //         if (matchedOption) {
-    //             setSelectedOptions([selectedValue]);
-    //             setInputValue(matchedOption.label);
-    //             setSearchOptions([matchedOption]);
-    //         }
-    //     },
-    //     [searchOptions]
-    // );
-
-    // const updateLicenseSelection = useCallback(
-    //     (selected) => {
-    //         if (!selected || selected.length === 0) {
-    //             return;
-    //         }
-
-    //         const selectedValue = selected[0];
-    //         const matchedOption = searchLicenseOptions.find(
-    //             (option) => option.label === selectedValue
-    //         );
-
-    //         if (matchedOption) {
-    //             setSelectedLicenseOptions([selectedValue]);
-    //             setInputLicenseValue(matchedOption.label);
-    //             setSearchLicenseOptions([matchedOption]);
-    //         }
-    //     },
-    //     [searchLicenseOptions]
-    // );
-
-    // const updateCustomLinkSelection = useCallback(
-    //     (selected) => {
-    //         if (!selected || selected.length === 0) {
-    //             return;
-    //         }
-
-    //         const selectedValue = selected[0];
-    //         const matchedOption = searchCustomLinkOptions.find(
-    //             (option) => option.label === selectedValue
-    //         );
-
-    //         if (matchedOption) {
-    //             setSelectedCustomLinkOptions([selectedValue]);
-    //             setInputCustomLinkValue(matchedOption.label);
-    //             setSearchCustomLinkOptions([matchedOption]);
-    //         }
-    //     },
-    //     [searchCustomLinkOptions]
-    // );
-
-    // const getFileName = (file) => {
-    //     if (!file) return "";
-    //     try {
-    //         const fileInfo = JSON.parse(file);
-    //         return fileInfo.name;
-    //     } catch (error) {
-    //         console.error("Error parsing file JSON:", error);
-    //         return "";
-    //     }
-    // };
-
-    // const handleToggleLicenseSelection = (licenseId) => {
-    //     const newSelectedLicenseIds = [...selectedLicenseIds];
-    //     if (newSelectedLicenseIds.includes(licenseId)) {
-    //         const index = newSelectedLicenseIds.indexOf(licenseId);
-    //         newSelectedLicenseIds.splice(index, 1);
-    //     } else {
-    //         newSelectedLicenseIds.push(licenseId);
-    //     }
-    //     setSelectedLicenseIds(newSelectedLicenseIds);
-    //     setSelectAll(licenses.every(license => newSelectedLicenseIds.includes(license.id)));
-    // };
-
-    // const handleToggleLicenseSelection = (licenseId) => {
-    //     setSelectedLicenseIds((prev) => {
-    //         if (prev.includes(licenseId)) {
-    //             return prev.filter((id) => id !== licenseId);
-    //         } else {
-    //             return [...prev, licenseId];
-    //         }
-    //     });
-    // };
-
-    // Check if all licenses on current page are selected
-    useEffect(() => {
-        const allCurrentPageSelected =
-            licenses.length > 0 &&
-            licenses.every((license) =>
-                selectedLicenseIds.includes(license.id)
-            );
-        setSelectAll(allCurrentPageSelected);
-    }, [licenses, selectedLicenseIds]);
-
-    // const handleSelectAll = () => {
-    //     const allLicenseIds = licenses.map(license => license.id);
-    //     if (selectAll) {
-    //         setSelectedLicenseIds([]);
-    //     } else {
-    //         setSelectedLicenseIds(allLicenseIds);
-    //     }
-    //     setSelectAll(!selectAll);
-    // };
-
-    // const handleSelectAll = () => {
-    //     if (selectAll) {
-    //         // Deselect all licenses on current page
-    //         setSelectedLicenseIds((prev) =>
-    //             prev.filter(
-    //                 (id) => !licenses.some((license) => license.id === id)
-    //             )
-    //         );
-    //     } else {
-    //         // Select all licenses on current page
-    //         const currentPageIds = licenses.map((license) => license.id);
-    //         setSelectedLicenseIds((prev) => {
-    //             const newSelection = [...prev];
-    //             currentPageIds.forEach((id) => {
-    //                 if (!newSelection.includes(id)) {
-    //                     newSelection.push(id);
-    //                 }
-    //             });
-    //             return newSelection;
-    //         });
-    //     }
-    //     setSelectAll(!selectAll);
-    // };
-
-    // const handleToggleCustomSelection = (customId) => {
-    //     const newSelectedCustomIds = [...selectedCustomIds];
-    //     if (newSelectedCustomIds.includes(customId)) {
-    //         const index = newSelectedCustomIds.indexOf(customId);
-    //         newSelectedCustomIds.splice(index, 1);
-    //     } else {
-    //         newSelectedCustomIds.push(customId);
-    //     }
-    //     setSelectedCustomIds(newSelectedCustomIds);
-    //     setSelectAllForCustom(
-    //         customs.every((custom) => newSelectedCustomIds.includes(custom.id))
-    //     );
-    // };
-
-    // const handleSelectAllForCustom = () => {
-    //     const allCustomIds = customs.map((custom) => custom.id);
-    //     if (selectAllForCustom) {
-    //         setSelectedCustomIds([]);
-    //     } else {
-    //         setSelectedCustomIds(allCustomIds);
-    //     }
-    //     setSelectAllForCustom(!selectAllForCustom);
-    // };
 
     const handlePricing = () => navigate("/pricing");
 
@@ -1409,83 +623,12 @@ export default function NewOnboarding() {
         fetchUserPlan();
     }, [currentStep]);
 
-    useEffect(() => {
-        // Only fetch email templates after user moves past step 1
-        if (currentStep <= 1) return;
-
-        const getEmailTemplates = async () => {
-            try {
-                const response = await fetch("/api/get-custom-templates");
-                const data = await response.json();
-                // setUserPlan(data.plan);
-                setEmailTemplates(data.templates);
-                if (data.templates.length === 1) {
-                    setEmailTemplateId(data.templates[0].id);
-                }
-                setDefaultTemplateId(data.defaultTemplateId);
-            } catch (error) {
-                console.error("Failed to fetch user plan:", error);
-            } finally {
-                setIsEmailTemplatesLoaded(true);
-            }
-        };
-
-        getEmailTemplates();
-    }, [currentStep]);
-
-    const isLicenseActionDisabled = () => {
-        // In onboarding flow, we're always creating new licenses
-        const isTitleEmpty = !licenseTitle?.trim();
-        if (value === "automated") {
-            return (
-                isTitleEmpty ||
-                !prefix?.trim() ||
-                !codeLength?.trim() ||
-                !suffix?.trim() ||
-                !totalCodes?.trim()
-            );
-        }
-        if (value === "manual") {
-            if (selectedManualLicenseTab === 0) {
-                return isTitleEmpty || licenseFiles.length === 0;
-            }
-            if (selectedManualLicenseTab === 1) {
-                return isTitleEmpty || !pasteKeysValue?.trim();
-            }
-        }
-
-        return false;
-    };
-
-    const isCustomLinksActionDisabled = () => {
-        // Check if there's at least one custom link with all required fields
-        // First check the input fields (for links being filled but not yet added)
-        const inputFieldsFilled =
-            title?.trim() && redirectURL?.trim();
-
-        // Check if any link in the array has all required fields
-        const hasValidLinkInArray = newCustoms.some(
-            (link) =>
-                link.title?.trim() &&
-                link.redirectURL?.trim()
-        );
-
-        // Button is disabled if neither input fields are filled nor there's a valid link in array
-        return !inputFieldsFilled && !hasValidLinkInArray;
-    };
-
     const isMixedContentActionDisabled = () => {
-        // For mixed content, user needs to provide at least ONE of:
-        // 1. Files (uploaded or Google Drive link)
-        // 2. Licenses (with proper validation using isLicenseActionDisabled)
-        // 3. Custom links (with proper validation using isCustomLinksActionDisabled)
-
+        // For mixed content, user needs to provide files
         const hasFiles = files.length > 0 || googleDriveLink;
-        const hasLicenses = !isLicenseActionDisabled();
-        const hasCustomLinks = !isCustomLinksActionDisabled();
 
-        // Mixed content requires at least one of the three options
-        return !hasFiles && !hasLicenses && !hasCustomLinks;
+        // Mixed content requires at least files
+        return !hasFiles;
     };
 
     useEffect(() => {
@@ -1502,86 +645,11 @@ export default function NewOnboarding() {
 
     // Initial load of files when store is available and tab is 0 (deferred until step 2)
     useEffect(() => {
-        if (currentStep <= 1) return;
-        if (store && selectedMainTab === 0 && orders.length === 0) {
-            fetchFiles();
-        }
-    }, [store, selectedMainTab, currentStep]);
-
-    const fetchFiles = async () => {
-        setIsLoading(true);
-        try {
-            const response = await fetch(
-                `/api/get-files?page=${currentPageFiles}&limit=${itemsPerPage}`
-            );
-            if (response.ok) {
-                const data = await response.json();
-                console.log("Files loaded:", data.files); // Debug log
-                setOrders(data.files);
-                setTotalFiles(data.total);
-
-                // Update selected file details with current page data
-                setSelectedFileDetails((prevDetails) => {
-                    // Remove any details that are from the current page to avoid duplicates
-                    const currentPageIds = data.files.map((f) => f.id);
-                    const otherPageDetails = prevDetails.filter(
-                        (detail) => !currentPageIds.includes(detail.id)
-                    );
-
-                    // Add current page details for selected files
-                    const currentPageSelectedDetails = data.files.filter(
-                        (file) => selectedFileIds.includes(file.id)
-                    );
-
-                    return [...otherPageDetails, ...currentPageSelectedDetails];
-                });
-            } else {
-                shopify.toast.show(
-                    t("createdigitalproduct.failed_to_fetch_files"),
-                    { isError: true, duration: 9999999 }
-                );
-            }
-        } catch (error) {
-            console.error("Error fetching files:", error);
-            shopify.toast.show(
-                t("createdigitalproduct.failed_to_fetch_files"),
-                { isError: true, duration: 9999999 }
-            );
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // useEffect(() => {
-    //     fetchFiles();
-    // }, [currentPageFiles]);
-
-    // const handleFilePageChange = async (newPage) => {
-    //     setIsPageLoading(true);
-    //     const response = await fetch(
-    //         `/api/search-file?search=${inputValue}&page=${newPage}&limit=${itemsPerPage}`,
-    //         {
-    //             method: "GET",
-    //         }
-    //     );
-
-    //     const data = await response.json();
-    //     if (response.ok) {
-    //         setOrders(data.files);
-    //         setTotalFiles(data.total);
-    //         setCurrentPageFiles(newPage);
-    //         setIsPageLoading(false);
-    //     } else {
-    //         console.error("Error fetching paginated results");
-    //         setIsPageLoading(false);
-    //     }
-    // };
+    }, [store]);
 
     const handleClearSearch = () => {
         setInputValue("");
         setSelectedOptions([]);
-        setSelectedFileIds([]); // Clear selections when clearing search
-        setSelectedFileDetails([]); // Clear file details
         setIsLoading(true);
         setCurrentPageFiles(1);
 
@@ -1624,224 +692,6 @@ export default function NewOnboarding() {
     //     }
     // };
 
-    const handleClearLicenseSearch = () => {
-        setInputLicenseValue("");
-        setSelectedLicenseOptions([]);
-        setIsLoading(true);
-        setCurrentPageLicenses(1);
-
-        fetch(`/api/search-license?page=1&limit=${itemsPerPage}`, {
-            method: "GET",
-        })
-            .then((response) => response.json())
-            .then((data) => {
-                setLicenses(data.licenses);
-                setTotalLicenses(data.total);
-                setIsLoading(false);
-            })
-            .catch(() => {
-                setIsLoading(false);
-                console.error("Error fetching licenses");
-            });
-    };
-
-    // const handleLicenseSearch = async () => {
-    //     setIsLoading(true);
-    //     setCurrentPageLicenses(1);
-    //     const response = await fetch(
-    //         `/api/search-license?search=${inputLicenseValue}&page=1&limit=${itemsPerPage}`,
-    //         {
-    //             method: "GET",
-    //         }
-    //     );
-
-    //     const data = await response.json();
-    //     if (response.ok) {
-    //         setLicenses(data.licenses);
-    //         setTotalLicenses(data.total);
-    //         setCurrentPageLicenses(1);
-    //         setIsLoading(false);
-    //     } else {
-    //         console.error("Error fetching search results");
-    //         setIsLoading(false);
-    //     }
-    // };
-
-    const handleClearCustomLinkSearch = () => {
-        setInputCustomLinkValue("");
-        setSelectedCustomLinkOptions([]);
-        setIsLoading(true);
-        setCurrentPageCustoms(1);
-
-        fetch(`/api/search-custom-link?page=1&limit=${itemsPerPage}`, {
-            method: "GET",
-        })
-            .then((response) => response.json())
-            .then((data) => {
-                setCustoms(data.customLinks);
-                setTotalCustoms(data.total);
-                setIsLoading(false);
-            })
-            .catch(() => {
-                setIsLoading(false);
-                console.error("Error fetching custom links");
-            });
-    };
-
-    // const handleCustomLinkSearch = async () => {
-    //     setIsLoading(true);
-    //     setCurrentPageCustoms(1);
-
-    //     const response = await fetch(
-    //         `/api/search-custom-link?search=${encodeURIComponent(
-    //             inputCustomLinkValue
-    //         )}&page=1&limit=${itemsPerPage}`,
-    //         {
-    //             method: "GET",
-    //         }
-    //     );
-
-    //     const data = await response.json();
-    //     if (response.ok) {
-    //         setCustoms(data.customLinks);
-    //         setTotalCustoms(data.total);
-    //         setCurrentPageCustoms(1);
-    //         setIsLoading(false);
-    //     } else {
-    //         console.error("Error fetching custom link search results");
-    //         setIsLoading(false);
-    //     }
-    // };
-
-    const fetchLicenses = async () => {
-        setIsLoading(true);
-        try {
-            const response = await fetch(
-                `/api/get-licenses-with-products?page=${currentPageLicenses}&limit=${itemsPerPage}`
-            );
-            if (response.ok) {
-                const data = await response.json();
-                setLicenses(data.licenses);
-                setTotalLicenses(data.total);
-
-                // Add this effect to update the select all state when the page changes
-                // This will check if all items on the new page are selected
-                const allCurrentPageSelected =
-                    data.licenses.length > 0 &&
-                    data.licenses.every((license) =>
-                        selectedLicenseIds.includes(license.id)
-                    );
-                setSelectAll(allCurrentPageSelected);
-
-                // Update all licenses if this is new data (your existing code)
-                setAllLicenses((prev) => {
-                    const existingIds = new Set(prev.map((l) => l.id));
-                    const newLicenses = data.licenses.filter(
-                        (l) => !existingIds.has(l.id)
-                    );
-                    return [...prev, ...newLicenses];
-                });
-            } else {
-                shopify.toast.show(
-                    t("createdigitalproduct.failed_to_fetch_licenses"),
-                    { isError: true, duration: 9999999 }
-                );
-            }
-        } catch (error) {
-            console.error("Error fetching licenses:", error);
-            shopify.toast.show(
-                t("createdigitalproduct.failed_to_fetch_licenses"),
-                { isError: true, duration: 9999999 }
-            );
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        // Only fetch licenses after user moves past step 1
-        if (currentStep <= 1) return;
-        fetchLicenses();
-    }, [currentPageLicenses, currentStep]);
-
-    // const handleLicensePageChange = async (newPage) => {
-    //     setIsPageLoading(true);
-    //     const response = await fetch(
-    //         `/api/search-license?search=${inputLicenseValue}&page=${newPage}&limit=${itemsPerPage}`,
-    //         {
-    //             method: "GET",
-    //         }
-    //     );
-
-    //     const data = await response.json();
-    //     if (response.ok) {
-    //         setLicenses(data.licenses);
-    //         setTotalLicenses(data.total);
-    //         setCurrentPageLicenses(newPage);
-    //         setIsPageLoading(false);
-    //     } else {
-    //         console.error("Error fetching paginated results");
-    //         setIsPageLoading(false);
-    //     }
-    // };
-
-    const fetchCustomLinks = async () => {
-        setIsLoading(true);
-        try {
-            const response = await fetch(
-                `/api/get-customs-with-products?page=${currentPageCustoms}&limit=${itemsPerPage}`
-            );
-            if (response.ok) {
-                const data = await response.json();
-                setCustoms(data.custom_links);
-                setTotalCustoms(data.total);
-            } else {
-                shopify.toast.show(
-                    t("createdigitalproduct.failed_to_fetch_custom_links"),
-                    { isError: true, duration: 9999999 }
-                );
-            }
-        } catch (error) {
-            console.error("Error fetching custom links:", error);
-            shopify.toast.show(
-                t("createdigitalproduct.failed_to_fetch_custom_links"),
-                { isError: true, duration: 9999999 }
-            );
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        // Only fetch custom links after user moves past step 1
-        if (currentStep <= 1) return;
-        fetchCustomLinks();
-    }, [currentPageCustoms, currentStep]);
-
-    // const handleCustomPageChange = async (newPage) => {
-    //     setIsPageLoading(true);
-
-    //     const response = await fetch(
-    //         `/api/search-custom-link?search=${encodeURIComponent(
-    //             inputCustomLinkValue
-    //         )}&page=${newPage}&limit=${itemsPerPage}`,
-    //         {
-    //             method: "GET",
-    //         }
-    //     );
-
-    //     const data = await response.json();
-    //     if (response.ok) {
-    //         setCustoms(data.customLinks);
-    //         setTotalCustoms(data.total);
-    //         setCurrentPageCustoms(newPage);
-    //         setIsPageLoading(false);
-    //     } else {
-    //         console.error("Error fetching paginated custom links");
-    //         setIsPageLoading(false);
-    //     }
-    // };
-
     useEffect(() => {
         // Only fetch digital products after user moves past step 1
         if (currentStep <= 1) return;
@@ -1879,7 +729,6 @@ export default function NewOnboarding() {
     // Function to capture current data state - simplified to avoid circular dependencies
     const captureCurrentData = useCallback(() => {
         return {
-            title: title || "",
             selectedProduct: selectedProduct || null,
             selected: selected || "active",
             contentType: contentType || [],
@@ -1903,10 +752,6 @@ export default function NewOnboarding() {
             // Exclude API-populated data from change detection to prevent SaveBar showing on load
             // files: files || [],        // API-populated - exclude from change detection
             // sampleFiles: sampleFiles || [], // API-populated - exclude from change detection
-            // licenses: licenses || [],      // API-populated - exclude from change detection
-            newLicenses: newLicenses || [], // User-added - keep this
-            customs: customs || [], // API-populated - exclude from change detection
-            newCustoms: newCustoms || [], // User-added - keep this
             tags: tags || [],
             qrCodeEnabled: qrCodeEnabled || false,
             qrCodePrintOnPDF: qrCodePrintOnPDF || false,
@@ -1915,18 +760,13 @@ export default function NewOnboarding() {
             sendKeyToMultipleCustomers: sendKeyToMultipleCustomers || false,
             deliverKeysInSequence: deliverKeysInSequence || false,
             perUnitNoDelivery: perUnitNoDelivery || 1,
-            redirectURL: redirectURL || "",
-            linkDetail: linkDetail || "",
-            licenseTitle: licenseTitle || "",
-            value: value || "automated",
-            prefix: prefix || "",
-            codeLength: codeLength || "",
-            suffix: suffix || "",
-            totalCodes: totalCodes || "",
+            
+            //value: value || "automated",
+            
+            //totalCodes: totalCodes || "",
             // Excluding complex objects that might cause initialization issues
         };
     }, [
-        title,
         selectedProduct,
         selected,
         contentType,
@@ -1948,10 +788,8 @@ export default function NewOnboarding() {
         // Removed API-populated variables from dependencies to prevent false changes
         // files,        // API-populated - exclude from change detection
         // sampleFiles, // API-populated - exclude from change detection
-        // licenses,    // API-populated - exclude from change detection
-        newLicenses,
+       
         // customs,     // API-populated - exclude from change detection
-        newCustoms,
         tags,
         qrCodeEnabled,
         qrCodePrintOnPDF,
@@ -1960,14 +798,6 @@ export default function NewOnboarding() {
         sendKeyToMultipleCustomers,
         deliverKeysInSequence,
         perUnitNoDelivery,
-        redirectURL,
-        linkDetail,
-        licenseTitle,
-        value,
-        prefix,
-        codeLength,
-        suffix,
-        totalCodes,
     ]);
 
     // Function to handle discard changes
@@ -1991,17 +821,12 @@ export default function NewOnboarding() {
             initialData.isProductMessageEnabled || false
         );
         setProductMessage(initialData.productMessage || "");
-        setTitle(initialData.title || "");
         setContentType(initialData.contentType || []);
         setAutoFulfill(initialData.autoFulfill || false);
         setDownloadLimit(initialData.downloadLimit || "");
         setIsDownloadLimitEnabled(initialData.isDownloadLimitEnabled || false);
         setFiles(initialData.files || []);
         setSampleFiles(initialData.sampleFiles || []);
-        setLicenses(initialData.licenses || []);
-        setNewLicenses(initialData.newLicenses || []);
-        setCustoms(initialData.customs || []);
-        setNewCustoms(initialData.newCustoms || []);
         setTags(initialData.tags || []);
         setQrCodeEnabled(initialData.qrCodeEnabled || false);
         setQRCodePrintOnPDF(initialData.qrCodePrintOnPDF || false);
@@ -2015,14 +840,10 @@ export default function NewOnboarding() {
             initialData.isManualDeliveryEnabled || false
         );
         setPerUnitNoDelivery(initialData.perUnitNoDelivery || 1);
-        setRedirectURL(initialData.redirectURL || "");
-        setLinkDetail(initialData.linkDetail || "");
-        setLicenseTitle(initialData.licenseTitle || "");
-        setValue(initialData.value || "automated");
-        setPrefix(initialData.prefix || "");
-        setCodeLength(initialData.codeLength || "");
-        setSuffix(initialData.suffix || "");
-        setTotalCodes(initialData.totalCodes || "");
+        
+        //setValue(initialData.value || "automated");
+        
+        //setTotalCodes(initialData.totalCodes || "");
 
         setHasUnsavedChanges(false);
         try {
@@ -2091,76 +912,11 @@ export default function NewOnboarding() {
         }
 
         let validFiles = [];
-        let selectedValidFiles = [];
-        //if (selectedMainTab === 0) {
-        // Use our selection state which contains all selected files from all pages
-        selectedValidFiles = selectedFileIds;
-        //} else {
         validFiles = files.filter((file) => file.size <= fileSizeLimit);
-        //}
-
-        // For onboarding flow: prepare license data directly without relying on state
-        let onboardingLicenseData = null;
-        if (selectedProductType === "license" && selectedProduct && licenseTitle?.trim()) {
-            // Validate required fields based on license type
-            const isValidAutomated = value === "automated" && prefix?.trim() && codeLength?.trim() && suffix?.trim() && totalCodes?.trim();
-            const isValidManual = value === "manual" && (
-                (selectedManualLicenseTab === 0 && licenseFiles.length > 0) ||
-                (selectedManualLicenseTab === 1 && pasteKeysValue?.trim())
-            );
-
-            if ((value === "automated" && isValidAutomated) || (value === "manual" && isValidManual)) {
-                onboardingLicenseData = {
-                    title: licenseTitle,
-                    licenseType: value,
-                    prefix: prefix || "",
-                    codeLength: codeLength || "",
-                    suffix: suffix || "",
-                    totalCodes: totalCodes || "",
-                    licenseFiles: licenseFiles,
-                    pasteKeysValue: pasteKeysValue || "",
-                    qrCodeEnabled: qrCodeEnabled,
-                    qrCodePrintOnPDF: qrCodePrintOnPDF,
-                    giftCardEnabled: giftCardEnabled,
-                    giftCardPropertyName: giftCardPropertyName || "",
-                    giftDeliveryPropertyName: giftDeliveryPropertyName || "",
-                    sendKeyToMultipleCustomers: sendKeyToMultipleCustomers,
-                    deliverKeysInSequence: deliverKeysInSequence,
-                    manual_codes_type: selectedManualLicenseTab === 0 ? "csv" : "paste_text",
-                    perUnitNoDelivery: perUnitNoDelivery || 1,
-                };
-                // Update state for display purposes
-                setNewLicenses([onboardingLicenseData]);
-                handleContentTypeChange("license");
-                console.log("Onboarding license data created:", onboardingLicenseData);
-            } else {
-                console.log("License validation failed - incomplete form data");
-                console.log("License type:", value, "Automated valid:", isValidAutomated, "Manual valid:", isValidManual);
-            }
-        } else {
-            console.log("License not created - selectedProductType:", selectedProductType, "hasTitle:", !!licenseTitle?.trim(), "hasProduct:", !!selectedProduct);
-        }
-
-        // For onboarding flow: prepare custom link data directly without relying on state
-        let onboardingCustomLinkData = null;
-        if (selectedProductType === "links" && selectedProduct && title?.trim() && redirectURL?.trim()) {
-            onboardingCustomLinkData = {
-                title: title,
-                redirectURL: redirectURL,
-                linkDetail: linkDetail || "",
-            };
-            // Update state for display purposes
-            setNewCustoms([onboardingCustomLinkData]);
-            handleContentTypeChange("custom_link");
-            console.log("Onboarding custom link data created:", onboardingCustomLinkData);
-        } else {
-            console.log("Custom link not created - selectedProductType:", selectedProductType, "hasTitle:", !!title?.trim(), "hasRedirectURL:", !!redirectURL?.trim(), "hasProduct:", !!selectedProduct);
-        }
 
         if (
             contentType.includes("files") &&
             !validFiles.length &&
-            !selectedValidFiles.length &&
             !googleDriveLink
         ) {
             shopify.toast.show(
@@ -2172,7 +928,7 @@ export default function NewOnboarding() {
         }
 
         if (
-            validFiles.length + selectedValidFiles.length > 50 &&
+            validFiles.length > 50 &&
             contentType.includes("files")
         ) {
             shopify.toast.show(
@@ -2191,12 +947,6 @@ export default function NewOnboarding() {
                     formData.append("files[]", fileId);
                 });
 
-                //if (selectedMainTab === 0) {
-                selectedValidFiles.forEach((fileId) => {
-                    formData.append("selectedFiles[]", fileId);
-                });
-                //}
-
                 if (googleDriveLink) {
                     const isFolder = googleDriveLink.includes("/folders/");
                     if (isFolder) {
@@ -2205,136 +955,6 @@ export default function NewOnboarding() {
                         formData.append("google_drive_url", googleDriveLink);
                     }
                 }
-            }
-
-            if (contentType.includes("license") || onboardingLicenseData) {
-                console.log("Processing licenses - contentType:", contentType, "hasOnboardingData:", !!onboardingLicenseData);
-
-                let selectedLicenses = [];
-                selectedLicenses = allLicenses
-                    .filter((license) =>
-                        selectedLicenseIds.includes(license.id)
-                    )
-                    .map((license) => license.id);
-
-                selectedLicenses.forEach((licenseId) => {
-                    formData.append("selectedLicenses[]", licenseId);
-                    formData.append(`licenseKeysPerUnit[${licenseId}]`, licenseKeysPerUnit[licenseId] || 1);
-                });
-
-                // Combine existing newLicenses with onboarding license data
-                const allLicensesToProcess = [...newLicenses];
-                if (onboardingLicenseData) {
-                    allLicensesToProcess.push(onboardingLicenseData);
-                }
-
-                console.log("Total licenses to process:", allLicensesToProcess.length);
-
-                allLicensesToProcess.forEach((license, index) => {
-                    formData.append(`licenses[${index}][title]`, license.title);
-                    formData.append(
-                        `licenses[${index}][licenseType]`,
-                        license.licenseType
-                    );
-                    formData.append(
-                        `licenses[${index}][prefix]`,
-                        license.prefix
-                    );
-                    formData.append(
-                        `licenses[${index}][codeLength]`,
-                        license.codeLength
-                    );
-                    formData.append(
-                        `licenses[${index}][suffix]`,
-                        license.suffix
-                    );
-                    formData.append(
-                        `licenses[${index}][totalCodes]`,
-                        license.totalCodes
-                    );
-                    formData.append(
-                        `licenses[${index}][qrCodeEnabled]`,
-                        license.qrCodeEnabled ? "1" : "0"
-                    );
-                    formData.append(
-                        `licenses[${index}][qrCodePrintOnPDF]`,
-                        license.qrCodePrintOnPDF ? "1" : "0"
-                    );
-                    formData.append(
-                        `licenses[${index}][giftCardEnabled]`,
-                        license.giftCardEnabled ? "1" : "0"
-                    );
-                    formData.append(
-                        `licenses[${index}][giftCardPropertyName]`,
-                        license.giftCardPropertyName
-                    );
-                    formData.append(
-                        `licenses[${index}][giftDeliveryPropertyName]`,
-                        license.giftDeliveryPropertyName
-                    );
-                    formData.append(
-                        `licenses[${index}][manual_codes_type]`,
-                        license.manual_codes_type
-                    );
-                    formData.append(
-                        `licenses[${index}][perUnitNoDelivery]`,
-                        license.perUnitNoDelivery
-                    );
-
-                    if (license.manual_codes_type === "paste_text") {
-                        formData.append(
-                            `licenses[${index}][pasteKeysValue]`,
-                            license.pasteKeysValue
-                        );
-                    }
-
-                    if (license.manual_codes_type === "csv") {
-                        license.licenseFiles.forEach((file, fileIndex) => {
-                            formData.append(
-                                `licenses[${index}][licenseFiles][${fileIndex}]`,
-                                file
-                            );
-                        });
-                        formData.append(
-                            `licenses[${index}][deliverKeysInSequence]`,
-                            license.deliverKeysInSequence ? "1" : "0"
-                        );
-                    }
-                    formData.append(
-                        `licenses[${index}][sendKeyToMultipleCustomers]`,
-                        license.sendKeyToMultipleCustomers ? "1" : "0"
-                    );
-                });
-            }
-
-            // Send custom links if there are any newly created or selected ones
-            if (newCustoms.length > 0 || selectedCustomIds.length > 0 || onboardingCustomLinkData) {
-                let selectedCustomLinks = [];
-                selectedCustomLinks = customs
-                    .filter((link) => selectedCustomIds.includes(link.id))
-                    .map((link) => link.id);
-
-                selectedCustomLinks.forEach((linkId) => {
-                    formData.append("selectedCustomLinks[]", linkId);
-                });
-
-                // Combine existing newCustoms with onboarding custom link data
-                const allCustomLinksToProcess = [...newCustoms];
-                if (onboardingCustomLinkData) {
-                    allCustomLinksToProcess.push(onboardingCustomLinkData);
-                }
-
-                allCustomLinksToProcess.forEach((link, index) => {
-                    formData.append(`customLinks[${index}][title]`, link.title);
-                    formData.append(
-                        `customLinks[${index}][redirectURL]`,
-                        link.redirectURL
-                    );
-                    formData.append(
-                        `customLinks[${index}][linkDetail]`,
-                        link.linkDetail
-                    );
-                });
             }
 
             if (sampleFiles.length) {
@@ -2378,33 +998,13 @@ export default function NewOnboarding() {
             } else if (expirationType === "specific-date") {
                 const formattedDate = formatDateForDB(selectedDate);
                 formData.append("expiration_value", formattedDate);
-            }
+            }            
 
-            formData.append(
-                "enable_pdf_stamping",
-                isPdfStampingEnabled ? "1" : "0"
-            );
-            formData.append("templateChoice", templateChoice);
-            if (isPdfStampingEnabled) {
-                if (templateChoice === "default") {
-                    formData.append("default_pdf_template", "1");
-                } else if (templateChoice === "custom") {
-                    formData.append("default_pdf_template", "0");
-                    formData.append("pdf_template_id", PDFTemplateId);
-                }
-            }
-
-            const statusValue = selected === "draft" ? 0 : 1;
+            //const statusValue = selected === "draft" ? 0 : 1;
             formData.append("status", statusValue);
 
-            // Build content_type array, adding license or custom_link if we have onboarding data
+            // Build content_type array
             let finalContentType = [...contentType];
-            if (onboardingLicenseData && !finalContentType.includes("license")) {
-                finalContentType.push("license");
-            }
-            if (onboardingCustomLinkData && !finalContentType.includes("custom_link")) {
-                finalContentType.push("custom_link");
-            }
             formData.append("content_type", finalContentType.join(", "));
 
             formData.append("shop", store.shopify_domain);
@@ -2549,23 +1149,18 @@ export default function NewOnboarding() {
         autoFulfill,
         contentType,
         files,
-        licenseTitle,
-        orders,
+        
         selectedProduct,
-        prefix,
+        //prefix,
         emailTemplateId,
         emailTemplateType,
         pasteKeysValue,
-        redirectURL,
         sendKeyToMultipleCustomers,
-        linkDetail,
         selected,
-        selectedMainTab,
-        suffix,
+        //suffix,
         tagInputValue,
         tags,
-        title,
-        totalCodes,
+        //totalCodes,
         qrCodeEnabled,
         qrCodePrintOnPDF,
         giftCardEnabled,
@@ -2573,8 +1168,7 @@ export default function NewOnboarding() {
         giftDeliveryPropertyName,
         sendKeyToMultipleCustomers,
         deliverKeysInSequence,
-        value,
-        selectedFileIds,
+        //value,
         sampleFiles,
         downloadLimit,
         isDownloadLimitEnabled,
@@ -2584,10 +1178,6 @@ export default function NewOnboarding() {
         isDownloadExpirationEnabled,
         productMessage,
         isProductMessageEnabled,
-        selectedLicenseIds,
-        newLicenses,
-        selectedCustomIds,
-        newCustoms,
         perUnitNoDelivery,
         isPdfStampingEnabled,
         templateChoice,
@@ -2628,10 +1218,6 @@ export default function NewOnboarding() {
         )} ${t("createdigitalproduct.per_file")})`
         : t("createdigitalproduct.no_limit_per_file")
         }`;
-
-    const exceedMaxSizeForLicense = licenseFiles.size > MAX_FILE_BYTE;
-
-
 
     const steps = [
         {
@@ -2807,10 +1393,7 @@ export default function NewOnboarding() {
         isStoreLoaded &&
         isNewUserChecked &&
         (currentStep > 1 ? (
-            isUserPlanLoaded &&
-            isPdfTemplatesLoaded &&
-            isEmailTemplatesLoaded &&
-            isCurrentFilesLoaded
+            isUserPlanLoaded
         ) : true);
 
     if (!isInitialLoadComplete) {
