@@ -12,6 +12,7 @@ use App\Http\Controllers\WebhooksController;
 use App\Http\Controllers\VimeoController;
 use App\Http\Controllers\WistiaController;
 use App\Http\Controllers\CollectionController;
+use App\Http\Controllers\ProductsController;
 use App\Models\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -60,6 +61,7 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
     });
     Route::post('/collections/product-count', [CollectionController::class, 'productCount']);
     Route::post('/collections/products', [CollectionController::class, 'getProducts']);
+    Route::post('/products/all', [ProductsController::class, 'getAllProducts']);
 
     Route::post('/update-reply-to-email', [StoresController::class, 'updateReplyToEmail']);
     Route::post('/update-cc-bcc-email', [StoresController::class, 'updateCcBccEmail']);

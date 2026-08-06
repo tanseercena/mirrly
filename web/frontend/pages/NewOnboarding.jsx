@@ -80,6 +80,7 @@ export default function NewOnboarding() {
     const [liveTestProduct, setLiveTestProduct] = useState(null);
     const [collectionProducts, setCollectionProducts] = useState([]); // Products from selected collections
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+    const [hasFetchedAllProducts, setHasFetchedAllProducts] = useState(false); // Track if all products have been fetched for "all" scope
     const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
     const [productSearchQuery, setProductSearchQuery] = useState('');
     const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
@@ -484,29 +485,7 @@ export default function NewOnboarding() {
         [setFiles, setGoogleDriveLink]
     );
 
-    // const handleDeleteSampleFileAtIndex = useCallback(
-    //     (index) => {
-    //         setSampleFiles((files) => {
-    //             let newFiles = [...files];
-    //             newFiles.splice(index, 1);
-    //             return newFiles;
-    //         });
-    //     },
-    //     [sampleFiles]
-    // );
-
-
-
-    // const handleTagInputChange = useCallback((value) => {
-    //     setTagInputValue(value);
-    // }, []);
-
-    // const handleTagInputSubmit = useCallback(() => {
-    //     if (tagInputValue.trim() !== "") {
-    //         setTags((prevTags) => [...prevTags, tagInputValue.trim()]);
-    //         setTagInputValue("");
-    //     }
-    // }, [tagInputValue]);
+   
 
     const removeTag = useCallback(
         (tag) => () => {
@@ -515,51 +494,7 @@ export default function NewOnboarding() {
         []
     );
 
-    // const tagMarkup = tags.map((tag) => (
-    //     <div key={tag}>
-    //         <Tag onRemove={removeTag(tag)}>{tag}</Tag>
-    //     </div>
-    // ));
-
-    // const options = [
-    //     { label: t("digtal_product_listing.draft"), value: "draft" },
-    //     { label: t("digtal_product_listing.active"), value: "active" },
-    // ];
-
-    // const resourceName = {
-    //     singular: "file",
-    //     plural: "files",
-    // };
-
-    // Simple selection state management
-    // const toggleFileSelection = (fileId) => {
-    //     setSelectedFileIds((prev) => {
-    //         const fileDetails = orders.find((order) => order.id === fileId);
-
-    //         if (prev.includes(fileId)) {
-    //             // Remove from selection
-    //             setSelectedFileDetails((prevDetails) =>
-    //                 prevDetails.filter((detail) => detail.id !== fileId)
-    //             );
-    //             return prev.filter((id) => id !== fileId);
-    //         } else {
-    //             // Add to selection
-    //             if (fileDetails) {
-    //                 setSelectedFileDetails((prevDetails) => [
-    //                     ...prevDetails,
-    //                     fileDetails,
-    //                 ]);
-    //             }
-    //             return [...prev, fileId];
-    //         }
-    //     });
-    // };
-
-    // const toggleCurrentPageSelection = () => {
-    //     const currentPageIds = orders.map((order) => order.id);
-    //     const allCurrentPageSelected = currentPageIds.every((id) =>
-    //     });
-
+    
     const dismissToast = useCallback(() => {
         setToast((prevToast) => ({
             ...prevToast,
@@ -672,30 +607,7 @@ export default function NewOnboarding() {
             });
     };
 
-    // const handleSearch = async () => {
-    //     setSelectedFileIds([]); // Clear selections when performing new search
-    //     setSelectedFileDetails([]); // Clear file details
-    //     setIsLoading(true);
-    //     setCurrentPageFiles(1);
-    //     const response = await fetch(
-    //         `/api/search-file?search=${inputValue}&page=1&limit=${itemsPerPage}`,
-    //         {
-    //             method: "GET",
-    //         }
-    //     );
-
-    //     const data = await response.json();
-    //     if (response.ok) {
-    //         setOrders(data.files);
-    //         setTotalFiles(data.total);
-    //         setCurrentPageFiles(1);
-    //         setIsLoading(false);
-    //     } else {
-    //         console.error("Error fetching search results");
-    //         setIsLoading(false);
-    //     }
-    // };
-
+    
     useEffect(() => {
         // Only fetch digital products after user moves past step 1
         if (currentStep <= 1) return;
@@ -710,10 +622,7 @@ export default function NewOnboarding() {
                     setDigitalProductsLimit(store.digital_products_limit);
                     setIsLoading(false);
 
-                    // if (productsData.digitalProducts.length >= store.digital_products_limit) {
-                    //     setIsLimitExceededModalActive(true);
-                    //     return;
-                    // }
+                    
                 } else {
                     console.error("Failed to fetch digital data");
                 }
@@ -725,10 +634,7 @@ export default function NewOnboarding() {
         fetchData();
     }, [store, currentStep]);
 
-    // const closeLimitExceededModal = () => {
-    //     setIsLimitExceededModalActive(false);
-    //     navigate("/digitalProducts");
-    // };
+
 
     // Function to capture current data state - simplified to avoid circular dependencies
     const captureCurrentData = useCallback(() => {
@@ -753,9 +659,7 @@ export default function NewOnboarding() {
             autoFulfill: autoFulfill || false,
             downloadLimit: downloadLimit || "",
             isDownloadLimitEnabled: isDownloadLimitEnabled || false,
-            // Exclude API-populated data from change detection to prevent SaveBar showing on load
-            // files: files || [],        // API-populated - exclude from change detection
-            // sampleFiles: sampleFiles || [], // API-populated - exclude from change detection
+
             tags: tags || [],
             qrCodeEnabled: qrCodeEnabled || false,
             qrCodePrintOnPDF: qrCodePrintOnPDF || false,
@@ -765,10 +669,6 @@ export default function NewOnboarding() {
             deliverKeysInSequence: deliverKeysInSequence || false,
             perUnitNoDelivery: perUnitNoDelivery || 1,
 
-            //value: value || "automated",
-
-            //totalCodes: totalCodes || "",
-            // Excluding complex objects that might cause initialization issues
         };
     }, [
         selectedProduct,
@@ -789,11 +689,6 @@ export default function NewOnboarding() {
         autoFulfill,
         downloadLimit,
         isDownloadLimitEnabled,
-        // Removed API-populated variables from dependencies to prevent false changes
-        // files,        // API-populated - exclude from change detection
-        // sampleFiles, // API-populated - exclude from change detection
-
-        // customs,     // API-populated - exclude from change detection
         tags,
         qrCodeEnabled,
         qrCodePrintOnPDF,
@@ -844,10 +739,6 @@ export default function NewOnboarding() {
             initialData.isManualDeliveryEnabled || false
         );
         setPerUnitNoDelivery(initialData.perUnitNoDelivery || 1);
-
-        //setValue(initialData.value || "automated");
-
-        //setTotalCodes(initialData.totalCodes || "");
 
         setHasUnsavedChanges(false);
         try {
@@ -1022,9 +913,7 @@ export default function NewOnboarding() {
                     : defaultTemplateId;
             //}
 
-            // if(emailTemplateType === 'custom') {
-            //     formData.append('email_template_id', emailTemplateId)
-            // }
+          
             formData.append("email_template_id", templateId);
 
             const xhr = new XMLHttpRequest();
@@ -1114,30 +1003,7 @@ export default function NewOnboarding() {
             // Send the request
             xhr.send(formData);
 
-            /* const response = await fetch('/api/save-digital-product', {
-                 method: 'POST',
-                 body: formData
-             });
-
-             if (response.ok) {
-                 const data = await response.json();
-                 if (data.error) {
-                     setSaving(false);
-                     if (data.type === 'exists') {
-                         shopify.toast.show("Digital product already exists for selected Shopify product.", { isError: true, duration: 9999999 });
-                     } else {
-                         shopify.toast.show("Error saving digital product.", { isError: true, duration: 9999999 });
-                     }
-                 } else {
-                     shopify.toast.show("Digital product saved successfully.");
-                     setTimeout(() => {
-                         navigate("/");
-                     }, 1000);
-                 }
-             } else {
-                 shopify.toast.show("Failed to save digital product. Please try again later.", { isError: true, duration: 9999999 });
-                 setSaving(false);
-             } */
+            
         } catch (error) {
             console.error("Error saving digital product:", error);
             shopify.toast.show(
@@ -1193,14 +1059,7 @@ export default function NewOnboarding() {
         navigate("/EmailTemplates");
     }, [navigate, handleSave]);
 
-    // SaveBar action handlers
-    // const handleSaveBarSave = async () => {
-    //     await handleSave();
-    // };
 
-    // const handleSaveBarDiscard = () => {
-    //     handleDiscardChanges();
-    // };
 
     const formatFileSizeLimit = (bytes) => {
         if (bytes >= 1024 * 1024 * 1024) {
@@ -1470,6 +1329,58 @@ export default function NewOnboarding() {
 
         fetchCollectionProducts();
     }, [selectedProductsOrCollections]);
+
+    // Fetch all products when "Enable for all apparel products" is selected
+    useEffect(() => {
+        const fetchAllProducts = async () => {
+            // Only fetch if productScope is "all" and we haven't fetched yet
+            if (productScope !== "all" || hasFetchedAllProducts) {
+                return;
+            }
+
+            setIsLoadingProducts(true);
+
+            try {
+                const response = await fetch("/api/products/all", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                });
+
+                const data = await response.json();
+
+                if (data.products) {
+                    setCollectionProducts(data.products);
+                    setProductCount(data.total ?? 0);
+                    setHasFetchedAllProducts(true);
+
+                    // Set the first product as the live test product if none is selected
+                    setLiveTestProduct(prevProduct => {
+                        if (data.products.length === 0) {
+                            return null;
+                        }
+                        // Check if previous product is still in the new list
+                        const isPrevProductValid = data.products.some(p => p.id === prevProduct?.id);
+                        return isPrevProductValid ? prevProduct : data.products[0];
+                    });
+                } else {
+                    setCollectionProducts([]);
+                    setProductCount(0);
+                    setLiveTestProduct(null);
+                }
+            } catch (error) {
+                console.error("Failed to fetch all products:", error);
+                setCollectionProducts([]);
+                setProductCount(0);
+                setLiveTestProduct(null);
+            } finally {
+                setIsLoadingProducts(false);
+            }
+        };
+
+        fetchAllProducts();
+    }, [productScope, hasFetchedAllProducts]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -2817,6 +2728,10 @@ export default function NewOnboarding() {
                                     onClick={() => {
                                         setProductScope("all");
                                         setSelectedProductType("all");
+                                        // Clear collection selections when switching to "all"
+                                        setSelectedProductsOrCollections([]);
+                                        setProductCount(0);
+                                        setHasFetchedAllProducts(false);
                                     }}
                                 >
                                     <div className="step2-radio">
@@ -2850,6 +2765,11 @@ export default function NewOnboarding() {
                                     onClick={() => {
                                         setProductScope("specific");
                                         setSelectedProductType("specific");
+                                        // Clear "all" products state when switching to "specific"
+                                        setCollectionProducts([]);
+                                        setProductCount(0);
+                                        setHasFetchedAllProducts(false);
+                                        setLiveTestProduct(null);
                                     }}
                                 >
                                     <div className="step2-radio">
@@ -2924,7 +2844,7 @@ export default function NewOnboarding() {
                                     </div>
                                     <div>
                                         <span className="step2-stats-number">
-                                            {productScope === "all" ? "—" : (productCount > 0 ? productCount : "0")}
+                                            {productScope === "all" ? (hasFetchedAllProducts ? (isLoadingProducts ? "..." : (productCount > 0 ? productCount : "0")) : "—") : (productCount > 0 ? productCount : "0")}
                                         </span>
                                         <span className="step2-stats-label">{t("onboarding.step2_stats_label")}</span>
                                     </div>
