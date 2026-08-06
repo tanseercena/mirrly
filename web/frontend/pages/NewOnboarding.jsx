@@ -78,6 +78,10 @@ export default function NewOnboarding() {
 
     // Step 4: Live test
     const [liveTestProduct, setLiveTestProduct] = useState(null);
+    const [collectionProducts, setCollectionProducts] = useState([]); // Products from selected collections
+    const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+    const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+    const [productSearchQuery, setProductSearchQuery] = useState('');
     const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
     const [testFeedback, setTestFeedback] = useState(null); // 'positive' or 'negative'
     const [showPhotoTip, setShowPhotoTip] = useState(false);
@@ -760,9 +764,9 @@ export default function NewOnboarding() {
             sendKeyToMultipleCustomers: sendKeyToMultipleCustomers || false,
             deliverKeysInSequence: deliverKeysInSequence || false,
             perUnitNoDelivery: perUnitNoDelivery || 1,
-            
+
             //value: value || "automated",
-            
+
             //totalCodes: totalCodes || "",
             // Excluding complex objects that might cause initialization issues
         };
@@ -788,7 +792,7 @@ export default function NewOnboarding() {
         // Removed API-populated variables from dependencies to prevent false changes
         // files,        // API-populated - exclude from change detection
         // sampleFiles, // API-populated - exclude from change detection
-       
+
         // customs,     // API-populated - exclude from change detection
         tags,
         qrCodeEnabled,
@@ -840,9 +844,9 @@ export default function NewOnboarding() {
             initialData.isManualDeliveryEnabled || false
         );
         setPerUnitNoDelivery(initialData.perUnitNoDelivery || 1);
-        
+
         //setValue(initialData.value || "automated");
-        
+
         //setTotalCodes(initialData.totalCodes || "");
 
         setHasUnsavedChanges(false);
@@ -998,7 +1002,7 @@ export default function NewOnboarding() {
             } else if (expirationType === "specific-date") {
                 const formattedDate = formatDateForDB(selectedDate);
                 formData.append("expiration_value", formattedDate);
-            }            
+            }
 
             //const statusValue = selected === "draft" ? 0 : 1;
             formData.append("status", statusValue);
@@ -1149,7 +1153,7 @@ export default function NewOnboarding() {
         autoFulfill,
         contentType,
         files,
-        
+
         selectedProduct,
         //prefix,
         emailTemplateId,
@@ -1315,8 +1319,26 @@ export default function NewOnboarding() {
                     type: item.type, // 'product' or 'collection'
                 }));
                 setSelectedProductsOrCollections(selectedItems);
-                setProductCount(selectedItems.length);
-                setSelectedProductType("specific"); // Enable continue button
+
+                const collectionIds = selectedItems.map((item) => item.id);
+
+                const response = await fetch("/api/collections/product-count", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        collectionIds,
+                    }),
+                });
+
+                const data = await response.json();
+
+                console.log("Backend Response:", data);
+
+                setProductCount(data.total ?? 0);
+
+                setSelectedProductType("specific");
             }
         } catch (error) {
             console.error('Resource picker error:', error);
@@ -1324,12 +1346,32 @@ export default function NewOnboarding() {
         }
     };
 
-    const handleRemoveSelection = (id) => {
+    const handleRemoveSelection = async (id) => {
         const updated = selectedProductsOrCollections.filter((item) => item.id !== id);
         setSelectedProductsOrCollections(updated);
-        setProductCount(updated.length);
+
         if (updated.length === 0) {
+            setProductCount(0);
             setSelectedProductType(null); // Disable continue button if no items
+        } else {
+            // Recalculate product count from remaining collections
+            const collectionIds = updated.map((item) => item.id);
+            try {
+                const response = await fetch("/api/collections/product-count", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        collectionIds,
+                    }),
+                });
+                const data = await response.json();
+                setProductCount(data.total ?? 0);
+            } catch (error) {
+                console.error('Failed to recalculate product count:', error);
+                setProductCount(0);
+            }
         }
     };
 
@@ -1377,12 +1419,83 @@ export default function NewOnboarding() {
         }
     }, [currentStep]);
 
-    // Set default live test product when products are selected
+    // Fetch products from selected collections for Step 4 dropdown
     useEffect(() => {
-        if (selectedProductsOrCollections.length > 0 && !liveTestProduct) {
-            setLiveTestProduct(selectedProductsOrCollections[0]);
-        }
+        const fetchCollectionProducts = async () => {
+            if (selectedProductsOrCollections.length === 0) {
+                setCollectionProducts([]);
+                setLiveTestProduct(null);
+                return;
+            }
+
+            setIsLoadingProducts(true);
+
+            try {
+                const collectionIds = selectedProductsOrCollections.map(item => item.id);
+
+                const response = await fetch("/api/collections/products", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ collectionIds }),
+                });
+
+                const data = await response.json();
+
+                if (data.products) {
+                    setCollectionProducts(data.products);
+
+                    // Use functional state update to avoid stale closure
+                    setLiveTestProduct(prevProduct => {
+                        if (data.products.length === 0) {
+                            return null;
+                        }
+                        // Check if previous product is still in the new list
+                        const isPrevProductValid = data.products.some(p => p.id === prevProduct?.id);
+                        return isPrevProductValid ? prevProduct : data.products[0];
+                    });
+                } else {
+                    setCollectionProducts([]);
+                    setLiveTestProduct(null);
+                }
+            } catch (error) {
+                console.error("Failed to fetch collection products:", error);
+                setCollectionProducts([]);
+                setLiveTestProduct(null);
+            } finally {
+                setIsLoadingProducts(false);
+            }
+        };
+
+        fetchCollectionProducts();
     }, [selectedProductsOrCollections]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (isProductDropdownOpen) {
+                const dropdown = document.querySelector('.step4-custom-dropdown');
+                if (dropdown && !dropdown.contains(event.target)) {
+                    setIsProductDropdownOpen(false);
+                    setProductSearchQuery('');
+                }
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isProductDropdownOpen]);
+
+    // Focus search input when dropdown opens
+    useEffect(() => {
+        if (isProductDropdownOpen) {
+            const searchInput = document.querySelector('.step4-search-input');
+            if (searchInput) {
+                searchInput.focus();
+            }
+        }
+    }, [isProductDropdownOpen]);
 
 
     const stepProgress = (currentStep / totalSteps) * 100;
@@ -4312,6 +4425,196 @@ export default function NewOnboarding() {
                             box-shadow: 0 0 0 3px rgba(15, 139, 141, 0.1);
                         }
 
+                        /* ── Custom Dropdown Styles ── */
+                        .step4-custom-dropdown {
+                            position: relative;
+                        }
+
+                        .step4-dropdown-trigger {
+                            width: 100%;
+                            padding: 10px 14px;
+                            padding-right: 40px;
+                            border: 1px solid #DCE3EA;
+                            border-radius: 10px;
+                            font-size: 14px;
+                            color: #12324B;
+                            background-color: white;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                            min-height: 56px;
+                            text-align: left;
+                        }
+
+                        .step4-dropdown-trigger:hover:not(:disabled) {
+                            border-color: #0F8B8D;
+                        }
+
+                        .step4-dropdown-trigger:focus {
+                            outline: none;
+                            border-color: #0F8B8D;
+                            box-shadow: 0 0 0 3px rgba(15, 139, 141, 0.1);
+                        }
+
+                        .step4-dropdown-trigger:disabled {
+                            opacity: 0.6;
+                            cursor: not-allowed;
+                        }
+
+                        .step4-dropdown-loading,
+                        .step4-dropdown-empty {
+                            color: #667085;
+                            font-size: 14px;
+                        }
+
+                        .step4-dropdown-thumb {
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 8px;
+                            object-fit: cover;
+                            flex-shrink: 0;
+                            background-color: #F8F9FA;
+                        }
+
+                        .step4-dropdown-thumb--placeholder {
+                            width: 36px;
+                            height: 36px;
+                            color: #9CA3AF;
+                            padding: 6px;
+                            background-color: #F8F9FA;
+                            border-radius: 8px;
+                        }
+
+                        .step4-dropdown-title {
+                            flex: 1;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
+                            font-size: 14px;
+                            color: #12324B;
+                        }
+
+                        .step4-dropdown-chevron {
+                            position: absolute;
+                            right: 14px;
+                            top: 50%;
+                            transform: translateY(-50%);
+                            pointer-events: none;
+                            color: #667085;
+                            width: 18px;
+                            height: 18px;
+                            transition: transform 0.2s;
+                        }
+
+                        .step4-dropdown-chevron--open {
+                            transform: translateY(-50%) rotate(180deg);
+                        }
+
+                        .step4-dropdown-menu {
+                            position: absolute;
+                            top: calc(100% + 4px);
+                            left: 0;
+                            right: 0;
+                            background: white;
+                            border: 1px solid #E5E7EB;
+                            border-radius: 10px;
+                            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+                            max-height: 300px;
+                            overflow-y: auto;
+                            z-index: 1000;
+                        }
+
+                        .step4-dropdown-option {
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                            padding: 10px 14px;
+                            cursor: pointer;
+                            transition: background-color 0.15s;
+                            border-bottom: 1px solid #F3F4F6;
+                        }
+
+                        .step4-dropdown-option:last-child {
+                            border-bottom: none;
+                        }
+
+                        .step4-dropdown-option:hover {
+                            background-color: #F8F9FA;
+                        }
+
+                        .step4-dropdown-option--selected {
+                            background-color: #F0F9FF;
+                        }
+
+                        .step4-dropdown-check {
+                            width: 18px;
+                            height: 18px;
+                            color: #0F8B8D;
+                            flex-shrink: 0;
+                            margin-left: auto;
+                        }
+
+                        /* Search Input Styles */
+                        .step4-dropdown-search {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            padding: 10px 14px;
+                            border-bottom: 1px solid #E5E7EB;
+                            position: sticky;
+                            top: 0;
+                            background: white;
+                            z-index: 1;
+                        }
+
+                        .step4-search-icon {
+                            width: 16px;
+                            height: 16px;
+                            color: #9CA3AF;
+                            flex-shrink: 0;
+                        }
+
+                        .step4-search-input {
+                            flex: 1;
+                            border: none;
+                            outline: none;
+                            font-size: 14px;
+                            color: #12324B;
+                            background: transparent;
+                            min-width: 0;
+                        }
+
+                        .step4-search-input::placeholder {
+                            color: #9CA3AF;
+                        }
+
+                        .step4-search-clear {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            width: 18px;
+                            height: 18px;
+                            border: none;
+                            background: none;
+                            cursor: pointer;
+                            color: #9CA3AF;
+                            padding: 0;
+                            flex-shrink: 0;
+                        }
+
+                        .step4-search-clear:hover {
+                            color: #667085;
+                        }
+
+                        .step4-dropdown-no-results {
+                            padding: 16px 14px;
+                            text-align: center;
+                            color: #9CA3AF;
+                            font-size: 13px;
+                        }
+
                         .step4-dropdown-arrow {
                             position: absolute;
                             right: 14px;
@@ -4819,31 +5122,124 @@ export default function NewOnboarding() {
 
                                     {/* Product Selector */}
                                     <div className="step4-product-section">
+                                        <div className="step4-section-title">{t("onboarding.select_product_to_test")}</div>
                                         <div className="step4-product-selector">
-                                            <select
-                                                className="step4-product-dropdown"
-                                                value={liveTestProduct?.id || ""}
-                                                onChange={(e) => {
-                                                    const productId = e.target.value;
-                                                    const product = selectedProductsOrCollections.find(p => p.id === productId) ||
-                                                        (selectedProductsOrCollections.length > 0 ? selectedProductsOrCollections[0] : null);
-                                                    setLiveTestProduct(product);
-                                                }}
-                                                disabled={selectedProductsOrCollections.length === 0}
-                                            >
-                                                {selectedProductsOrCollections.length === 0 ? (
-                                                    <option>{t("onboarding.no_product_available")}</option>
-                                                ) : (
-                                                    selectedProductsOrCollections.map((product) => (
-                                                        <option key={product.id} value={product.id}>
-                                                            {product.title}
-                                                        </option>
-                                                    ))
+                                            {/* Custom Product Dropdown */}
+                                            <div className="step4-custom-dropdown">
+                                                <button
+                                                    type="button"
+                                                    className="step4-dropdown-trigger"
+                                                    onClick={() => !isLoadingProducts && collectionProducts.length > 0 && setIsProductDropdownOpen(!isProductDropdownOpen)}
+                                                    disabled={isLoadingProducts || collectionProducts.length === 0}
+                                                >
+                                                    {isLoadingProducts ? (
+                                                        <span className="step4-dropdown-loading">{t("onboarding.loading_products")}</span>
+                                                    ) : liveTestProduct ? (
+                                                        <>
+                                                            {liveTestProduct.image?.src ? (
+                                                                <img
+                                                                    src={liveTestProduct.image.src}
+                                                                    alt={liveTestProduct.title}
+                                                                    className="step4-dropdown-thumb"
+                                                                />
+                                                            ) : (
+                                                                <svg className="step4-dropdown-thumb step4-dropdown-thumb--placeholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
+                                                                    <path d="m9 22 1-7" />
+                                                                    <path d="m16 22-1-7" />
+                                                                </svg>
+                                                            )}
+                                                            <span className="step4-dropdown-title">{liveTestProduct.title}</span>
+                                                        </>
+                                                    ) : collectionProducts.length === 0 ? (
+                                                        <span className="step4-dropdown-empty">{t("onboarding.no_product_available")}</span>
+                                                    ) : null}
+                                                    <svg className={`step4-dropdown-chevron ${isProductDropdownOpen ? 'step4-dropdown-chevron--open' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="m6 9 6 6 6-6" />
+                                                    </svg>
+                                                </button>
+
+                                                {/* Dropdown Menu */}
+                                                {isProductDropdownOpen && (
+                                                    <div className="step4-dropdown-menu">
+                                                        {/* Search Input */}
+                                                        <div className="step4-dropdown-search">
+                                                            <svg className="step4-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                <circle cx="11" cy="11" r="8" />
+                                                                <path d="m21 21-4.35-4.35" />
+                                                            </svg>
+                                                            <input
+                                                                type="text"
+                                                                className="step4-search-input"
+                                                                placeholder={t("onboarding.search_products_placeholder")}
+                                                                value={productSearchQuery}
+                                                                onChange={(e) => setProductSearchQuery(e.target.value)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                            {productSearchQuery && (
+                                                                <button
+                                                                    className="step4-search-clear"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setProductSearchQuery('');
+                                                                    }}
+                                                                >
+                                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <path d="M18 6 6 18" />
+                                                                        <path d="m6 6 12 12" />
+                                                                    </svg>
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Filtered Products */}
+                                                        {collectionProducts
+                                                            .filter(product =>
+                                                                product.title.toLowerCase().includes(productSearchQuery.toLowerCase())
+                                                            )
+                                                            .map((product) => (
+                                                            <div
+                                                                key={product.id}
+                                                                className={`step4-dropdown-option ${liveTestProduct?.id === product.id ? 'step4-dropdown-option--selected' : ''}`}
+                                                                onClick={() => {
+                                                                    setLiveTestProduct(product);
+                                                                    setIsProductDropdownOpen(false);
+                                                                    setProductSearchQuery('');
+                                                                }}
+                                                            >
+                                                                {product.image?.src ? (
+                                                                    <img
+                                                                        src={product.image.src}
+                                                                        alt={product.title}
+                                                                        className="step4-dropdown-thumb"
+                                                                    />
+                                                                ) : (
+                                                                    <svg className="step4-dropdown-thumb step4-dropdown-thumb--placeholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
+                                                                        <path d="m9 22 1-7" />
+                                                                        <path d="m16 22-1-7" />
+                                                                    </svg>
+                                                                )}
+                                                                <span className="step4-dropdown-title">{product.title}</span>
+                                                                {liveTestProduct?.id === product.id && (
+                                                                    <svg className="step4-dropdown-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <path d="M20 6L9 17l-5-5" />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                        ))}
+
+                                                        {/* No Results Message */}
+                                                        {collectionProducts.filter(product =>
+                                                            product.title.toLowerCase().includes(productSearchQuery.toLowerCase())
+                                                        ).length === 0 && (
+                                                            <div className="step4-dropdown-no-results">
+                                                                {t("onboarding.no_products_found")}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
-                                            </select>
-                                            <svg className="step4-dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="m6 9 6 6 6-6" />
-                                            </svg>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -4865,9 +5261,9 @@ export default function NewOnboarding() {
                                         <div className="step4-tips-header">
                                             <div className="step4-tips-icon-wrapper">
                                                 <svg className="step4-tips-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/>
-                                                    <path d="M9 18h6"/>
-                                                    <path d="M10 22h4"/>
+                                                    <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+                                                    <path d="M9 18h6" />
+                                                    <path d="M10 22h4" />
                                                 </svg>
                                             </div>
                                             <span className="step4-tips-title">{t("onboarding.tips_title")}</span>
@@ -4917,18 +5313,7 @@ export default function NewOnboarding() {
                                         </div>
 
                                         <div style={{ position: 'relative' }}>
-                                            {liveTestProduct?.image?.src ? (
-                                                <img
-                                                    src={liveTestProduct.image.src}
-                                                    alt={liveTestProduct.title}
-                                                    className="step4-preview-image"
-                                                    onError={(e) => {
-                                                        e.target.style.display = 'none';
-                                                        e.target.nextElementSibling.style.display = 'flex';
-                                                    }}
-                                                />
-                                            ) : null}
-                                            <div className="step4-preview-placeholder" style={{ display: liveTestProduct?.image?.src ? 'none' : 'flex' }}>
+                                            <div className="step4-preview-placeholder" style={{ display: 'flex' }}>
                                                 <div className="step4-preview-placeholder-inner">
                                                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#DCE3EA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                         <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
@@ -4965,14 +5350,14 @@ export default function NewOnboarding() {
                                                     className="step4-floating-btn"
                                                     onClick={() => {
                                                         // Switch to next product if available
-                                                        if (selectedProductsOrCollections.length > 1) {
-                                                            const currentIndex = selectedProductsOrCollections.findIndex(p => p.id === liveTestProduct?.id);
-                                                            const nextIndex = (currentIndex + 1) % selectedProductsOrCollections.length;
-                                                            setLiveTestProduct(selectedProductsOrCollections[nextIndex]);
+                                                        if (collectionProducts.length > 1) {
+                                                            const currentIndex = collectionProducts.findIndex(p => p.id === liveTestProduct?.id);
+                                                            const nextIndex = (currentIndex + 1) % collectionProducts.length;
+                                                            setLiveTestProduct(collectionProducts[nextIndex]);
                                                         }
                                                     }}
                                                     title={t("onboarding.change_apparel")}
-                                                    disabled={selectedProductsOrCollections.length <= 1}
+                                                    disabled={collectionProducts.length <= 1}
                                                 >
                                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                         <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />

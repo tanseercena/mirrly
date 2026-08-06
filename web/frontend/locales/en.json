@@ -653,6 +653,12 @@
     "plans": {
         "title": "Choose a plan that is right for you.",
         "sub_title": "All paid plans come with a 7-day free trial.",
+        "monthly": {
+            "title": "Monthly"
+        },
+        "yearly": {
+            "title": "Yearly"
+        },
         "lifetime_20%": "🔥 Lifetime 20% Off – Upgrade to Yearly & Save Forever!",
         "upgrade_to_a_yearly": "Upgrade to a yearly plan and enjoy",
         "off_for_life": "off for life!",
@@ -1860,6 +1866,9 @@
         "change_apparel": "Change apparel",
         "no_products_available": "No products available",
         "try_it_now": "Try it now",
+	        "search_products_placeholder": "Search products...",
+	        "no_products_found": "No products found",
+	        "loading_products": "Loading products...",
         "live_test_camera_title": "Live Try-On Test",
         "how_did_it_go": "How did it go?",
         "looks_great": "Looks great",
@@ -1919,10 +1928,10 @@
         "step2_all_apparel_title": "Enable for all apparel products",
         "step2_all_apparel_desc": "Try-on will be available on all your apparel products that have model images.",
         "step2_specific_title": "Choose specific collections",
-        "step2_specific_desc": "Select which collections you want to enable try-on for.",
+        "step2_specific_desc": "Select which collections or individual products you want to enable try-on for.",
         "step2_browse_button": "Browse collections",
         "step2_stats_title": "Products that will get try-on",
-        "step2_stats_label": "collections",
+        "step2_stats_label": "products",
         "step2_stats_note": "This count is updated in real-time based on your selection.",
         "step2_includes_title": "Includes:",
         "step2_includes_model_images": "Products with model images",
