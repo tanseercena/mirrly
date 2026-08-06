@@ -653,12 +653,6 @@
     "plans": {
         "title": "Choose a plan that is right for you.",
         "sub_title": "All paid plans come with a 7-day free trial.",
-        "monthly": {
-            "title": "Monthly"
-        },
-        "yearly": {
-            "title": "Yearly"
-        },
         "lifetime_20%": "🔥 Lifetime 20% Off – Upgrade to Yearly & Save Forever!",
         "upgrade_to_a_yearly": "Upgrade to a yearly plan and enjoy",
         "off_for_life": "off for life!",
@@ -1878,8 +1872,8 @@
         "try-on_live_discription":"Try-on button is live on your product pages",
         "youre_all_setup_ready": "You're all set!",
         "setup_summary": "Setup Summary",
-        "product_enabled": "product enabled",
-        "products_enabled": "products enabled",
+        "product_enabled": "Product enabled",
+        "products_enabled": "Products enabled",
         "theme_embed_status": "Theme embed",
         "active": "Active",
         "test_completed": "Test completed",
@@ -1889,16 +1883,20 @@
         "plan_selection_subtitle": "Select a plan that fits your needs. All plans include a free trial.",
         "starter_plan": "Starter",
         "starter_price": "Free",
+        "starter_yearly_price": "Free",
         "starter_included": "50 try-on sessions/month",
         "growth_plan": "Growth",
-        "growth_price": "$29/month",
+        "growth_price": "$79/month",
+        "growth_yearly_price": "$63/month",
         "growth_included": "500 try-on sessions/month",
         "scale_plan": "Scale",
-        "scale_price": "$99/month",
+        "scale_price": "$199/month",
+        "scale_yearly_price": "$159/month",
         "scale_included": "Unlimited try-on sessions",
         "popular": "Popular",
         "free_trial_note": "Start with a 14-day free trial. No credit card required.",
         "go_to_dashboard": "Go to Dashboard",
+        "step5_progress_label": "5/5",
         "complete": "Complete",
         "step3_heading": "Add the try-on button to your theme",
         "step3_description": "Add Mirrly to your product pages so customers can see the try-on button right where it matters.",
@@ -1969,7 +1967,9 @@
         "refresh_status": "Refresh status",
         "no_product_available": "No product available",
         "live_test_camera": "Live Test Camera",
-        "save_20_percent": "Save 20%"
+        "save_20_percent": "Save 20%",
+        "monthly_title":"Monthly",
+        "yearly_title":"Yearly"
     },
     "create_free_order": {
         "create_a_test_order": "Create a test order",

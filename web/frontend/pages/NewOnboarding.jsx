@@ -89,6 +89,7 @@ export default function NewOnboarding() {
 
     // Step 5: Plan selection
     const [selectedPlan, setSelectedPlan] = useState("starter"); // Default to starter plan
+    const [billingPeriod, setBillingPeriod] = useState("monthly"); // "monthly" or "yearly"
 
     const totalSteps = 5;
 
@@ -485,7 +486,7 @@ export default function NewOnboarding() {
         [setFiles, setGoogleDriveLink]
     );
 
-   
+
 
     const removeTag = useCallback(
         (tag) => () => {
@@ -494,7 +495,7 @@ export default function NewOnboarding() {
         []
     );
 
-    
+
     const dismissToast = useCallback(() => {
         setToast((prevToast) => ({
             ...prevToast,
@@ -607,7 +608,7 @@ export default function NewOnboarding() {
             });
     };
 
-    
+
     useEffect(() => {
         // Only fetch digital products after user moves past step 1
         if (currentStep <= 1) return;
@@ -622,7 +623,7 @@ export default function NewOnboarding() {
                     setDigitalProductsLimit(store.digital_products_limit);
                     setIsLoading(false);
 
-                    
+
                 } else {
                     console.error("Failed to fetch digital data");
                 }
@@ -913,7 +914,7 @@ export default function NewOnboarding() {
                     : defaultTemplateId;
             //}
 
-          
+
             formData.append("email_template_id", templateId);
 
             const xhr = new XMLHttpRequest();
@@ -1003,7 +1004,7 @@ export default function NewOnboarding() {
             // Send the request
             xhr.send(formData);
 
-            
+
         } catch (error) {
             console.error("Error saving digital product:", error);
             shopify.toast.show(
@@ -5118,45 +5119,45 @@ export default function NewOnboarding() {
                                                                 product.title.toLowerCase().includes(productSearchQuery.toLowerCase())
                                                             )
                                                             .map((product) => (
-                                                            <div
-                                                                key={product.id}
-                                                                className={`step4-dropdown-option ${liveTestProduct?.id === product.id ? 'step4-dropdown-option--selected' : ''}`}
-                                                                onClick={() => {
-                                                                    setLiveTestProduct(product);
-                                                                    setIsProductDropdownOpen(false);
-                                                                    setProductSearchQuery('');
-                                                                }}
-                                                            >
-                                                                {product.image?.src ? (
-                                                                    <img
-                                                                        src={product.image.src}
-                                                                        alt={product.title}
-                                                                        className="step4-dropdown-thumb"
-                                                                    />
-                                                                ) : (
-                                                                    <svg className="step4-dropdown-thumb step4-dropdown-thumb--placeholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                        <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
-                                                                        <path d="m9 22 1-7" />
-                                                                        <path d="m16 22-1-7" />
-                                                                    </svg>
-                                                                )}
-                                                                <span className="step4-dropdown-title">{product.title}</span>
-                                                                {liveTestProduct?.id === product.id && (
-                                                                    <svg className="step4-dropdown-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                        <path d="M20 6L9 17l-5-5" />
-                                                                    </svg>
-                                                                )}
-                                                            </div>
-                                                        ))}
+                                                                <div
+                                                                    key={product.id}
+                                                                    className={`step4-dropdown-option ${liveTestProduct?.id === product.id ? 'step4-dropdown-option--selected' : ''}`}
+                                                                    onClick={() => {
+                                                                        setLiveTestProduct(product);
+                                                                        setIsProductDropdownOpen(false);
+                                                                        setProductSearchQuery('');
+                                                                    }}
+                                                                >
+                                                                    {product.image?.src ? (
+                                                                        <img
+                                                                            src={product.image.src}
+                                                                            alt={product.title}
+                                                                            className="step4-dropdown-thumb"
+                                                                        />
+                                                                    ) : (
+                                                                        <svg className="step4-dropdown-thumb step4-dropdown-thumb--placeholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                            <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
+                                                                            <path d="m9 22 1-7" />
+                                                                            <path d="m16 22-1-7" />
+                                                                        </svg>
+                                                                    )}
+                                                                    <span className="step4-dropdown-title">{product.title}</span>
+                                                                    {liveTestProduct?.id === product.id && (
+                                                                        <svg className="step4-dropdown-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                            <path d="M20 6L9 17l-5-5" />
+                                                                        </svg>
+                                                                    )}
+                                                                </div>
+                                                            ))}
 
                                                         {/* No Results Message */}
                                                         {collectionProducts.filter(product =>
                                                             product.title.toLowerCase().includes(productSearchQuery.toLowerCase())
                                                         ).length === 0 && (
-                                                            <div className="step4-dropdown-no-results">
-                                                                {t("onboarding.no_products_found")}
-                                                            </div>
-                                                        )}
+                                                                <div className="step4-dropdown-no-results">
+                                                                    {t("onboarding.no_products_found")}
+                                                                </div>
+                                                            )}
                                                     </div>
                                                 )}
                                             </div>
@@ -5489,6 +5490,7 @@ export default function NewOnboarding() {
                             display: flex;
                             flex-direction: column;
                             gap: 24px;
+                            min-height: 0;
                         }
 
                         .step5-left-col > .Card,
@@ -5496,6 +5498,16 @@ export default function NewOnboarding() {
                             height: 100%;
                             display: flex;
                             flex-direction: column;
+                            min-height: 0;
+                        }
+
+                        /* Inner content wrapper - flex container for distributing space */
+                        .step5-left-col > .Card > div,
+                        .step5-right-col > .Card > div {
+                            display: flex;
+                            flex-direction: column;
+                            height: 100%;
+                            min-height: 0;
                         }
 
                         /* ── Celebration section ── */
@@ -5530,9 +5542,10 @@ export default function NewOnboarding() {
                             background: white;
                             border-radius: 16px;
                             padding: 24px;
-                            margin-top:8px;
+                            margin-top: 8px;
                             border: 1px solid #DCE3EA;
                             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+                            flex: 1;
                         }
 
                         .step5-card-title {
@@ -5621,8 +5634,9 @@ export default function NewOnboarding() {
                             background: linear-gradient(135deg, #ECF8FF 0%, #E0F2F1 100%);
                             border-radius: 16px;
                             padding: 12px;
-                            margin-top: 10px;
+                            
                             border: 1px solid #B8E4E9;
+                            margin-top: auto;
                         }
 
                         .step5-ready-content {
@@ -5727,6 +5741,8 @@ export default function NewOnboarding() {
                             grid-template-columns: repeat(3, 1fr);
                             gap: 16px;
                             margin-bottom: 24px;
+                            flex: 1;
+                            min-height: 0;
                         }
 
                         .step5-plan-card {
@@ -5904,7 +5920,8 @@ export default function NewOnboarding() {
                             align-items: center;
                             justify-content: space-between;
                             padding-top: 24px;
-                            border-top: 1px solid #DCE3EA;
+                        /* ── border-top: 1px solid #DCE3EA; ── */
+                            border: 1px solid #2171c1;
                         }
 
                         .step5-btn {
@@ -6184,16 +6201,16 @@ export default function NewOnboarding() {
                                                     {/* Billing Toggle */}
                                                     <div className="step5-billing-toggle">
                                                         <button
-                                                            className={`step5-toggle-option ${true ? 'active' : ''}`}
-                                                            onClick={() => { }}
+                                                            className={`step5-toggle-option ${billingPeriod === 'monthly' ? 'active' : ''}`}
+                                                            onClick={() => setBillingPeriod('monthly')}
                                                         >
-                                                            {t("plans.monthly.title")}
+                                                            {t("onboarding.monthly_title")}
                                                         </button>
                                                         <button
-                                                            className={`step5-toggle-option ${false ? 'active' : ''}`}
-                                                            onClick={() => { }}
+                                                            className={`step5-toggle-option ${billingPeriod === 'yearly' ? 'active' : ''}`}
+                                                            onClick={() => setBillingPeriod('yearly')}
                                                         >
-                                                            {t("plans.yearly.title")}
+                                                            {t("onboarding.yearly_title")}
                                                             <span className="step5-toggle-discount">{t("onboarding.save_20_percent")}</span>
                                                         </button>
                                                     </div>
@@ -6210,7 +6227,7 @@ export default function NewOnboarding() {
                                                                 <div className="step5-plan-badge recommended">{t("onboarding.recommended")}</div>
                                                             )}
                                                             <div className="step5-plan-name">{t("onboarding.starter_plan")}</div>
-                                                            <div className="step5-plan-price">{t("onboarding.starter_price")}</div>
+                                                            <div className="step5-plan-price">{billingPeriod === 'yearly' ? t("onboarding.starter_yearly_price") : t("onboarding.starter_price")}</div>
                                                             <div className="step5-plan-subtitle">{t("onboarding.starter_sessions")}</div>
                                                             <div className="step5-plan-features">
                                                                 <div className="step5-plan-feature">
@@ -6257,7 +6274,7 @@ export default function NewOnboarding() {
                                                         >
                                                             <div className="step5-plan-badge popular">{t("onboarding.popular")}</div>
                                                             <div className="step5-plan-name">{t("onboarding.growth_plan")}</div>
-                                                            <div className="step5-plan-price">{t("onboarding.growth_price")}</div>
+                                                            <div className="step5-plan-price">{billingPeriod === 'yearly' ? t("onboarding.growth_yearly_price") : t("onboarding.growth_price")}</div>
                                                             <div className="step5-plan-subtitle">{t("onboarding.growth_sessions")}</div>
                                                             <div className="step5-plan-features">
                                                                 <div className="step5-plan-feature">
@@ -6307,7 +6324,7 @@ export default function NewOnboarding() {
                                                             onClick={() => setSelectedPlan("scale")}
                                                         >
                                                             <div className="step5-plan-name">{t("onboarding.scale_plan")}</div>
-                                                            <div className="step5-plan-price">{t("onboarding.scale_price")}</div>
+                                                            <div className="step5-plan-price">{billingPeriod === 'yearly' ? t("onboarding.scale_yearly_price") : t("onboarding.scale_price")}</div>
                                                             <div className="step5-plan-subtitle">{t("onboarding.unlimited_sessions")}</div>
                                                             <div className="step5-plan-features">
                                                                 <div className="step5-plan-feature">
@@ -6392,7 +6409,7 @@ export default function NewOnboarding() {
                                             <div className="step5-dot"></div>
                                             <div className="step5-dot"></div>
                                             <div className="step5-dot"></div>
-                                            <span className="step5-progress-label">5/5</span>
+                                            <span className="step5-progress-label">{t("onboarding.step5_progress_label")}</span>
                                         </div>
 
                                         {/* Go to Dashboard Button */}
