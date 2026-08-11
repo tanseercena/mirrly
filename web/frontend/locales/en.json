@@ -598,6 +598,18 @@
     },
     "dashboard": {
         "title": "Dashboard",
+        "setup_progress_banner": {
+            "title": "Complete your setup to start getting more try-ons",
+            "subtitle": "You're almost there! Finish setting up your try-on to make it live for your customers.",
+            "close": "Close",
+            "continue_live_test": "Continue live test",
+            "steps": {
+                "product_type": "Product Type",
+                "theme_embed": "Theme Embed",
+                "live_test": "Live Test",
+                "choose_plan": "Choose Plan"
+            }
+        },
         "discount_banner": "🔥 Lifetime 20% Off – Upgrade to Yearly & Save Forever!",
         "discount_banner_desc": "Upgrade to a yearly plan and enjoy",
         "discount_banner_desc_2": "off for life!",
@@ -648,7 +660,81 @@
         "dismiss_guide": "Dismiss Guide",
         "mark_as_done": "Mark as done",
         "mark_as_not_done": "Mark as not done",
-        "done": "Done"
+        "done": "Done",
+        "overview": {
+            "title": "Overview",
+            "description": "See how your live try-on is performing. Stats are updated in real time.",
+            "last_30_days": "Last 30 days",
+            "sessions_this_cycle": "Sessions this cycle",
+            "add_to_cart_after_try_on": "Add-to-cart after try-on",
+            "avg_session_length": "Avg. session length",
+            "spend_this_cycle": "Spend this cycle",
+            "vs_previous_30_days": "vs. previous 30 days",
+            "conversion_rate": "conversion rate",
+            "per_session": "per session"
+        },
+        "session_usage": {
+            "title": "Session usage",
+            "resets_on": "Resets on {{date}}",
+            "growth_plan": "Growth plan",
+            "current_plan": "Current plan",
+            "of_sessions": "of {{count}} sessions",
+            "used": "{{percentage}} used",
+            "sessions_remaining": "{{count}} sessions remaining",
+            "need_more_upgrade": "Need more? Upgrade your plan anytime."
+        },
+        "current_plan": {
+            "title": "Your plan",
+            "up_to_sessions": "Up to {{count}} try-on sessions",
+            "all_core_features": "All core features",
+            "sessions_per_month": "Up to {{count}} sessions / month",
+            "high_quality_results": "High quality results",
+            "priority_support": "Priority support",
+            "usage_analytics": "Usage analytics",
+            "manage_plan": "Manage plan",
+            "view_all_plans": "View all plans"
+        },
+        "session_funnel": {
+            "title": "Session funnel",
+            "description": "See how shoppers move through the try-on experience.",
+            "camera_opened": "Camera opened",
+            "of_product_page_clicks": "of product page clicks",
+            "try_on_started": "Try-on started",
+            "continued_after_camera": "continued after camera",
+            "try_on_completed": "Try-on completed",
+            "completed_try_on": "completed try-on",
+            "added_to_cart": "Added to cart",
+            "added_to_cart_step": "added to cart"
+        },
+        "recent_sessions": {
+            "title": "Recent sessions",
+            "description": "Latest try-on sessions from your store.",
+            "view_all_sessions": "View all sessions",
+            "table_headers": {
+                "customer": "Customer",
+                "product": "Product",
+                "date_time": "Date & time",
+                "session_length": "Session length",
+                "result": "Result",
+                "action": "Action"
+            },
+            "view": "View",
+            "more_actions": "More actions"
+        },
+        "status": {
+            "completed": "Completed",
+            "pending": "Pending"
+        },
+        "date_filter": {
+            "today": "Today",
+            "yesterday": "Yesterday",
+            "last_7_days": "Last 7 days",
+            "last_30_days": "Last 30 days",
+            "last_90_days": "Last 90 days",
+            "custom": "Custom",
+            "cancel": "Cancel",
+            "apply": "Apply"
+        }
     },
     "plans": {
         "title": "Choose a plan that is right for you.",
