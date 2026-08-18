@@ -28,9 +28,6 @@ export default function App() {
                             {/* <Link to="/DigitalLottery">{t("sidebar.digital_lottery")}</Link> */}
                             <Link to="/settings">{t("sidebar.settings")}</Link>
                             <Link to="/sessions">{t("sidebar.sessions")}</Link>
-                            <Link to="/library">{t("sidebar.library")}</Link>
-                            <Link to="/EmailTemplates">{t("email_templates.title")}</Link>
-                            <Link to="/analytics">{t("sidebar.analytics")}</Link>
                             <Link to="/plans">{t("sidebar.plans")}</Link>
                         </NavMenu>
                         <AppProvider>

@@ -53,7 +53,7 @@ export function IntroVideoCard ({title, video_link, description, onCancel}) {
                 <MediaCard
                     title={title}
                     primaryAction={{
-                        content: t("digtal_lottery.watch_tutorial"),
+                        content: t("createdigitalproduct.watch_tutorial"),
                         onAction: () => {
                             window.open(video_link, "_blank")
                         },

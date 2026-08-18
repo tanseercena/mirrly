@@ -14,7 +14,6 @@ import { useState, useCallback } from "react";
 
 import { Icon } from "@shopify/polaris";
 import {
-    ChartVerticalFilledIcon,
     PlusCircleIcon,
     EmailIcon,
     EditIcon,
@@ -39,14 +38,6 @@ const Congratulations = ({ onComplete }) => {
     // Navigation handlers
     const handleCreateNewProduct = useCallback(() => {
         navigate("/CreateDigitalProduct");
-    }, [navigate]);
-
-    const handleGoToAnalytics = useCallback(() => {
-        navigate("/analytics");
-    }, [navigate]);
-
-    const handleOpenEmailEditor = useCallback(() => {
-        navigate("/EmailTemplates");
     }, [navigate]);
 
     const handleTestOrder = useCallback(() => {
@@ -185,41 +176,6 @@ const Congratulations = ({ onComplete }) => {
                                             >
                                                 {t(
                                                     "onboarding.create_new_product"
-                                                )}
-                                            </Button>
-                                        </InlineStack>
-
-                                        {/* Enable Analytics */}
-                                        <InlineStack
-                                            align="space-between"
-                                            blockAlign="center"
-                                        >
-                                            <InlineStack
-                                                gap="200"
-                                                blockAlign="center"
-                                            >
-                                                <Icon
-                                                    source={
-                                                        ChartVerticalFilledIcon
-                                                    }
-                                                    tone="base"
-                                                />
-                                                <Text
-                                                    variant="bodyMd"
-                                                    as="span"
-                                                >
-                                                    {t(
-                                                        "onboarding.enable_analytics"
-                                                    )}
-                                                </Text>
-                                            </InlineStack>
-                                            <Button
-                                                size="slim"
-                                                variant="secondary"
-                                                onClick={handleGoToAnalytics}
-                                            >
-                                                {t(
-                                                    "onboarding.go_to_analytics"
                                                 )}
                                             </Button>
                                         </InlineStack>

@@ -741,23 +741,6 @@ class StoresController extends Controller
         ]);
     }
 
-    public function updateEmailTemplate(Request $request)
-    {
-        $session = $request->get('shopifySession');
-        $shop = $session->getShop();
-
-        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
-
-        if (!$store) {
-            return response()->json([
-                'message' => 'Store not found',
-            ], 404);
-        }
-
-        // Template functionality removed - just return success
-        return response()->json(['message' => 'Email template updated successfully']);
-    }
-
     public function dismissBanner(Request $request)
     {
         $request->validate([

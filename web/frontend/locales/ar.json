@@ -766,24 +766,7 @@
             "storage": "التخزين"
         }
     },
-    "analytics": {
-        "title": "لوحة التحليلات",
-        "downloads": "التحميلات",
-        "downloads_by_country": "التحميلات حسب البلد",
-        "n/a": "غير متاح",
-        "download_over_time": "التحميلات عبر الزمن",
-        "top_performing_products": "أفضل المنتجات أداءً",
-        "text": "نص",
-        "numeric": "رقمي",
-        "product_name": "اسم المنتج",
-        "next": "التالي",
-        "previous": "السابق",
-        "geographical_insights": "الأفكار الجغرافية",
-        "download_summary": "ملخص التحميل",
-        "total_downloads": "إجمالي التحميلات:",
-        "highest_month": "أعلى شهر:",
-        "downloads_lower_case": "تحميلات"
-    },
+
     "orders": {
         "title": "الطلبات",
         "failed_to_fetch_orders": "فشل في جلب الطلبات",
@@ -1515,7 +1498,6 @@
         "settings": "الإعدادات",
         "sessions": "الجلسات",
         "library": "المكتبة",
-        "analytics": "تحليلات",
         "plans": "الخطط"
     },
     "email_templates": {
@@ -1722,8 +1704,6 @@
     "next_steps": "الخطوات التالية",
     "create_another_product": "إنشاء منتج آخر",
     "create_new_product": "إنشاء منتج جديد",
-    "enable_analytics": "تفعيل التحليلات",
-    "go_to_analytics": "الانتقال إلى التحليلات",
     "customize_emails": "تخصيص البريد الإلكتروني",
     "open_email_editor": "فتح محرر البريد الإلكتروني",
     "test_digital_product_with_order": "اختبار المنتج الرقمي مع طلب",

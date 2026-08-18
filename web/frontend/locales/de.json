@@ -764,24 +764,7 @@
             "storage": "Speicher"
         }
     },
-    "analytics": {
-        "title": "Analyse-Dashboard",
-        "downloads": "Downloads",
-        "downloads_by_country": "Downloads nach Land",
-        "n/a": "k. A.",
-        "download_over_time": "Downloads im Zeitverlauf",
-        "top_performing_products": "Top-Produkte",
-        "text": "Text",
-        "numeric": "Numerisch",
-        "product_name": "Produktname",
-        "next": "Weiter",
-        "previous": "Zurück",
-        "geographical_insights": "Geografische Einblicke",
-        "download_summary": "Download-Zusammenfassung",
-        "total_downloads": "Gesamte Downloads:",
-        "highest_month": "Bester Monat:",
-        "downloads_lower_case": "downloads"
-    },
+
     "orders": {
         "title": "Bestellungen",
         "failed_to_fetch_orders": "Bestellungen konnten nicht abgerufen werden",
@@ -1518,7 +1501,6 @@
         "settings": "Einstellungen",
         "sessions": "Sitzungen",
         "library": "Bibliothek",
-        "analytics": "Analysen",
         "plans": "Pläne"
     },
     "email_templates": {
@@ -1725,9 +1707,7 @@
         "next_steps": "Nächste Schritte",
         "create_another_product": "Weiteres Produkt erstellen",
         "create_new_product": "Neues Produkt erstellen",
-        "enable_analytics": "Analysen aktivieren",
-        "go_to_analytics": "Zu den Analysen",
-        "customize_emails": "E-Mails anpassen",
+                "customize_emails": "E-Mails anpassen",
         "open_email_editor": "E-Mail-Editor öffnen",
         "test_digital_product_with_order": "Digitales Produkt mit Bestellung testen",
         "test_digital_product": "Digitales Produkt testen",

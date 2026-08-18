@@ -50,7 +50,7 @@ const ProductPicker = (props) => {
                     primary
                     onClick={toggleProductPicker}
                 >
-                    {t("digtal_lottery.select_product") || "Select Product"}
+                    {t("createdigitalproduct.browse_products") || "Select Product"}
                 </Button>
             </BlockStack>
         </>
@@ -84,7 +84,7 @@ const ProductItem = (props) => {
 
                 <BlockStack gap="200">
                     <Text variant="bodyMd" color='subdued' as="p">
-                        {t("digtal_lottery.product") || "Product"}
+                        {t("digtal_product_listing.product") || "Product"}
                     </Text>
 
                     <Text variant="bodyMd" fontWeight="bold" as="h3">
@@ -98,7 +98,7 @@ const ProductItem = (props) => {
                     <div onClick={props.onEdit} style={{ cursor: 'pointer' }}>
                         <Link>
                             <Text variant="bodyLg" as="p">
-                                {t("digtal_lottery.edit") || "Edit"}
+                                {t("createdigitalproduct.edit_product") || "Edit"}
                             </Text>
                         </Link>
                     </div>

@@ -764,24 +764,7 @@
             "storage": "ストレージ"
         }
     },
-    "analytics": {
-        "title": "分析ダッシュボード",
-        "downloads": "ダウンロード数",
-        "downloads_by_country": "国別ダウンロード数",
-        "n/a": "N/A",
-        "download_over_time": "ダウンロード数の推移",
-        "top_performing_products": "パフォーマンスの高い製品",
-        "text": "テキスト",
-        "numeric": "数値",
-        "product_name": "製品名",
-        "next": "次へ",
-        "previous": "前へ",
-        "geographical_insights": "地理的インサイト",
-        "download_summary": "ダウンロード概要",
-        "total_downloads": "総ダウンロード数：",
-        "highest_month": "最高月：",
-        "downloads_lower_case": "ダウンロード"
-    },
+
     "orders": {
         "title": "注文",
         "failed_to_fetch_orders": "注文の取得に失敗しました",
@@ -1518,7 +1501,6 @@
         "settings": "設定",
         "sessions": "セッション",
         "library": "ライブラリ",
-        "analytics": "分析",
         "plans": "プラン"
     },
     "email_templates": {
@@ -1726,8 +1708,6 @@
     "next_steps": "次のステップ",
     "create_another_product": "別の商品を作成",
     "create_new_product": "新しい商品を作成",
-    "enable_analytics": "分析を有効化",
-    "go_to_analytics": "分析に進む",
     "customize_emails": "メールをカスタマイズ",
     "open_email_editor": "メールエディタを開く",
     "test_digital_product_with_order": "注文でデジタル商品をテスト",

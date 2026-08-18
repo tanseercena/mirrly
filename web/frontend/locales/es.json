@@ -764,24 +764,7 @@
             "storage": "Almacenamiento"
         }
     },
-    "analytics": {
-        "title": "Panel de Análisis",
-        "downloads": "Descargas",
-        "downloads_by_country": "Descargas por País",
-        "n/a": "N/A",
-        "download_over_time": "Descargas a lo Largo del Tiempo",
-        "top_performing_products": "Productos con Mejor Rendimiento",
-        "text": "texto",
-        "numeric": "numérico",
-        "product_name": "Nombre del Producto",
-        "next": "Siguiente",
-        "previous": "Anterior",
-        "geographical_insights": "Información Geográfica",
-        "download_summary": "Resumen de Descargas",
-        "total_downloads": "Total de Descargas:",
-        "highest_month": "Mes más alto:",
-        "downloads_lower_case": "descargas"
-    },
+
     "orders": {
         "title": "Pedidos",
         "failed_to_fetch_orders": "Error al obtener los pedidos",
@@ -1564,7 +1547,6 @@
         "settings": "Configuraciones",
         "sessions": "Sesiones",
         "library": "Biblioteca",
-        "analytics": "Analíticas",
         "plans": "Planes"
     },
     "email_templates": {
@@ -1771,9 +1753,7 @@
         "next_steps": "Próximos pasos",
         "create_another_product": "Crear otro producto",
         "create_new_product": "Crear nuevo producto",
-        "enable_analytics": "Habilitar analíticas",
-        "go_to_analytics": "Ir a analíticas",
-        "customize_emails": "Personalizar correos electrónicos",
+                "customize_emails": "Personalizar correos electrónicos",
         "open_email_editor": "Abrir editor de correos",
         "test_digital_product_with_order": "Probar producto digital con pedido",
         "test_digital_product": "Probar producto digital",
