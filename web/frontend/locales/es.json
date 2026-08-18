@@ -948,7 +948,7 @@
         "digital_productss": "productos digitales",
         "upload_csv_products": "Subir Productos CSV",
         "drag_and_drop_your_csv_files": "Arrastra y suelta tus archivos CSV",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Sube un archivo CSV para añadir rápidamente múltiples productos digitales a Digitally. Utiliza nuestra plantilla proporcionada para asegurar un formato adecuado.",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Sube un archivo CSV para añadir rápidamente múltiples productos digitales. Utiliza nuestra plantilla proporcionada para asegurar un formato adecuado.",
         "uploaded_file": "Archivo Subido:",
         "download_the_csv_template_here": "Descargar la plantilla CSV aquí",
         "close": "Cerrar",
@@ -1562,7 +1562,7 @@
         "digital_products": "Productos digitales",
         "digital_lottery": "Lotería digital",
         "settings": "Configuraciones",
-        "orders": "Pedidos",
+        "sessions": "Sesiones",
         "library": "Biblioteca",
         "analytics": "Analíticas",
         "plans": "Planes"

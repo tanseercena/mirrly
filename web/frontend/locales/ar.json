@@ -950,7 +950,7 @@
         "digital_productss": "منتجات رقمية",
         "upload_csv_products": "رفع منتجات CSV",
         "drag_and_drop_your_csv_files": "اسحب وأفلت ملفات CSV الخاصة بك",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "قم برفع ملف CSV لإضافة عدة منتجات رقمية إلى Digitally بسرعة. استخدم القالب المقدم لضمان التنسيق الصحيح.",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "قم برفع ملف CSV لإضافة عدة منتجات رقمية بسرعة. استخدم القالب المقدم لضمان التنسيق الصحيح.",
         "uploaded_file": "الملف المرفوع:",
         "download_the_csv_template_here": "حمّل قالب CSV من هنا",
         "close": "إغلاق",
@@ -1513,7 +1513,7 @@
         "digital_products": "المنتجات الرقمية",
         "digital_lottery": "اليانصيب الرقمي",
         "settings": "الإعدادات",
-        "orders": "الطلبات",
+        "sessions": "الجلسات",
         "library": "المكتبة",
         "analytics": "تحليلات",
         "plans": "الخطط"

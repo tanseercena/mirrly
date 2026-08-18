@@ -948,7 +948,7 @@
         "digital_productss": "Digitale produkter",
         "upload_csv_products": "Upload CSV-produkter",
         "drag_and_drop_your_csv_files": "Træk og slip dine CSV-filer",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Upload en CSV-fil for hurtigt at tilføje flere digitale produkter til Digitally. Brug den medfølgende skabelon for korrekt format.",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Upload en CSV-fil for hurtigt at tilføje flere digitale produkter. Brug den medfølgende skabelon for korrekt format.",
         "uploaded_file": "Uploadet fil:",
         "download_the_csv_template_here": "Download CSV-skabelonen her",
         "close": "Luk",
@@ -1515,7 +1515,7 @@
         "digital_products": "Digitale produkter",
         "digital_lottery": "Digitalt lotteri",
         "settings": "Indstillinger",
-        "orders": "Ordrer",
+        "sessions": "Sessioner",
         "library": "Bibliotek",
         "analytics": "Analyser",
         "plans": "Planer"

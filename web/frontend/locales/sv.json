@@ -984,7 +984,7 @@
         "digital_productss": "digitala produkter",
         "upload_csv_products": "Ladda upp CSV-produkter",
         "drag_and_drop_your_csv_files": "Dra och släpp dina CSV-filer",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Ladda upp en CSV-fil för att snabbt lägga till flera digitala produkter till Digitally. Använd vår medföljande mall för att säkerställa korrekt formatering.",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Ladda upp en CSV-fil för att snabbt lägga till flera digitala produkter. Använd vår medföljande mall för att säkerställa korrekt formatering.",
         "uploaded_file": "Uppladdad fil:",
         "download_the_csv_template_here": "Ladda ner CSV-mallen här",
         "close": "Stäng",
@@ -1552,7 +1552,7 @@
         "digital_products": "Digitala produkter",
         "digital_lottery": "Digitalt lotteri",
         "settings": "Inställningar",
-        "orders": "Beställningar",
+        "sessions": "Sessioner",
         "library": "Bibliotek",
         "analytics": "Analys",
         "plans": "Planer"

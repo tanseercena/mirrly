@@ -24,14 +24,14 @@ export default function App() {
                 <ReviewProvider>
                     <QueryProvider>
                         <NavMenu>
-                            <Link to="/digitalProducts">{t("sidebar.digital_products")}</Link>
+                            <Link to="/products">{t("sidebar.digital_products")}</Link>
                             {/* <Link to="/DigitalLottery">{t("sidebar.digital_lottery")}</Link> */}
-                            <Link to="/Settings/Email">{t("sidebar.settings")}</Link>
-                            <Link to="/orders">{t("sidebar.orders")}</Link>
+                            <Link to="/settings">{t("sidebar.settings")}</Link>
+                            <Link to="/sessions">{t("sidebar.sessions")}</Link>
                             <Link to="/library">{t("sidebar.library")}</Link>
                             <Link to="/EmailTemplates">{t("email_templates.title")}</Link>
                             <Link to="/analytics">{t("sidebar.analytics")}</Link>
-                            <Link to="/pricing">{t("sidebar.plans")}</Link>
+                            <Link to="/plans">{t("sidebar.plans")}</Link>
                         </NavMenu>
                         <AppProvider>
                             <Routes pages={pages} />

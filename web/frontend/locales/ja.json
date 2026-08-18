@@ -948,7 +948,7 @@
         "digital_productss": "デジタル製品",
         "upload_csv_products": "CSV製品をアップロード",
         "drag_and_drop_your_csv_files": "CSVファイルをドラッグアンドドロップ",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "CSVファイルをアップロードして、複数のデジタル製品をDigitallyにすばやく追加します。適切なフォーマットを確保するために、提供されたテンプレートを使用してください。",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "CSVファイルをアップロードして、複数のデジタル製品をすばやく追加します。適切なフォーマットを確保するために、提供されたテンプレートを使用してください。",
         "uploaded_file": "アップロードされたファイル：",
         "download_the_csv_template_here": "CSVテンプレートをここでダウンロード",
         "close": "閉じる",
@@ -1516,7 +1516,7 @@
         "digital_products": "デジタル製品",
         "digital_lottery": "デジタルくじ",
         "settings": "設定",
-        "orders": "注文",
+        "sessions": "セッション",
         "library": "ライブラリ",
         "analytics": "分析",
         "plans": "プラン"

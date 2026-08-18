@@ -27,7 +27,7 @@
         "digital_productss": "数字产品",
         "upload_csv_products": "上传 CSV 产品",
         "drag_and_drop_your_csv_files": "将您的 CSV 文件拖放到此处",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "上传 CSV 文件以快速将多个数字产品添加到 Digitally。请使用我们提供的模板以确保正确的格式。",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "上传 CSV 文件以快速将多个数字产品添加。请使用我们提供的模板以确保正确的格式。",
         "uploaded_file": "已上传文件：",
         "download_the_csv_template_here": "在此处下载 CSV 模板",
         "close": "关闭",
@@ -1551,7 +1551,7 @@
         "digital_products": "数字产品",
         "digital_lottery": "数字抽奖",
         "settings": "设置",
-        "orders": "订单",
+        "sessions": "会话",
         "library": "资料库",
         "analytics": "分析",
         "plans": "方案"

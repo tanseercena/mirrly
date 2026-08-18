@@ -58,35 +58,61 @@ const formatDate = (date) =>
 const SessionFunnelDateFilter = () => {
     const { t } = useTranslation();
     const [popoverActive, setPopoverActive] = useState(false);
+
+    // Committed state (only updated on Apply)
     const [selectedRangeValue, setSelectedRangeValue] = useState('last30');
     const [selectedDates, setSelectedDates] = useState(getRangeDates('last30'));
+
+    // Temporary state for popover UI
+    const [tempRangeValue, setTempRangeValue] = useState('last30');
+    const [tempDates, setTempDates] = useState(getRangeDates('last30'));
+
     const [{ month, year }, setMonthYear] = useState({
         month: selectedDates.end.getMonth(),
         year: selectedDates.end.getFullYear(),
     });
     const RANGE_OPTIONS = getRangeOptions(t);
 
-    const togglePopoverActive = useCallback(() => setPopoverActive((active) => !active), []);
+    const togglePopoverActive = useCallback(() => {
+        setPopoverActive((active) => !active);
+        // Reset temp state to committed state when opening
+        if (!popoverActive) {
+            setTempRangeValue(selectedRangeValue);
+            setTempDates(selectedDates);
+            setMonthYear({ month: selectedDates.end.getMonth(), year: selectedDates.end.getFullYear() });
+        }
+    }, [popoverActive, selectedRangeValue, selectedDates]);
 
     const handleMonthChange = useCallback((month, year) => setMonthYear({ month, year }), []);
 
     const handleOptionSelect = useCallback((value) => {
         const [selected] = value;
-        setSelectedRangeValue(selected);
+        setTempRangeValue(selected);
         if (selected !== 'custom') {
             const range = getRangeDates(selected);
-            setSelectedDates(range);
+            setTempDates(range);
             setMonthYear({ month: range.end.getMonth(), year: range.end.getFullYear() });
         }
     }, []);
 
     const handleDatePickerChange = useCallback(({ start, end }) => {
-        setSelectedDates({ start, end });
-        setSelectedRangeValue('custom');
+        setTempDates({ start, end });
+        setTempRangeValue('custom');
     }, []);
 
-    const handleApply = useCallback(() => setPopoverActive(false), []);
-    const handleCancel = useCallback(() => setPopoverActive(false), []);
+    const handleApply = useCallback(() => {
+        // Commit the temp state
+        setSelectedRangeValue(tempRangeValue);
+        setSelectedDates(tempDates);
+        setPopoverActive(false);
+    }, [tempRangeValue, tempDates]);
+
+    const handleCancel = useCallback(() => {
+        // Reset temp state to committed state
+        setTempRangeValue(selectedRangeValue);
+        setTempDates(selectedDates);
+        setPopoverActive(false);
+    }, [selectedRangeValue, selectedDates]);
 
     const activeLabel = RANGE_OPTIONS.find((option) => option.value === selectedRangeValue)?.label;
     const buttonLabel =
@@ -111,7 +137,7 @@ const SessionFunnelDateFilter = () => {
                         <div style={{ minWidth: '180px', padding: '8px', borderInlineEnd: '1px solid var(--p-color-border-subdued)' }}>
                             <OptionList
                                 options={RANGE_OPTIONS}
-                                selected={[selectedRangeValue]}
+                                selected={[tempRangeValue]}
                                 onChange={handleOptionSelect}
                             />
                         </div>
@@ -121,7 +147,7 @@ const SessionFunnelDateFilter = () => {
                                 year={year}
                                 onChange={handleDatePickerChange}
                                 onMonthChange={handleMonthChange}
-                                selected={selectedDates}
+                                selected={tempDates}
                                 allowRange
                             />
                         </div>

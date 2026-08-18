@@ -984,7 +984,7 @@
         "digital_productss": "digitale producten",
         "upload_csv_products": "CSV-producten uploaden",
         "drag_and_drop_your_csv_files": "Sleep uw CSV-bestanden hierheen",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Upload een CSV-bestand om snel meerdere digitale producten toe te voegen aan Digitally. Gebruik onze meegeleverde sjabloon om de juiste opmaak te garanderen.",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Upload een CSV-bestand om snel meerdere digitale producten toe te voegen. Gebruik onze meegeleverde sjabloon om de juiste opmaak te garanderen.",
         "uploaded_file": "Geüpload bestand:",
         "download_the_csv_template_here": "Download de CSV-sjabloon hier",
         "close": "Sluiten",
@@ -1552,7 +1552,7 @@
         "digital_products": "Digitale producten",
         "digital_lottery": "Digitale loterij",
         "settings": "Instellingen",
-        "orders": "Bestellingen",
+        "sessions": "Sessies",
         "library": "Bibliotheek",
         "analytics": "Analyse",
         "plans": "Plannen"
