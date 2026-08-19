@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Page,
@@ -28,6 +28,11 @@ const PlansPage = () => {
     const { t } = useTranslation();
     const [cycle, setCycle] = useState('monthly');
     const [selectedPlan, setSelectedPlan] = useState('growth');
+    const pricingSectionRef = useRef(null);
+
+    const scrollToPricing = () => {
+        pricingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
 
     /* ============================================
         SEGMENTED TOGGLE (Monthly / Yearly)
@@ -372,7 +377,7 @@ const PlansPage = () => {
                                 </Text>
                             </BlockStack>
                         </InlineStack>
-                        <Button disclosure>{t('plans_page.change_plan')}</Button>
+                        <Button disclosure onClick={scrollToPricing}>{t('plans_page.change_plan')}</Button>
                     </InlineStack>
                 </Box>
             </div>
@@ -516,7 +521,7 @@ const PlansPage = () => {
                     </BlockStack>
                 </InlineStack>
                 <div style={{ flexShrink: 0 }}>
-                    <Button>{t('plans_page.upgrade_to_growth')}</Button>
+                    <Button>{t('plans_page.upgrade_to_growth_btn')}</Button>
                 </div>
             </InlineStack>
         </div>
@@ -526,7 +531,8 @@ const PlansPage = () => {
         PRICING SECTION
         ============================================ */
     const PricingSection = () => (
-        <BlockStack gap="400">
+        <div ref={pricingSectionRef}>
+            <BlockStack gap="400">
             <InlineStack align="space-between" blockAlign="start">
                 <BlockStack gap="050">
                     <Text variant="headingLg" as="h2" fontWeight={600}>
@@ -571,6 +577,7 @@ const PlansPage = () => {
                 </InlineStack>
             </InlineStack>
         </BlockStack>
+        </div>
     );
 
     return (
@@ -585,9 +592,9 @@ const PlansPage = () => {
                             {t('plans_page.billing_subtitle')}
                         </Text>
                     </BlockStack>
-                    <Button icon={CreditCardIcon} disclosure>
+                    {/* <Button icon={CreditCardIcon} disclosure>
                         {t('plans_page.manage_payment_method')}
-                    </Button>
+                    </Button> */}
                 </InlineStack>
 
                 <CurrentPlanCard />
