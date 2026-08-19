@@ -764,24 +764,7 @@
             "storage": "Armazenamento"
         }
     },
-    "analytics": {
-        "title": "Painel de Análise",
-        "downloads": "Downloads",
-        "downloads_by_country": "Downloads por País",
-        "n/a": "N/A",
-        "download_over_time": "Downloads ao Longo do Tempo",
-        "top_performing_products": "Produtos de Melhor Desempenho",
-        "text": "texto",
-        "numeric": "numérico",
-        "product_name": "Nome do Produto",
-        "next": "Próximo",
-        "previous": "Anterior",
-        "geographical_insights": "Informações Geográficas",
-        "download_summary": "Resumo de Downloads",
-        "total_downloads": "Total de Downloads:",
-        "highest_month": "Mês de maior movimento:",
-        "downloads_lower_case": "downloads"
-    },
+
     "orders": {
         "title": "Pedidos",
         "failed_to_fetch_orders": "Falha ao buscar pedidos",
@@ -984,7 +967,7 @@
         "digital_productss": "produtos digitais",
         "upload_csv_products": "Carregar Produtos CSV",
         "drag_and_drop_your_csv_files": "Arraste e solte seus arquivos CSV",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Carregue um arquivo CSV para adicionar rapidamente vários produtos digitais ao Digitally. Use nosso modelo fornecido para garantir a formatação correta.",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Carregue um arquivo CSV para adicionar rapidamente vários produtos digitais. Use nosso modelo fornecido para garantir a formatação correta.",
         "uploaded_file": "Arquivo Carregado:",
         "download_the_csv_template_here": "Baixe o modelo CSV aqui",
         "close": "Fechar",
@@ -1552,9 +1535,8 @@
         "digital_products": "Produtos digitais",
         "digital_lottery": "Loteria digital",
         "settings": "Configurações",
-        "orders": "Pedidos",
+        "sessions": "Sessões",
         "library": "Biblioteca",
-        "analytics": "Análises",
         "plans": "Planos"
     },
     "email_templates": {
@@ -1762,9 +1744,7 @@
             "next_steps": "Próximos passos",
             "create_another_product": "Criar outro produto",
             "create_new_product": "Criar novo produto",
-            "enable_analytics": "Ativar análises",
-            "go_to_analytics": "Ir para análises",
-            "customize_emails": "Personalizar e-mails",
+                            "customize_emails": "Personalizar e-mails",
             "open_email_editor": "Abrir editor de e-mail",
             "test_digital_product_with_order": "Testar produto digital com pedido",
             "test_digital_product": "Testar produto digital",

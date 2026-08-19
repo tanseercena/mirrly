@@ -1,85 +1,11 @@
-/* Fix side spacing for screens below 490px on index page */
-@media (max-width: 490px) {
-  /* Ensure Page component has proper horizontal padding below 490px */
-  .Polaris-Page {
-    /* padding-left: var(--p-space-400) !important;
-    padding-right: var(--p-space-400) !important;
-    padding-bottom: 50px !important;
-    margin-bottom: 50px !important;
-    margin-left: 10px; */
-  }
+/* ============================================
+   Dashboard Page - Polaris Native Implementation
+   ============================================ */
 
-  /* Reduce top spacing when banner/setup card are hidden */
-  .index-page-container .Polaris-Layout {
-    /* margin-top: calc(var(--p-space-100) * -0.5) !important; */
-  }
+/* This dashboard is built using Shopify Polaris components and their native styling.
+   No custom CSS is needed for layout, spacing, or component styling. */
 
-  .Polaris-Page__Content {
-    /* padding-left: 0 !important;
-    padding-right: 0 !important; */
-  }
-
-  /* Ensure Layout sections have proper spacing */
-  .Polaris-LegacyStack,
-  .Polaris-Layout__Section {
-    /* padding-left: 0 !important;
-    padding-right: 0 !important; */
-  }
-
-  /* Fix Card component spacing on small screens */
-  .Polaris-LegacyCard {
-    /* margin-left: calc(var(--p-space-400) * -1) !important;
-    margin-right: calc(var(--p-space-400) * -1) !important;
-    width: calc(100% + var(--p-space-800)) !important;
-    max-width: calc(100% + var(--p-space-800)) !important; */
-  }
-
-  /* Fix Banner component side spacing specifically */
-  .Polaris-Banner {
-    /* margin-left: var(--p-space-100) !important;
-    margin-right: var(--p-space-100) !important; */
-  }
-
-  /* Ensure consistent vertical spacing between all cards and banners */
-  .Polaris-Layout__Section {
-    /* margin-bottom: var(--p-space-100) !important; */
-  }
-
-  /* Reduce top spacing for first section when banner/setup card are hidden */
-  .Polaris-Layout__Section:first-child {
-    /* margin-top: calc(var(--p-space-100) * -0.5) !important; */
-  }
-
-  /* Reduce Layout top margin to minimize spacing below Dashboard title */
-  .Polaris-Layout {
-    /* margin-top: calc(var(--p-space-200) * -1) !important; */
-  }
-
-  .Polaris-Layout__Section:last-child {
-    /* margin-bottom: 0 !important; */
-  }
-
-  /* Add 30px margin-top to Crisp chat widget */
-  .crisp-client .crisp-box {
-    margin-top: 30px !important;
-  }
-
-  #crisp-chatbox,
-  .crisp-client {
-    margin-top: 30px !important;
-  }
-
-  /* Fix any overflow issues */
-  .Polaris-Page--fullWidth,
-  .Polaris-Page--narrowWidth,
-  .Polaris-Layout {
-    overflow-x: hidden;
-  }
-
-  /* Ensure content doesn't overflow */
-  .Polaris-BlockStack,
-  .Polaris-Layout__Section > * {
-    max-width: 100%;
-    overflow-wrap: break-word;
-  }
-}
+/* If you need to add custom styles in the future, please ensure they are:
+   1. Not duplicating Polaris functionality
+   2. Following Polaris design principles
+   3. Minimal and scoped to specific needs */

@@ -766,24 +766,7 @@
             "storage": "التخزين"
         }
     },
-    "analytics": {
-        "title": "لوحة التحليلات",
-        "downloads": "التحميلات",
-        "downloads_by_country": "التحميلات حسب البلد",
-        "n/a": "غير متاح",
-        "download_over_time": "التحميلات عبر الزمن",
-        "top_performing_products": "أفضل المنتجات أداءً",
-        "text": "نص",
-        "numeric": "رقمي",
-        "product_name": "اسم المنتج",
-        "next": "التالي",
-        "previous": "السابق",
-        "geographical_insights": "الأفكار الجغرافية",
-        "download_summary": "ملخص التحميل",
-        "total_downloads": "إجمالي التحميلات:",
-        "highest_month": "أعلى شهر:",
-        "downloads_lower_case": "تحميلات"
-    },
+
     "orders": {
         "title": "الطلبات",
         "failed_to_fetch_orders": "فشل في جلب الطلبات",
@@ -950,7 +933,7 @@
         "digital_productss": "منتجات رقمية",
         "upload_csv_products": "رفع منتجات CSV",
         "drag_and_drop_your_csv_files": "اسحب وأفلت ملفات CSV الخاصة بك",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "قم برفع ملف CSV لإضافة عدة منتجات رقمية إلى Digitally بسرعة. استخدم القالب المقدم لضمان التنسيق الصحيح.",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "قم برفع ملف CSV لإضافة عدة منتجات رقمية بسرعة. استخدم القالب المقدم لضمان التنسيق الصحيح.",
         "uploaded_file": "الملف المرفوع:",
         "download_the_csv_template_here": "حمّل قالب CSV من هنا",
         "close": "إغلاق",
@@ -1513,9 +1496,8 @@
         "digital_products": "المنتجات الرقمية",
         "digital_lottery": "اليانصيب الرقمي",
         "settings": "الإعدادات",
-        "orders": "الطلبات",
+        "sessions": "الجلسات",
         "library": "المكتبة",
-        "analytics": "تحليلات",
         "plans": "الخطط"
     },
     "email_templates": {
@@ -1722,8 +1704,6 @@
     "next_steps": "الخطوات التالية",
     "create_another_product": "إنشاء منتج آخر",
     "create_new_product": "إنشاء منتج جديد",
-    "enable_analytics": "تفعيل التحليلات",
-    "go_to_analytics": "الانتقال إلى التحليلات",
     "customize_emails": "تخصيص البريد الإلكتروني",
     "open_email_editor": "فتح محرر البريد الإلكتروني",
     "test_digital_product_with_order": "اختبار المنتج الرقمي مع طلب",

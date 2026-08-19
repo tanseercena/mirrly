@@ -27,7 +27,7 @@
         "digital_productss": "数字产品",
         "upload_csv_products": "上传 CSV 产品",
         "drag_and_drop_your_csv_files": "将您的 CSV 文件拖放到此处",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "上传 CSV 文件以快速将多个数字产品添加到 Digitally。请使用我们提供的模板以确保正确的格式。",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "上传 CSV 文件以快速将多个数字产品添加。请使用我们提供的模板以确保正确的格式。",
         "uploaded_file": "已上传文件：",
         "download_the_csv_template_here": "在此处下载 CSV 模板",
         "close": "关闭",
@@ -1355,24 +1355,7 @@
             "storage": "存储"
         }
     },
-    "analytics": {
-        "title": "分析仪表板",
-        "downloads": "下载",
-        "downloads_by_country": "按国家/地区下载",
-        "n/a": "不适用",
-        "download_over_time": "随时间变化的下载量",
-        "top_performing_products": "表现最佳的产品",
-        "text": "文本",
-        "numeric": "数字",
-        "product_name": "产品名称",
-        "next": "下一页",
-        "previous": "上一页",
-        "geographical_insights": "地理洞察",
-        "download_summary": "下载摘要",
-        "total_downloads": "总下载量：",
-        "highest_month": "最高月份：",
-        "downloads_lower_case": "下载"
-    },
+
     "orders": {
         "title": "订单",
         "failed_to_fetch_orders": "获取订单失败",
@@ -1551,9 +1534,8 @@
         "digital_products": "数字产品",
         "digital_lottery": "数字抽奖",
         "settings": "设置",
-        "orders": "订单",
+        "sessions": "会话",
         "library": "资料库",
-        "analytics": "分析",
         "plans": "方案"
     },
     "email_templates": {
@@ -1769,8 +1751,6 @@
     "next_steps": "下一步",
     "create_another_product": "创建另一个产品",
     "create_new_product": "创建新产品",
-    "enable_analytics": "启用分析",
-    "go_to_analytics": "前往分析",
     "customize_emails": "自定义邮件",
     "open_email_editor": "打开邮件编辑器",
     "test_digital_product_with_order": "通过订单测试数字产品",

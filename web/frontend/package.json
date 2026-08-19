@@ -23,7 +23,7 @@
         "@shopify/i18next-shopify": "^0.2.11",
         "@shopify/polaris": "^12.1.1",
         "@shopify/polaris-icons": "^9.3.1",
-        "@shopify/polaris-viz": "^15.0.4",
+        "@shopify/polaris-viz": "^16.16.0",
         "@shopify/react-form": "^2.5.0",
         "@smastrom/react-rating": "^1.5.0",
         "@vitejs/plugin-react": "4.0.0",

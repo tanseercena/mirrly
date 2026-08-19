@@ -764,24 +764,7 @@
             "storage": "Lagring"
         }
     },
-    "analytics": {
-        "title": "Analysinstrumentpanel",
-        "downloads": "Nedladdningar",
-        "downloads_by_country": "Nedladdningar per land",
-        "n/a": "Ej tillgängligt",
-        "download_over_time": "Nedladdningar över tid",
-        "top_performing_products": "Bäst presterande produkter",
-        "text": "text",
-        "numeric": "numerisk",
-        "product_name": "Produktnamn",
-        "next": "Nästa",
-        "previous": "Föregående",
-        "geographical_insights": "Geografiska insikter",
-        "download_summary": "Nedladdningssammanfattning",
-        "total_downloads": "Totalt antal nedladdningar:",
-        "highest_month": "Högsta månad:",
-        "downloads_lower_case": "nedladdningar"
-    },
+
     "orders": {
         "title": "Beställningar",
         "failed_to_fetch_orders": "Kunde inte hämta beställningar",
@@ -984,7 +967,7 @@
         "digital_productss": "digitala produkter",
         "upload_csv_products": "Ladda upp CSV-produkter",
         "drag_and_drop_your_csv_files": "Dra och släpp dina CSV-filer",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Ladda upp en CSV-fil för att snabbt lägga till flera digitala produkter till Digitally. Använd vår medföljande mall för att säkerställa korrekt formatering.",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Ladda upp en CSV-fil för att snabbt lägga till flera digitala produkter. Använd vår medföljande mall för att säkerställa korrekt formatering.",
         "uploaded_file": "Uppladdad fil:",
         "download_the_csv_template_here": "Ladda ner CSV-mallen här",
         "close": "Stäng",
@@ -1552,9 +1535,8 @@
         "digital_products": "Digitala produkter",
         "digital_lottery": "Digitalt lotteri",
         "settings": "Inställningar",
-        "orders": "Beställningar",
+        "sessions": "Sessioner",
         "library": "Bibliotek",
-        "analytics": "Analys",
         "plans": "Planer"
     },
     "email_templates": {
@@ -1762,8 +1744,6 @@
     "next_steps": "Nästa steg",
     "create_another_product": "Skapa en annan produkt",
     "create_new_product": "Skapa ny produkt",
-    "enable_analytics": "Aktivera analys",
-    "go_to_analytics": "Gå till analys",
     "customize_emails": "Anpassa e-postmeddelanden",
     "open_email_editor": "Öppna e-postredigerare",
     "test_digital_product_with_order": "Testa digital produkt med beställning",

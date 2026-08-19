@@ -178,9 +178,6 @@ const Step1 = ({ onComplete }) => {
     const [inputCustomLinkValue, setInputCustomLinkValue] = useState("");
     const [searchCustomLinkOptions, setSearchCustomLinkOptions] = useState([]);
 
-    const [emailTemplateType, setEmailTemplateType] = useState("default");
-    const [emailTemplateId, setEmailTemplateId] = useState();
-    const [emailTemplates, setEmailTemplates] = useState();
     const [pasteKeysValue, setPasteKeysValue] = useState("");
 
     const [isPdfStampingEnabled, setIsPdfStampingEnabled] = useState(false);
@@ -766,10 +763,6 @@ const Step1 = ({ onComplete }) => {
 
     const handleSelectChange = (value) => {
         setSelected(value);
-    };
-
-    const handleEmailTemplateChange = (value) => {
-        setEmailTemplateId(value);
     };
 
     const handleAutoFulfillCheckbox = (checked) => {
@@ -1365,25 +1358,6 @@ const Step1 = ({ onComplete }) => {
         };
 
         fetchUserPlan();
-    }, []);
-
-    useEffect(() => {
-        const getEmailTemplates = async () => {
-            try {
-                const response = await fetch("/api/get-custom-templates");
-                const data = await response.json();
-                // setUserPlan(data.plan);
-                setEmailTemplates(data.templates);
-                if (data.templates.length === 1) {
-                    setEmailTemplateId(data.templates[0].id);
-                }
-                setDefaultTemplateId(data.defaultTemplateId);
-            } catch (error) {
-                console.error("Failed to fetch user plan:", error);
-            }
-        };
-
-        getEmailTemplates();
     }, []);
 
     const isLicenseActionDisabled = () => {
@@ -2062,17 +2036,6 @@ const handleSave = useCallback(async (additionalData = {}) => {
         formData.append("status", statusValue);
         formData.append("content_type", uniqueContentType.join(", "));
         formData.append("shop", store.shopify_domain);
-
-        formData.append("email_template_type", emailTemplateType);
-        const templateId =
-            emailTemplateType === "custom"
-                ? emailTemplateId
-                : defaultTemplateId;
-
-        // if(emailTemplateType === 'custom') {
-        //     formData.append('email_template_id', emailTemplateId)
-        // }
-        formData.append("email_template_id", templateId);
 
         const xhr = new XMLHttpRequest();
 

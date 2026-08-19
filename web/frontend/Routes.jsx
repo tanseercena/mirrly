@@ -83,8 +83,6 @@ function useRoutes(pages) {
 
     // Manual dynamic routes (for specific cases)
     const manualDynamicRoutes = {
-        'SingleOrder.jsx': '/singleOrder/:id',
-        'EditDigitalProduct.jsx': '/editDigitalProduct/:id',
         // Add specific routes here
     };
 

@@ -764,24 +764,7 @@
             "storage": "Lagerplads"
         }
     },
-    "analytics": {
-        "title": "Analyse-dashboard",
-        "downloads": "Downloads",
-        "downloads_by_country": "Downloads pr. land",
-        "n/a": "Ikke relevant",
-        "download_over_time": "Downloads over tid",
-        "top_performing_products": "Bedst ydende produkter",
-        "text": "tekst",
-        "numeric": "numerisk",
-        "product_name": "Produktnavn",
-        "next": "Næste",
-        "previous": "Forrige",
-        "geographical_insights": "Geografiske indsigter",
-        "download_summary": "Downloadoversigt",
-        "total_downloads": "Totalt antal downloads:",
-        "highest_month": "Højeste måned:",
-        "downloads_lower_case": "downloads"
-    },
+
     "orders": {
         "title": "Ordrer",
         "failed_to_fetch_orders": "Kunne ikke hente ordrer",
@@ -948,7 +931,7 @@
         "digital_productss": "Digitale produkter",
         "upload_csv_products": "Upload CSV-produkter",
         "drag_and_drop_your_csv_files": "Træk og slip dine CSV-filer",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Upload en CSV-fil for hurtigt at tilføje flere digitale produkter til Digitally. Brug den medfølgende skabelon for korrekt format.",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Upload en CSV-fil for hurtigt at tilføje flere digitale produkter. Brug den medfølgende skabelon for korrekt format.",
         "uploaded_file": "Uploadet fil:",
         "download_the_csv_template_here": "Download CSV-skabelonen her",
         "close": "Luk",
@@ -1515,9 +1498,8 @@
         "digital_products": "Digitale produkter",
         "digital_lottery": "Digitalt lotteri",
         "settings": "Indstillinger",
-        "orders": "Ordrer",
+        "sessions": "Sessioner",
         "library": "Bibliotek",
-        "analytics": "Analyser",
         "plans": "Planer"
     },
     "email_templates": {
@@ -1724,9 +1706,7 @@
         "next_steps": "Næste trin",
         "create_another_product": "Opret et andet produkt",
         "create_new_product": "Opret nyt produkt",
-        "enable_analytics": "Aktiver analyse",
-        "go_to_analytics": "Gå til analyse",
-        "customize_emails": "Tilpas e-mails",
+                "customize_emails": "Tilpas e-mails",
         "open_email_editor": "Åbn e-mail editor",
         "test_digital_product_with_order": "Test digitalt produkt med ordre",
         "test_digital_product": "Test digitalt produkt",

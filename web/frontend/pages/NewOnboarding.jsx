@@ -202,9 +202,6 @@ export default function NewOnboarding() {
     const [inputLicenseValue, setInputLicenseValue] = useState("");
     const [searchLicenseOptions, setSearchLicenseOptions] = useState([]);
 
-    const [emailTemplateType, setEmailTemplateType] = useState("");
-    const [emailTemplateId, setEmailTemplateId] = useState();
-    const [emailTemplates, setEmailTemplates] = useState();
     const [pasteKeysValue, setPasteKeysValue] = useState("");
 
     const [isPdfStampingEnabled, setIsPdfStampingEnabled] = useState(false);
@@ -235,9 +232,6 @@ export default function NewOnboarding() {
             const response = await fetch("/api/check-new-user");
             const data = await response.json();
             setIsNewUser(data.isNewUser);
-            if (data.isNewUser) {
-                setEmailTemplateType("default");
-            }
         } catch (error) {
             console.error("Failed to fetch user plan:", error);
         } finally {
@@ -705,8 +699,6 @@ export default function NewOnboarding() {
         // Reset only tracked fields to initial data
         setSelectedProduct(initialData.selectedProduct || null);
         setSelected(initialData.selected || "active");
-        setEmailTemplateType(initialData.emailTemplateType || "default");
-        setEmailTemplateId(initialData.emailTemplateId || null);
         setIsDownloadExpirationEnabled(
             initialData.isDownloadExpirationEnabled || false
         );
@@ -905,18 +897,6 @@ export default function NewOnboarding() {
 
             formData.append("shop", store.shopify_domain);
 
-            formData.append("email_template_type", emailTemplateType);
-            let templateId = "";
-            //if(isNewUser) {
-            templateId =
-                emailTemplateType === "custom"
-                    ? emailTemplateId
-                    : defaultTemplateId;
-            //}
-
-
-            formData.append("email_template_id", templateId);
-
             const xhr = new XMLHttpRequest();
 
             // Track progress
@@ -1057,7 +1037,7 @@ export default function NewOnboarding() {
 
     const handleCreateNewProduct = useCallback(async () => {
         await handleSave();
-        navigate("/EmailTemplates");
+        navigate("/products");
     }, [navigate, handleSave]);
 
 

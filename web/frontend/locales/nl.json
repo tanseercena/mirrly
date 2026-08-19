@@ -764,24 +764,7 @@
             "storage": "Opslag"
         }
     },
-    "analytics": {
-        "title": "Analyse-dashboard",
-        "downloads": "Downloads",
-        "downloads_by_country": "Downloads per land",
-        "n/a": "N.v.t.",
-        "download_over_time": "Downloads in de loop van de tijd",
-        "top_performing_products": "Best presterende producten",
-        "text": "tekst",
-        "numeric": "numeriek",
-        "product_name": "Productnaam",
-        "next": "Volgende",
-        "previous": "Vorige",
-        "geographical_insights": "Geografische inzichten",
-        "download_summary": "Downloadoverzicht",
-        "total_downloads": "Totaal aantal downloads:",
-        "highest_month": "Hoogste maand:",
-        "downloads_lower_case": "downloads"
-    },
+
     "orders": {
         "title": "Bestellingen",
         "failed_to_fetch_orders": "Bestellingen ophalen mislukt",
@@ -984,7 +967,7 @@
         "digital_productss": "digitale producten",
         "upload_csv_products": "CSV-producten uploaden",
         "drag_and_drop_your_csv_files": "Sleep uw CSV-bestanden hierheen",
-        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Upload een CSV-bestand om snel meerdere digitale producten toe te voegen aan Digitally. Gebruik onze meegeleverde sjabloon om de juiste opmaak te garanderen.",
+        "upload_a_csv_file_to_quickly_add_multiple_digital_products_to_digitally": "Upload een CSV-bestand om snel meerdere digitale producten toe te voegen. Gebruik onze meegeleverde sjabloon om de juiste opmaak te garanderen.",
         "uploaded_file": "Geüpload bestand:",
         "download_the_csv_template_here": "Download de CSV-sjabloon hier",
         "close": "Sluiten",
@@ -1552,9 +1535,8 @@
         "digital_products": "Digitale producten",
         "digital_lottery": "Digitale loterij",
         "settings": "Instellingen",
-        "orders": "Bestellingen",
+        "sessions": "Sessies",
         "library": "Bibliotheek",
-        "analytics": "Analyse",
         "plans": "Plannen"
     },
     "email_templates": {
@@ -1761,8 +1743,6 @@
     "next_steps": "Volgende stappen",
     "create_another_product": "Maak een ander product",
     "create_new_product": "Nieuw product maken",
-    "enable_analytics": "Analytics inschakelen",
-    "go_to_analytics": "Ga naar analytics",
     "customize_emails": "E-mails aanpassen",
     "open_email_editor": "Open e-maileditor",
     "test_digital_product_with_order": "Test digitaal product met bestelling",
