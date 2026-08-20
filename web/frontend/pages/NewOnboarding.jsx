@@ -88,7 +88,7 @@ export default function NewOnboarding() {
     const [showPhotoTip, setShowPhotoTip] = useState(false);
 
     // Step 5: Plan selection
-    const [selectedPlan, setSelectedPlan] = useState("starter"); // Default to starter plan
+    const [selectedPlan, setSelectedPlan] = useState("growth"); // Default to growth plan
     const [billingPeriod, setBillingPeriod] = useState("monthly"); // "monthly" or "yearly"
 
     const totalSteps = 5;
@@ -5806,7 +5806,7 @@ export default function NewOnboarding() {
                                                     <p className="step5-subheading">{t("onboarding.plan_selection_subtitle")}</p>
 
                                                     {/* Billing Toggle */}
-                                                    {/*<div className="step5-billing-toggle">
+                                                    {/* <div className="step5-billing-toggle">
                                                         <button
                                                             className={`step5-toggle-option ${billingPeriod === 'monthly' ? 'active' : ''}`}
                                                             onClick={() => setBillingPeriod('monthly')}
@@ -5819,8 +5819,8 @@ export default function NewOnboarding() {
                                                         >
                                                             {t("onboarding.yearly_title")}
                                                             <span className="step5-toggle-discount">{t("onboarding.save_20_percent")}</span>
-                                                        </button> */}
-                                                    </div>
+                                                        </button> 
+                                                    </div> */}
 
                                                     {/* Plan Cards */}
                                                     <div className="step5-plan-cards">
@@ -5830,9 +5830,6 @@ export default function NewOnboarding() {
                                                             className={`step5-plan-card ${selectedPlan === "starter" ? "selected" : ""}`}
                                                             onClick={() => setSelectedPlan("starter")}
                                                         >
-                                                            {selectedPlan === "starter" && (
-                                                                <div className="step5-plan-badge recommended">{t("onboarding.recommended")}</div>
-                                                            )}
                                                             <div className="step5-plan-name">{t("onboarding.starter_plan")}</div>
                                                             <div className="step5-plan-price">{billingPeriod === 'yearly' ? t("onboarding.starter_yearly_price") : t("onboarding.starter_price")}</div>
                                                             <div className="step5-plan-subtitle">{t("onboarding.starter_sessions")}</div>
@@ -5930,6 +5927,7 @@ export default function NewOnboarding() {
                                                             className={`step5-plan-card ${selectedPlan === "scale" ? "selected" : ""}`}
                                                             onClick={() => setSelectedPlan("scale")}
                                                         >
+                                                            <div className="step5-plan-badge recommended">{t("onboarding.recommended")}</div>
                                                             <div className="step5-plan-name">{t("onboarding.scale_plan")}</div>
                                                             <div className="step5-plan-price">{billingPeriod === 'yearly' ? t("onboarding.scale_yearly_price") : t("onboarding.scale_price")}</div>
                                                             <div className="step5-plan-subtitle">{t("onboarding.unlimited_sessions")}</div>

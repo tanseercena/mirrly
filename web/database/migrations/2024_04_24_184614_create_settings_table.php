@@ -17,6 +17,9 @@ return new class extends Migration
             $table->enum("collection_type", ['all', 'specific'])->default('all');
             $table->json('collections')->nullable();
             $table->json('button_branding')->nullable();
+            $table->json('camera_fallback')->nullable();
+            $table->json('privacy_recording')->nullable();
+            $table->json('notification')->nullable();
             $table->timestamps();
         });
     }
