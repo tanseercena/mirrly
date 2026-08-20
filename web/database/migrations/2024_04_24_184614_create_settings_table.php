@@ -14,8 +14,12 @@ return new class extends Migration
         Schema::create('settings', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('store_id');
-            $table->boolean("send_email")->default(true);
-            $table->json('email_content')->nullable();
+            $table->enum("collection_type", ['all', 'specific'])->default('all');
+            $table->json('collections')->nullable();
+            $table->json('button_branding')->nullable();
+            $table->json('camera_fallback')->nullable();
+            $table->json('privacy_recording')->nullable();
+            $table->json('notification')->nullable();
             $table->timestamps();
         });
     }

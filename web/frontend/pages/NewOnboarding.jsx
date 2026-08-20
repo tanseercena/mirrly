@@ -88,72 +88,24 @@ export default function NewOnboarding() {
     const [showPhotoTip, setShowPhotoTip] = useState(false);
 
     // Step 5: Plan selection
-    const [selectedPlan, setSelectedPlan] = useState("starter"); // Default to starter plan
+    const [selectedPlan, setSelectedPlan] = useState("growth"); // Default to growth plan
     const [billingPeriod, setBillingPeriod] = useState("monthly"); // "monthly" or "yearly"
 
     const totalSteps = 5;
 
-    //s cr
+    // Store and navigation
     const { store } = React.useContext(AppContext);
     const shopify = useAppBridge();
     const navigate = useNavigate();
-    const [selected, setSelected] = useState("active");
-    const [autoFulfill, setAutoFulfill] = useState(false);
-    const [downloadLimit, setDownloadLimit] = useState("");
-    const [isDownloadLimitEnabled, setIsDownloadLimitEnabled] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState(null);
-    const [files, setFiles] = useState([]);
-    const [sampleFiles, setSampleFiles] = useState([]);
-    // const [filterLicenseValue, setFilterLicenseValue] = useState("");
-    // const [filterCustomValue, setFilterCustomValue] = useState("");
-    const [selectedMainTab, setSelectedMainTab] = useState(1);
-    const [tagInputValue, setTagInputValue] = useState("");
-    const [tags, setTags] = useState([]);
-    const [isPageLoading, setIsPageLoading] = useState(false);
-    const [contentType, setContentType] = useState([]);
-    const [saving, setSaving] = useState(false);
-    const [userPlan, setUserPlan] = useState("free");
-    const [fileStorageLimit, setFileStorageLimit] = useState(null);
-    const [currentFileStorage, setCurrentFileStorage] = useState(0);
-    const [fileSizeLimit, setFileSizeLimit] = useState("No limit");
-    const [digitalProducts, setDigitalProducts] = useState([]);
-    const [digitalProductsLimit, setDigitalProductsLimit] = useState(0);
-    const [isLoading, setIsLoading] = useState(true); // For ongoing loading operations
-    const [isFinishingOnboarding, setIsFinishingOnboarding] = useState(false); // For finish-onboarding API call
-
-    // Track loading states for all essential data
-    const [isStoreLoaded, setIsStoreLoaded] = useState(false);
-    const [isNewUserChecked, setIsNewUserChecked] = useState(false);
-    const [isUserPlanLoaded, setIsUserPlanLoaded] = useState(false);
-    const [isLimitExceededModalActive, setIsLimitExceededModalActive] =
-        useState(false);
-    const itemsPerPage = 10;
-    const [productMessage, setProductMessage] = useState("");
-    const [qrCodeEnabled, setQrCodeEnabled] = useState(false);
-    const [qrCodePrintOnPDF, setQRCodePrintOnPDF] = useState(false);
-    const [giftCardEnabled, setGiftCardEnabled] = useState(false);
-    const [giftCardPropertyName, setGiftCardPropertyName] = useState("");
-    const [giftDeliveryPropertyName, setGiftDeliveryPropertyName] =
-        useState("");
-    const [sendKeyToMultipleCustomers, setSendKeyToMultipleCustomers] =
-        useState(false);
-    const [deliverKeysInSequence, setDeliverKeysInSequence] = useState(false);
-    const [perUnitNoDelivery, setPerUnitNoDelivery] = useState(1);
     const { t } = useTranslation();
-    const [defaultTemplateId, setDefaultTemplateId] = useState(null);
-    const [isNewUser, setIsNewUser] = useState(false);
-    const app = useAppBridge();
-    const APP_ID = "78b2cf9c2a9c63431defd44ad600ee8f";
-    const EXTENSION_HANDLE = "digitally";
     const [isMobile, setIsMobile] = useState(false);
 
-    // SaveBar state
-    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-    const [initialData, setInitialData] = useState({});
-    const [isInitialDataCaptured, setIsInitialDataCaptured] = useState(false);
-    const [isManualDeliveryEnabled, setIsManualDeliveryEnabled] =
-        useState(false);
+    // Loading states
+    const [isLoading, setIsLoading] = useState(true);
+    const [isFinishingOnboarding, setIsFinishingOnboarding] = useState(false);
+    const [isStoreLoaded, setIsStoreLoaded] = useState(false);
+    const [isNewUser, setIsNewUser] = useState(false);
+    const [isNewUserChecked, setIsNewUserChecked] = useState(false);
 
     useEffect(() => {
         const handleResize = () => {
@@ -165,66 +117,6 @@ export default function NewOnboarding() {
 
         return () => window.removeEventListener("resize", handleResize);
     }, []);
-
-    function nodeContainsDescendant(rootNode, descendant) {
-        if (rootNode === descendant) {
-            return true;
-        }
-        let parent = descendant.parentNode;
-        while (parent != null) {
-            if (parent === rootNode) {
-                return true;
-            }
-            parent = parent.parentNode;
-        }
-        return false;
-    }
-
-    const [visible, setVisible] = useState(false);
-    const [expirationType, setExpirationType] = useState("days");
-    const [expirationDays, setExpirationDays] = useState("");
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [isDownloadExpirationEnabled, setIsDownloadExpirationEnabled] =
-        useState(false);
-    const [isProductMessageEnabled, setIsProductMessageEnabled] =
-        useState(false);
-    const [{ month, year }, setDate] = useState({
-        month: selectedDate.getMonth(),
-        year: selectedDate.getFullYear(),
-    });
-    const datePickerRef = useRef(null);
-    //const formattedValue = selectedDate.toISOString().slice(0, 10);
-    const [progress, setProgress] = useState(0);
-    const [selectedOptions, setSelectedOptions] = useState([]);
-    const [inputValue, setInputValue] = useState("");
-    const [searchOptions, setSearchOptions] = useState([]);
-    const [selectedLicenseOptions, setSelectedLicenseOptions] = useState([]);
-    const [inputLicenseValue, setInputLicenseValue] = useState("");
-    const [searchLicenseOptions, setSearchLicenseOptions] = useState([]);
-
-    const [pasteKeysValue, setPasteKeysValue] = useState("");
-
-    const [isPdfStampingEnabled, setIsPdfStampingEnabled] = useState(false);
-    const [templateChoice, setTemplateChoice] = useState("default");
-    const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
-    const [textSize, setTextSize] = useState("12");
-    const [textColor, setTextColor] = useState("#000000");
-    const [alignment, setAlignment] = useState("left");
-    const [font, setFont] = useState("arial");
-    const [pageSize, setPageSize] = useState("A4");
-    const [pageLayout, setPageLayout] = useState("portrait");
-    const [verticalAdjustment, setVerticalAdjustment] = useState("");
-    const [pagesToStamp, setPagesToStamp] = useState("");
-    const [stampText, setStampText] = useState("");
-    const [allowPrinting, setAllowPrinting] = useState(false);
-    const [allowCopy, setAllowCopy] = useState(false);
-    const [passwordProtect, setPasswordProtect] = useState(false);
-    const [templateTitle, setTemplateTitle] = useState("");
-    const [PDFTemplateId, setPDFTemplateId] = useState(null);
-    const [selectedTemplate, setSelectedTemplate] = useState("");
-    const [previewFile, setPreviewFile] = useState(null);
-    const [isPreviewLoading, setIsPreviewLoading] = useState(false);
-    const [googleDriveLink, setGoogleDriveLink] = useState("");
 
 
     const checkNewUsers = async () => {
@@ -244,93 +136,6 @@ export default function NewOnboarding() {
         // Check new user status on initial load (needed for step 1)
         checkNewUsers();
     }, []);
-
-
-    const templateOptions = [
-        { label: t("createdigitalproduct.select_custom_template"), value: "" },
-    ];
-
-    const handleRadioButtonChange = useCallback((newValue) => {
-        setValue(newValue);
-    }, []);
-
-    const handleTabChange = useCallback((selectedMainTabIndex) => {
-        setSelectedMainTab(selectedMainTabIndex);
-    }, []);
-
-
-
-    // const handleCustomTabChange = useCallback((selectedCustomTabIndex) => {
-    //     setSelectedCustomTab(selectedCustomTabIndex);
-    // }, []);
-
-    const mainTabs = [
-        { id: "newFile", content: t("createdigitalproduct.add_new_file") },
-        {
-            id: "googleDrive",
-            content: t("createdigitalproduct.google_drive_file"),
-        },
-    ];
-
-    const manualLicenseTabs = [
-        { id: "uploadCsv", content: t("createdigitalproduct.upload_csv") },
-        {
-            id: "pasteKeys",
-            content: t("createdigitalproduct.paste_keys_codes"),
-        },
-    ];
-
-    // const customTabs = [
-    //     {
-    //         id: "existingCustoms",
-    //         content: t("createdigitalproduct.from_existing_customs"),
-    //     },
-    //     { id: "newCustom", content: t("createdigitalproduct.add_new_custom") },
-    // ];
-
-    const handleGoogleDriveLinkChange = (newValue) => {
-        setGoogleDriveLink(newValue);
-    };
-
-    // const handleExpirationDaysChange = (value) => {
-    //     const numericValue = parseInt(value, 10);
-
-    //     if (numericValue < 1) {
-    //         setExpirationDays(1);
-    //     } else {
-    //         setExpirationDays(numericValue);
-    //     }
-    // };
-
-    // const handleProductMessagehange = (value) => {
-    //     setProductMessage(value);
-    // };
-
-    // function handleInputValueChange() {
-    //     console.log("handleInputValueChange");
-    // }
-
-    // function handleOnClose({ relatedTarget }) {
-    //     setVisible(false);
-    // }
-
-    // function handleMonthChange(month, year) {
-    //     setDate({ month, year });
-    // }
-
-    // function handleDateSelection({ end: newSelectedDate }) {
-    //     setSelectedDate(newSelectedDate);
-    //     setVisible(false);
-    // }
-
-    useEffect(() => {
-        if (selectedDate) {
-            setDate({
-                month: selectedDate.getMonth(),
-                year: selectedDate.getFullYear(),
-            });
-        }
-    }, [selectedDate]);
 
     // const handleDownloadExpirationEnabledChange = (checked) => {
     //     setIsDownloadExpirationEnabled(checked);
@@ -400,33 +205,33 @@ export default function NewOnboarding() {
         });
     };
 
-    const handleDropZoneDrop = useCallback(
-        (dropFiles) => {
-            const newFiles = Array.from(dropFiles);
-            const totalNewFilesSize = newFiles.reduce(
-                (acc, file) => acc + file.size,
-                0
-            );
+    // const handleDropZoneDrop = useCallback(
+    //     (dropFiles) => {
+    //         const newFiles = Array.from(dropFiles);
+    //         const totalNewFilesSize = newFiles.reduce(
+    //             (acc, file) => acc + file.size,
+    //             0
+    //         );
 
-            if (
-                fileStorageLimit !== Infinity &&
-                currentFileStorage + totalNewFilesSize > fileStorageLimit
-            ) {
-                shopify.toast.show(
-                    `File storage limit exceeded. Maximum allowed is ${prettyBytes(
-                        fileStorageLimit
-                    )}`,
-                    { isError: true, duration: 9999999 }
-                );
-                return;
-            }
+    //         if (
+    //             fileStorageLimit !== Infinity &&
+    //             currentFileStorage + totalNewFilesSize > fileStorageLimit
+    //         ) {
+    //             shopify.toast.show(
+    //                 `File storage limit exceeded. Maximum allowed is ${prettyBytes(
+    //                     fileStorageLimit
+    //                 )}`,
+    //                 { isError: true, duration: 9999999 }
+    //             );
+    //             return;
+    //         }
 
-            setFiles((prevFiles) => [...prevFiles, ...newFiles]);
-            setCurrentFileStorage((prev) => prev + totalNewFilesSize);
-            handleContentTypeChange("files");
-        },
-        [fileStorageLimit, currentFileStorage]
-    );
+    //         setFiles((prevFiles) => [...prevFiles, ...newFiles]);
+    //         setCurrentFileStorage((prev) => prev + totalNewFilesSize);
+    //         handleContentTypeChange("files");
+    //     },
+    //     [fileStorageLimit, currentFileStorage]
+    // );
 
     // const handleSampleDropZoneDrop = useCallback(
     //     (_dropFiles, acceptedFiles, _rejectedFiles) => {
@@ -465,603 +270,400 @@ export default function NewOnboarding() {
             console.error("Resource picker error:", error);
         }
     };
-    const handleDeleteFileAtIndex = useCallback(
-        (index, type) => {
-            if (type === "files") {
-                setFiles((files) => {
-                    let newFiles = [...files];
-                    newFiles.splice(index, 1);
-                    return newFiles;
-                });
-            } else if (type === "googleDrive") {
-                setGoogleDriveLink(null);
-            }
-        },
-        [setFiles, setGoogleDriveLink]
-    );
-
-
-
-    const removeTag = useCallback(
-        (tag) => () => {
-            setTags((prevTags) => prevTags.filter((t) => t !== tag));
-        },
-        []
-    );
-
-
-    const dismissToast = useCallback(() => {
-        setToast((prevToast) => ({
-            ...prevToast,
-            showToast: false,
-        }));
-    }, []);
-
-    const handleInputChange = async (value) => {
-        setInputValue(value);
-
-        if (value.length > 2) {
-            setLoading(true);
-
-            try {
-                const response = await fetch(
-                    `/api/search-file?search=${encodeURIComponent(
-                        value
-                    )}&page=1&limit=10`,
-                    {
-                        method: "GET",
-                    }
-                );
-
-                const data = await response.json();
-                if (response.ok) {
-                    setSearchOptions(
-                        data.files.map((item) => ({
-                            label: item.fileName,
-                            value: item.fileName,
-                        }))
-                    );
-                } else {
-                    console.error("Error fetching search results");
-                }
-            } catch (error) {
-                console.error("Error fetching search results:", error);
-            } finally {
-                setLoading(false);
-            }
-        } else {
-            setSearchOptions([]);
-        }
-    };
-
-
-
-    const handlePricing = () => navigate("/pricing");
-
-    useEffect(() => {
-        // Only fetch user plan after user moves past step 1
-        if (currentStep <= 1) return;
-
-        const fetchUserPlan = async () => {
-            try {
-                const response = await fetch("/api/user-plan");
-                const data = await response.json();
-                setUserPlan(data.plan);
-            } catch (error) {
-                console.error("Failed to fetch user plan:", error);
-            } finally {
-                setIsUserPlanLoaded(true);
-            }
-        };
-
-        fetchUserPlan();
-    }, [currentStep]);
-
-    const isMixedContentActionDisabled = () => {
-        // For mixed content, user needs to provide files
-        const hasFiles = files.length > 0 || googleDriveLink;
-
-        // Mixed content requires at least files
-        return !hasFiles;
-    };
-
-    useEffect(() => {
-        if (store) {
-            const storageLimit =
-                store.file_storage === "unlimited"
-                    ? Infinity
-                    : Number(store.file_storage);
-            setFileStorageLimit(storageLimit);
-            setFileSizeLimit(store.per_file_limit);
-            setIsStoreLoaded(true);
-        }
-    }, [store]);
-
-    // Initial load of files when store is available and tab is 0 (deferred until step 2)
-    useEffect(() => {
-    }, [store]);
-
-    const handleClearSearch = () => {
-        setInputValue("");
-        setSelectedOptions([]);
-        setIsLoading(true);
-        setCurrentPageFiles(1);
-
-        fetch(`/api/search-file?page=1&limit=${itemsPerPage}`, {
-            method: "GET",
-        })
-            .then((response) => response.json())
-            .then((data) => {
-                setOrders(data.files);
-                setTotalFiles(data.total);
-                setIsLoading(false);
-            })
-            .catch(() => {
-                setIsLoading(false);
-                console.error("Error fetching files");
-            });
-    };
-
-
-    useEffect(() => {
-        // Only fetch digital products after user moves past step 1
-        if (currentStep <= 1) return;
-
-        const fetchData = async () => {
-            try {
-                const productsResponse = await fetch("/api/get-digital-data");
-
-                if (productsResponse.ok) {
-                    const productsData = await productsResponse.json();
-                    setDigitalProducts(productsData.digitalProducts);
-                    setDigitalProductsLimit(store.digital_products_limit);
-                    setIsLoading(false);
-
-
-                } else {
-                    console.error("Failed to fetch digital data");
-                }
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            }
-        };
-
-        fetchData();
-    }, [store, currentStep]);
 
 
 
     // Function to capture current data state - simplified to avoid circular dependencies
-    const captureCurrentData = useCallback(() => {
-        return {
-            selectedProduct: selectedProduct || null,
-            selected: selected || "active",
-            contentType: contentType || [],
-            isManualDeliveryEnabled: isManualDeliveryEnabled || false,
-            emailTemplateType: emailTemplateType || "default",
-            emailTemplateId: emailTemplateId || null,
-            isDownloadExpirationEnabled: isDownloadExpirationEnabled || false,
-            expirationType: expirationType || "days",
-            expirationDays: expirationDays || "",
-            selectedDate: selectedDate || new Date(),
-            // PDF stamping settings
-            isPdfStampingEnabled: isPdfStampingEnabled || false,
-            templateChoice: templateChoice || "none",
-            PDFTemplateId: PDFTemplateId || null,
-            // Product message settings
-            isProductMessageEnabled: isProductMessageEnabled || false,
-            productMessage: productMessage || "",
-            autoFulfill: autoFulfill || false,
-            downloadLimit: downloadLimit || "",
-            isDownloadLimitEnabled: isDownloadLimitEnabled || false,
+    // const captureCurrentData = useCallback(() => {
+    //     return {
+    //         selectedProduct: selectedProduct || null,
+    //         selected: selected || "active",
+    //         contentType: contentType || [],
+    //         isManualDeliveryEnabled: isManualDeliveryEnabled || false,
+    //         emailTemplateType: emailTemplateType || "default",
+    //         emailTemplateId: emailTemplateId || null,
+    //         isDownloadExpirationEnabled: isDownloadExpirationEnabled || false,
+    //         expirationType: expirationType || "days",
+    //         expirationDays: expirationDays || "",
+    //         selectedDate: selectedDate || new Date(),
+    //         // Product message settings
+    //         isProductMessageEnabled: isProductMessageEnabled || false,
+    //         productMessage: productMessage || "",
+    //         autoFulfill: autoFulfill || false,
+    //         downloadLimit: downloadLimit || "",
+    //         isDownloadLimitEnabled: isDownloadLimitEnabled || false,
 
-            tags: tags || [],
-            qrCodeEnabled: qrCodeEnabled || false,
-            qrCodePrintOnPDF: qrCodePrintOnPDF || false,
-            giftCardEnabled: giftCardEnabled || false,
-            giftCardPropertyName: giftCardPropertyName || "",
-            sendKeyToMultipleCustomers: sendKeyToMultipleCustomers || false,
-            deliverKeysInSequence: deliverKeysInSequence || false,
-            perUnitNoDelivery: perUnitNoDelivery || 1,
+    //         tags: tags || [],
+    //         qrCodeEnabled: qrCodeEnabled || false,
+    //         qrCodePrintOnPDF: qrCodePrintOnPDF || false,
+    //         giftCardEnabled: giftCardEnabled || false,
+    //         giftCardPropertyName: giftCardPropertyName || "",
+    //         sendKeyToMultipleCustomers: sendKeyToMultipleCustomers || false,
+    //         deliverKeysInSequence: deliverKeysInSequence || false,
+    //         perUnitNoDelivery: perUnitNoDelivery || 1,
 
-        };
-    }, [
-        selectedProduct,
-        selected,
-        contentType,
-        isManualDeliveryEnabled,
-        emailTemplateType,
-        emailTemplateId,
-        isDownloadExpirationEnabled,
-        expirationType,
-        expirationDays,
-        selectedDate,
-        isPdfStampingEnabled,
-        templateChoice,
-        PDFTemplateId,
-        isProductMessageEnabled,
-        productMessage,
-        autoFulfill,
-        downloadLimit,
-        isDownloadLimitEnabled,
-        tags,
-        qrCodeEnabled,
-        qrCodePrintOnPDF,
-        giftCardEnabled,
-        giftCardPropertyName,
-        sendKeyToMultipleCustomers,
-        deliverKeysInSequence,
-        perUnitNoDelivery,
-    ]);
+    //     };
+    // }, [
+    //     selectedProduct,
+    //     selected,
+    //     contentType,
+    //     isManualDeliveryEnabled,
+    //     emailTemplateType,
+    //     emailTemplateId,
+    //     isDownloadExpirationEnabled,
+    //     expirationType,
+    //     expirationDays,
+    //     selectedDate,
+    //     isProductMessageEnabled,
+    //     productMessage,
+    //     autoFulfill,
+    //     downloadLimit,
+    //     isDownloadLimitEnabled,
+    //     tags,
+    //     qrCodeEnabled,
+    //     qrCodePrintOnPDF,
+    //     giftCardEnabled,
+    //     giftCardPropertyName,
+    //     sendKeyToMultipleCustomers,
+    //     deliverKeysInSequence,
+    //     perUnitNoDelivery,
+    // ]);
 
     // Function to handle discard changes
-    const handleDiscardChanges = useCallback(() => {
-        // Reset only tracked fields to initial data
-        setSelectedProduct(initialData.selectedProduct || null);
-        setSelected(initialData.selected || "active");
-        setIsDownloadExpirationEnabled(
-            initialData.isDownloadExpirationEnabled || false
-        );
-        setExpirationType(initialData.expirationType || "days");
-        setExpirationDays(initialData.expirationDays || "");
-        setSelectedDate(initialData.selectedDate || new Date());
-        // PDF stamping settings
-        setIsPdfStampingEnabled(initialData.isPdfStampingEnabled || false);
-        setTemplateChoice(initialData.templateChoice || "none");
-        setPDFTemplateId(initialData.PDFTemplateId || null);
-        setIsProductMessageEnabled(
-            initialData.isProductMessageEnabled || false
-        );
-        setProductMessage(initialData.productMessage || "");
-        setContentType(initialData.contentType || []);
-        setAutoFulfill(initialData.autoFulfill || false);
-        setDownloadLimit(initialData.downloadLimit || "");
-        setIsDownloadLimitEnabled(initialData.isDownloadLimitEnabled || false);
-        setFiles(initialData.files || []);
-        setSampleFiles(initialData.sampleFiles || []);
-        setTags(initialData.tags || []);
-        setQrCodeEnabled(initialData.qrCodeEnabled || false);
-        setQRCodePrintOnPDF(initialData.qrCodePrintOnPDF || false);
-        setGiftCardEnabled(initialData.giftCardEnabled || false);
-        setGiftCardPropertyName(initialData.giftCardPropertyName || "");
-        setSendKeyToMultipleCustomers(
-            initialData.sendKeyToMultipleCustomers || false
-        );
-        setDeliverKeysInSequence(initialData.deliverKeysInSequence || false);
-        setIsManualDeliveryEnabled(
-            initialData.isManualDeliveryEnabled || false
-        );
-        setPerUnitNoDelivery(initialData.perUnitNoDelivery || 1);
+    // const handleDiscardChanges = useCallback(() => {
+    //     // Reset only tracked fields to initial data
+    //     setSelectedProduct(initialData.selectedProduct || null);
+    //     setSelected(initialData.selected || "active");
+    //     setIsDownloadExpirationEnabled(
+    //         initialData.isDownloadExpirationEnabled || false
+    //     );
+    //     setExpirationType(initialData.expirationType || "days");
+    //     setExpirationDays(initialData.expirationDays || "");
+    //     setSelectedDate(initialData.selectedDate || new Date());
+    //     setIsProductMessageEnabled(
+    //         initialData.isProductMessageEnabled || false
+    //     );
+    //     setProductMessage(initialData.productMessage || "");
+    //     setContentType(initialData.contentType || []);
+    //     setAutoFulfill(initialData.autoFulfill || false);
+    //     setDownloadLimit(initialData.downloadLimit || "");
+    //     setIsDownloadLimitEnabled(initialData.isDownloadLimitEnabled || false);
+    //     setFiles(initialData.files || []);
+    //     setSampleFiles(initialData.sampleFiles || []);
+    //     setTags(initialData.tags || []);
+    //     setQrCodeEnabled(initialData.qrCodeEnabled || false);
+    //     setQRCodePrintOnPDF(initialData.qrCodePrintOnPDF || false);
+    //     setGiftCardEnabled(initialData.giftCardEnabled || false);
+    //     setGiftCardPropertyName(initialData.giftCardPropertyName || "");
+    //     setSendKeyToMultipleCustomers(
+    //         initialData.sendKeyToMultipleCustomers || false
+    //     );
+    //     setDeliverKeysInSequence(initialData.deliverKeysInSequence || false);
+    //     setIsManualDeliveryEnabled(
+    //         initialData.isManualDeliveryEnabled || false
+    //     );
+    //     setPerUnitNoDelivery(initialData.perUnitNoDelivery || 1);
 
-        setHasUnsavedChanges(false);
-        try {
-            //shopify.saveBar.hide("create-digital-product-savebar");
-        } catch (error) {
-            // SaveBar not set up in onboarding flow - ignore error
-        }
-    }, [initialData, shopify]);
+    //     setHasUnsavedChanges(false);
+    //     try {
+    //         //shopify.saveBar.hide("create-digital-product-savebar");
+    //     } catch (error) {
+    //         // SaveBar not set up in onboarding flow - ignore error
+    //     }
+    // }, [initialData, shopify]);
 
     // Function to check if data has changed
-    const hasDataChanged = useCallback(() => {
-        const currentData = captureCurrentData();
-        return JSON.stringify(currentData) !== JSON.stringify(initialData);
-    }, [captureCurrentData, initialData]);
+    // const hasDataChanged = useCallback(() => {
+    //     const currentData = captureCurrentData();
+    //     return JSON.stringify(currentData) !== JSON.stringify(initialData);
+    // }, [captureCurrentData, initialData]);
 
     // Effect to monitor changes and update SaveBar
-    useEffect(() => {
-        console.log("Insitan Data Capture: ", isInitialDataCaptured);
-        if (isInitialDataCaptured) {
-            const changed = hasDataChanged();
-            setHasUnsavedChanges(changed);
-            console.log("Changed: " + changed);
+    // useEffect(() => {
+    //     console.log("Insitan Data Capture: ", isInitialDataCaptured);
+    //     if (isInitialDataCaptured) {
+    //         const changed = hasDataChanged();
+    //         setHasUnsavedChanges(changed);
+    //         console.log("Changed: " + changed);
 
-            if (changed) {
-                try {
-                    //shopify.saveBar.show("create-digital-product-savebar");
-                } catch (error) {
-                    // SaveBar not set up in onboarding flow - ignore error
-                }
-            } else {
-                try {
-                    //shopify.saveBar.hide("create-digital-product-savebar");
-                } catch (error) {
-                    // SaveBar not set up in onboarding flow - ignore error
-                }
-            }
-        }
-    }, [hasDataChanged, isInitialDataCaptured, shopify]);
+    //         if (changed) {
+    //             try {
+    //                 //shopify.saveBar.show("create-digital-product-savebar");
+    //             } catch (error) {
+    //                 // SaveBar not set up in onboarding flow - ignore error
+    //             }
+    //         } else {
+    //             try {
+    //                 //shopify.saveBar.hide("create-digital-product-savebar");
+    //             } catch (error) {
+    //                 // SaveBar not set up in onboarding flow - ignore error
+    //             }
+    //         }
+    //     }
+    // }, [hasDataChanged, isInitialDataCaptured, shopify]);
 
     // Capture initial data immediately on mount (before any API data is loaded)
-    useEffect(() => {
-        // Capture initial state when component first mounts
-        if (!isInitialDataCaptured) {
-            const initial = captureCurrentData();
-            console.log("Capturing initial data on mount:", initial);
-            setInitialData(initial);
-            setIsInitialDataCaptured(true);
-        }
-    }, [isInitialDataCaptured]);
+    // useEffect(() => {
+    //     // Capture initial state when component first mounts
+    //     if (!isInitialDataCaptured) {
+    //         const initial = captureCurrentData();
+    //         console.log("Capturing initial data on mount:", initial);
+    //         setInitialData(initial);
+    //         setIsInitialDataCaptured(true);
+    //     }
+    // }, [isInitialDataCaptured]);
 
-    const handleSave = useCallback(async () => {
-        setSaving(true);
-        // setProgress(0); // Reset progress
+    // const handleSave = useCallback(async () => {
+    //     setSaving(true);
+    //     // setProgress(0); // Reset progress
 
-        if (
-            isPdfStampingEnabled &&
-            templateChoice === "custom" &&
-            !PDFTemplateId
-        ) {
-            shopify.toast.show(
-                t("createdigitalproduct.please_save_the_pdf_template_first"),
-                { isError: true, duration: 9999999 }
-            );
-            setSaving(false);
-            return;
-        }
+    //     let validFiles = [];
+    //     validFiles = files.filter((file) => file.size <= fileSizeLimit);
 
-        let validFiles = [];
-        validFiles = files.filter((file) => file.size <= fileSizeLimit);
+    //     if (
+    //         contentType.includes("files") &&
+    //         !validFiles.length
+    //     ) {
+    //         shopify.toast.show(
+    //             t("createdigitalproduct.please_select_valid_files"),
+    //             { isError: true, duration: 9999999 }
+    //         );
+    //         setSaving(false);
+    //         return;
+    //     }
 
-        if (
-            contentType.includes("files") &&
-            !validFiles.length &&
-            !googleDriveLink
-        ) {
-            shopify.toast.show(
-                t("createdigitalproduct.please_select_valid_files"),
-                { isError: true, duration: 9999999 }
-            );
-            setSaving(false);
-            return;
-        }
+    //     if (
+    //         validFiles.length > 50 &&
+    //         contentType.includes("files")
+    //     ) {
+    //         shopify.toast.show(
+    //             t("createdigitalproduct.you_can_select_a_maximum_of_50_files"),
+    //             { isError: true, duration: 9999999 }
+    //         );
+    //         setSaving(false);
+    //         return;
+    //     }
 
-        if (
-            validFiles.length > 50 &&
-            contentType.includes("files")
-        ) {
-            shopify.toast.show(
-                t("createdigitalproduct.you_can_select_a_maximum_of_50_files"),
-                { isError: true, duration: 9999999 }
-            );
-            setSaving(false);
-            return;
-        }
+    //     try {
+    //         var formData = new FormData();
 
-        try {
-            var formData = new FormData();
+    //         if (contentType.includes("files")) {
+    //             validFiles.forEach((fileId) => {
+    //                 formData.append("files[]", fileId);
+    //             });
+    //         }
 
-            if (contentType.includes("files")) {
-                validFiles.forEach((fileId) => {
-                    formData.append("files[]", fileId);
-                });
+    //         if (sampleFiles.length) {
+    //             sampleFiles.forEach((file) => {
+    //                 if (file instanceof File) {
+    //                     formData.append("sampleFiles[]", file);
+    //                 }
+    //             });
+    //         }
 
-                if (googleDriveLink) {
-                    const isFolder = googleDriveLink.includes("/folders/");
-                    if (isFolder) {
-                        formData.append("google_drive_url", googleDriveLink);
-                    } else {
-                        formData.append("google_drive_url", googleDriveLink);
-                    }
-                }
-            }
+    //         formData.append(
+    //             "is_manual_delivery_enabled",
+    //             isManualDeliveryEnabled ? "1" : "0"
+    //         );
 
-            if (sampleFiles.length) {
-                sampleFiles.forEach((file) => {
-                    if (file instanceof File) {
-                        formData.append("sampleFiles[]", file);
-                    }
-                });
-            }
+    //         formData.append(
+    //             "is_download_limit_enabled",
+    //             isDownloadLimitEnabled ? "1" : "0"
+    //         );
+    //         if (isDownloadLimitEnabled) {
+    //             formData.append("download_limit", downloadLimit);
+    //         }
 
-            formData.append(
-                "is_manual_delivery_enabled",
-                isManualDeliveryEnabled ? "1" : "0"
-            );
+    //         formData.append(
+    //             "is_product_message_enabled",
+    //             isProductMessageEnabled ? "1" : "0"
+    //         );
+    //         if (isProductMessageEnabled) {
+    //             formData.append("product_message", productMessage);
+    //         }
 
-            formData.append(
-                "is_download_limit_enabled",
-                isDownloadLimitEnabled ? "1" : "0"
-            );
-            if (isDownloadLimitEnabled) {
-                formData.append("download_limit", downloadLimit);
-            }
+    //         formData.append("product", JSON.stringify(selectedProduct));
+    //         formData.append("auto_fulfill", autoFulfill ? "1" : "0");
+    //         formData.append(
+    //             "download_expiration",
+    //             isDownloadExpirationEnabled ? "1" : "0"
+    //         );
+    //         formData.append("expiration_type", expirationType);
+    //         if (expirationType === "days") {
+    //             formData.append("expiration_value", expirationDays);
+    //         } else if (expirationType === "specific-date") {
+    //             const formattedDate = formatDateForDB(selectedDate);
+    //             formData.append("expiration_value", formattedDate);
+    //         }
 
-            formData.append(
-                "is_product_message_enabled",
-                isProductMessageEnabled ? "1" : "0"
-            );
-            if (isProductMessageEnabled) {
-                formData.append("product_message", productMessage);
-            }
+    //         //const statusValue = selected === "draft" ? 0 : 1;
+    //         formData.append("status", statusValue);
 
-            formData.append("product", JSON.stringify(selectedProduct));
-            formData.append("auto_fulfill", autoFulfill ? "1" : "0");
-            formData.append(
-                "download_expiration",
-                isDownloadExpirationEnabled ? "1" : "0"
-            );
-            formData.append("expiration_type", expirationType);
-            if (expirationType === "days") {
-                formData.append("expiration_value", expirationDays);
-            } else if (expirationType === "specific-date") {
-                const formattedDate = formatDateForDB(selectedDate);
-                formData.append("expiration_value", formattedDate);
-            }
+    //         // Build content_type array
+    //         let finalContentType = [...contentType];
+    //         formData.append("content_type", finalContentType.join(", "));
 
-            //const statusValue = selected === "draft" ? 0 : 1;
-            formData.append("status", statusValue);
+    //         formData.append("shop", store.shopify_domain);
 
-            // Build content_type array
-            let finalContentType = [...contentType];
-            formData.append("content_type", finalContentType.join(", "));
+    //         const xhr = new XMLHttpRequest();
 
-            formData.append("shop", store.shopify_domain);
+    //         // Track progress
+    //         xhr.upload.onprogress = (event) => {
+    //             if (event.lengthComputable) {
+    //                 const percentCompleted = Math.round(
+    //                     (event.loaded * 100) / event.total
+    //                 );
+    //                 setProgress(percentCompleted);
+    //             }
+    //         };
 
-            const xhr = new XMLHttpRequest();
+    //         // Set up the request
+    //         xhr.open("POST", "/api/save-digital-product", true);
 
-            // Track progress
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const percentCompleted = Math.round(
-                        (event.loaded * 100) / event.total
-                    );
-                    setProgress(percentCompleted);
-                }
-            };
+    //         // Handle the response
+    //         xhr.onload = () => {
+    //             if (xhr.status === 200) {
+    //                 const response = JSON.parse(xhr.responseText);
+    //                 console.log("Backend Response:", response);
+    //                 if (response.error) {
+    //                     setSaving(false);
+    //                     setProgress(0);
+    //                     if (response.type === "exists") {
+    //                         shopify.toast.show(
+    //                             t(
+    //                                 "editdigitalproduct.digital_product_already_exists_for_selected_shopify_product"
+    //                             ),
+    //                             { isError: true, duration: 9999999 }
+    //                         );
+    //                     } else {
+    //                         shopify.toast.show(
+    //                             t(
+    //                                 "editdigitalproduct.error_saving_digital_product"
+    //                             ),
+    //                             { isError: true, duration: 9999999 }
+    //                         );
+    //                     }
+    //                 } else {
+    //                     shopify.toast.show(
+    //                         t(
+    //                             "createdigitalproduct.digital_product_saved_successfully"
+    //                         )
+    //                     );
+    //                     // Update initial data and hide SaveBar
+    //                     const updatedData = captureCurrentData();
+    //                     setInitialData(updatedData);
+    //                     setHasUnsavedChanges(false);
+    //                     try {
+    //                         //shopify.saveBar.hide("create-digital-product-savebar");
+    //                     } catch (error) {
+    //                         // SaveBar not set up in onboarding flow - ignore error
+    //                     }
+    //                     // Redirect or further actions after success
+    //                     // setTimeout(() => {
+    //                     //     navigate("/digitalProducts");
+    //                     // }, 1000);
+    //                 }
+    //             } else {
+    //                 shopify.toast.show(
+    //                     t(
+    //                         "createdigitalproduct.failed_to_save_digital_product_please_try_again_later"
+    //                     ),
+    //                     { isError: true, duration: 9999999 }
+    //                 );
+    //             }
+    //             setSaving(false);
+    //             setProgress(0); // Reset progress after completion
+    //         };
 
-            // Set up the request
-            xhr.open("POST", "/api/save-digital-product", true);
+    //         // Handle errors
+    //         xhr.onerror = () => {
+    //             shopify.toast.show(
+    //                 t(
+    //                     "createdigitalproduct.an_unexpected_error_occurred_please_try_again_later"
+    //                 ),
+    //                 { isError: true, duration: 9999999 }
+    //             );
+    //             setSaving(false);
+    //             setProgress(0);
+    //         };
 
-            // Handle the response
-            xhr.onload = () => {
-                if (xhr.status === 200) {
-                    const response = JSON.parse(xhr.responseText);
-                    console.log("Backend Response:", response);
-                    if (response.error) {
-                        setSaving(false);
-                        setProgress(0);
-                        if (response.type === "exists") {
-                            shopify.toast.show(
-                                t(
-                                    "editdigitalproduct.digital_product_already_exists_for_selected_shopify_product"
-                                ),
-                                { isError: true, duration: 9999999 }
-                            );
-                        } else {
-                            shopify.toast.show(
-                                t(
-                                    "editdigitalproduct.error_saving_digital_product"
-                                ),
-                                { isError: true, duration: 9999999 }
-                            );
-                        }
-                    } else {
-                        shopify.toast.show(
-                            t(
-                                "createdigitalproduct.digital_product_saved_successfully"
-                            )
-                        );
-                        // Update initial data and hide SaveBar
-                        const updatedData = captureCurrentData();
-                        setInitialData(updatedData);
-                        setHasUnsavedChanges(false);
-                        try {
-                            //shopify.saveBar.hide("create-digital-product-savebar");
-                        } catch (error) {
-                            // SaveBar not set up in onboarding flow - ignore error
-                        }
-                        // Redirect or further actions after success
-                        // setTimeout(() => {
-                        //     navigate("/digitalProducts");
-                        // }, 1000);
-                    }
-                } else {
-                    shopify.toast.show(
-                        t(
-                            "createdigitalproduct.failed_to_save_digital_product_please_try_again_later"
-                        ),
-                        { isError: true, duration: 9999999 }
-                    );
-                }
-                setSaving(false);
-                setProgress(0); // Reset progress after completion
-            };
-
-            console.log(templateChoice);
-
-            // Handle errors
-            xhr.onerror = () => {
-                shopify.toast.show(
-                    t(
-                        "createdigitalproduct.an_unexpected_error_occurred_please_try_again_later"
-                    ),
-                    { isError: true, duration: 9999999 }
-                );
-                setSaving(false);
-                setProgress(0);
-            };
-
-            // Send the request
-            xhr.send(formData);
+    //         // Send the request
+    //         xhr.send(formData);
 
 
-        } catch (error) {
-            console.error("Error saving digital product:", error);
-            shopify.toast.show(
-                t(
-                    "createdigitalproduct.an_unexpected_error_occurred_please_try_again_later"
-                ),
-                { isError: true, duration: 9999999 }
-            );
-            setSaving(false);
-            setProgress(0);
-        }
-    }, [
-        autoFulfill,
-        contentType,
-        files,
+    //     } catch (error) {
+    //         console.error("Error saving digital product:", error);
+    //         shopify.toast.show(
+    //             t(
+    //                 "createdigitalproduct.an_unexpected_error_occurred_please_try_again_later"
+    //             ),
+    //             { isError: true, duration: 9999999 }
+    //         );
+    //         setSaving(false);
+    //         setProgress(0);
+    //     }
+    // }, [
+    //     autoFulfill,
+    //     contentType,
+    //     files,
 
-        selectedProduct,
-        //prefix,
-        emailTemplateId,
-        emailTemplateType,
-        pasteKeysValue,
-        sendKeyToMultipleCustomers,
-        selected,
-        //suffix,
-        tagInputValue,
-        tags,
-        //totalCodes,
-        qrCodeEnabled,
-        qrCodePrintOnPDF,
-        giftCardEnabled,
-        giftCardPropertyName,
-        giftDeliveryPropertyName,
-        sendKeyToMultipleCustomers,
-        deliverKeysInSequence,
-        //value,
-        sampleFiles,
-        downloadLimit,
-        isDownloadLimitEnabled,
-        expirationType,
-        expirationDays,
-        selectedDate,
-        isDownloadExpirationEnabled,
-        productMessage,
-        isProductMessageEnabled,
-        perUnitNoDelivery,
-        isPdfStampingEnabled,
-        templateChoice,
-        PDFTemplateId,
-    ]);
+    //     selectedProduct,
+    //     //prefix,
+    //     emailTemplateId,
+    //     emailTemplateType,
+    //     sendKeyToMultipleCustomers,
+    //     selected,
+    //     //suffix,
+    //     tagInputValue,
+    //     tags,
+    //     //totalCodes,
+    //     qrCodeEnabled,
+    //     qrCodePrintOnPDF,
+    //     giftCardEnabled,
+    //     giftCardPropertyName,
+    //     giftDeliveryPropertyName,
+    //     sendKeyToMultipleCustomers,
+    //     deliverKeysInSequence,
+    //     //value,
+    //     sampleFiles,
+    //     downloadLimit,
+    //     isDownloadLimitEnabled,
+    //     expirationType,
+    //     expirationDays,
+    //     selectedDate,
+    //     isDownloadExpirationEnabled,
+    //     productMessage,
+    //     isProductMessageEnabled,
+    //     perUnitNoDelivery,
+    // ]);
 
-    const handleCreateNewProduct = useCallback(async () => {
-        await handleSave();
-        navigate("/products");
-    }, [navigate, handleSave]);
+    // const handleCreateNewProduct = useCallback(async () => {
+    //     await handleSave();
+    //     navigate("/products");
+    // }, [navigate, handleSave]);
 
 
 
-    const formatFileSizeLimit = (bytes) => {
-        if (bytes >= 1024 * 1024 * 1024) {
-            return `${Math.floor(bytes / (1024 * 1024 * 1024))} GB`;
-        } else if (bytes >= 1024 * 1024) {
-            return `${Math.floor(bytes / (1024 * 1024))} MB`;
-        } else if (bytes >= 1024) {
-            return `${Math.floor(bytes / 1024)} KB`;
-        } else {
-            return `${bytes} bytes`;
-        }
-    };
+    // const formatFileSizeLimit = (bytes) => {
+    //     if (bytes >= 1024 * 1024 * 1024) {
+    //         return `${Math.floor(bytes / (1024 * 1024 * 1024))} GB`;
+    //     } else if (bytes >= 1024 * 1024) {
+    //         return `${Math.floor(bytes / (1024 * 1024))} MB`;
+    //     } else if (bytes >= 1024) {
+    //         return `${Math.floor(bytes / 1024)} KB`;
+    //     } else {
+    //         return `${bytes} bytes`;
+    //     }
+    // };
 
-    const fileLabelText = `${t(
-        "createdigitalproduct.drag_and_drop_your_files"
-    )} ${fileSizeLimit
-        ? `(${t("createdigitalproduct.max")} ${formatFileSizeLimit(
-            fileSizeLimit
-        )} ${t("createdigitalproduct.per_file")})`
-        : t("createdigitalproduct.no_limit_per_file")
-        }`;
+    // const fileLabelText = `${t(
+    //     "createdigitalproduct.drag_and_drop_your_files"
+    // )} ${fileSizeLimit
+    //     ? `(${t("createdigitalproduct.max")} ${formatFileSizeLimit(
+    //         fileSizeLimit
+    //     )} ${t("createdigitalproduct.per_file")})`
+    //     : t("createdigitalproduct.no_limit_per_file")
+    //     }`;
 
     const steps = [
         {
@@ -1394,12 +996,7 @@ export default function NewOnboarding() {
 
     // Show page loader until all essential data is loaded
     // On step 1, only require essential data. Defer other calls until step 2+
-    const isInitialLoadComplete =
-        isStoreLoaded &&
-        isNewUserChecked &&
-        (currentStep > 1 ? (
-            isUserPlanLoaded
-        ) : true);
+    const isInitialLoadComplete = isNewUserChecked;
 
     if (!isInitialLoadComplete) {
         return <PageLoader />;
@@ -5458,7 +5055,7 @@ export default function NewOnboarding() {
                         .step5-layout {
                             display: grid;
                             grid-template-columns: 34fr 66fr;
-                            gap: 24px;
+                            gap: 10px;
                             max-width: 1400px;
                             margin: 0 auto;
                             animation: slideUp 0.4s ease-out;
@@ -5476,6 +5073,14 @@ export default function NewOnboarding() {
                         .step5-left-col > .Card,
                         .step5-right-col > .Card {
                             height: 100%;
+                            display: flex !important;
+                            flex-direction: column;
+                            min-height: 0;
+                        }
+
+                        .step5-left-col > .Card > *,
+                        .step5-right-col > .Card > * {
+                            flex: 1;
                             display: flex;
                             flex-direction: column;
                             min-height: 0;
@@ -5521,7 +5126,7 @@ export default function NewOnboarding() {
                         .step5-summary-card {
                             background: white;
                             border-radius: 16px;
-                            padding: 24px;
+                            padding: 18px;
                             margin-top: 8px;
                             border: 1px solid #DCE3EA;
                             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -5575,13 +5180,13 @@ export default function NewOnboarding() {
                         }
 
                         .step5-summary-label {
-                            font-size: 14px;
+                            font-size: 13px;
                             font-weight: 600;
                             color: #12324B;
                         }
 
                         .step5-summary-desc {
-                            font-size: 13px;
+                            font-size: 12px;
                             color: #667085;
                             margin-top: 2px;
                         }
@@ -5613,7 +5218,7 @@ export default function NewOnboarding() {
                         .step5-ready-card {
                             background: linear-gradient(135deg, #ECF8FF 0%, #E0F2F1 100%);
                             border-radius: 16px;
-                            padding: 12px;
+                            padding: 14px;
                             
                             border: 1px solid #B8E4E9;
                             margin-top: auto;
@@ -5641,14 +5246,14 @@ export default function NewOnboarding() {
                         }
 
                         .step5-ready-title {
-                            font-size: 17px;
+                            font-size: 14px;
                             font-weight: 600;
                             color: #12324B;
                             margin-bottom: 4px;
                         }
 
                         .step5-ready-desc {
-                            font-size: 15px;
+                            font-size: 13px;
                             color: #667085;
                             line-height: 1.4;
                         }
@@ -5657,6 +5262,7 @@ export default function NewOnboarding() {
                         .step5-right-col {
                             display: flex;
                             flex-direction: column;
+                            min-height: 0;
                         }
 
                         .step5-heading {
@@ -5719,7 +5325,7 @@ export default function NewOnboarding() {
                         .step5-plan-cards {
                             display: grid;
                             grid-template-columns: repeat(3, 1fr);
-                            gap: 16px;
+                            gap: 8px;
                             margin-bottom: 24px;
                             flex: 1;
                             min-height: 0;
@@ -5735,6 +5341,12 @@ export default function NewOnboarding() {
                             position: relative;
                             display: flex;
                             flex-direction: column;
+                            min-width: 0;
+                        }
+
+                        .step5-plan-card > * {
+                            overflow-wrap: break-word;
+                            word-break: break-word;
                         }
 
                         .step5-plan-card:hover {
@@ -5777,13 +5389,19 @@ export default function NewOnboarding() {
                             font-weight: 600;
                             color: #12324B;
                             margin-bottom: 8px;
+                            min-width: 0;
+                            overflow-wrap: break-word;
+                            word-break: break-word;
                         }
 
                         .step5-plan-price {
-                            font-size: 28px;
+                            font-size: 22px;
                             font-weight: 700;
                             color: #0F8B8D;
                             margin-bottom: 4px;
+                            min-width: 0;
+                            overflow-wrap: break-word;
+                            word-break: break-word;
                         }
 
                         .step5-plan-subtitle {
@@ -5791,6 +5409,9 @@ export default function NewOnboarding() {
                             font-weight: 500;
                             color: #667085;
                             margin-bottom: 12px;
+                            min-width: 0;
+                            overflow-wrap: break-word;
+                            word-break: break-word;
                         }
 
                         .step5-plan-features {
@@ -5802,10 +5423,16 @@ export default function NewOnboarding() {
 
                         .step5-plan-feature {
                             display: flex;
-                            align-items: center;
+                            align-items: flex-start;
                             gap: 8px;
                             font-size: 13px;
                             color: #667085;
+                            min-width: 0;
+                        }
+
+                        .step5-plan-feature span {
+                            overflow-wrap: break-word;
+                            word-break: break-word;
                         }
 
                         .step5-plan-feature svg {
@@ -5901,7 +5528,7 @@ export default function NewOnboarding() {
                             justify-content: space-between;
                             padding-top: 24px;
                         /* ── border-top: 1px solid #DCE3EA; ── */
-                            border: 1px solid #2171c1;
+                            // border: 1px solid #2171c1;
                         }
 
                         .step5-btn {
@@ -6078,7 +5705,7 @@ export default function NewOnboarding() {
 
                                             {/* Left Column Card */}
                                             <Card>
-                                                <div style={{ padding: "0px" }}>
+                                                <div style={{ padding: "0px", display: "flex", flexDirection: "column", height: "100%" }}>
                                                     {/* Celebration Section */}
                                                     <div className="step5-celebration">
                                                         <div className="step5-celebration-emoji">🎉</div>
@@ -6150,7 +5777,7 @@ export default function NewOnboarding() {
                                                     </div>
 
                                                     {/* Ready Card */}
-                                                    <div className="step5-ready-card">
+                                                    <div className="step5-ready-card" style={{ marginTop: "14px" }}>
                                                         <div className="step5-ready-content">
                                                             <div className="step5-ready-icon">
                                                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -6174,26 +5801,26 @@ export default function NewOnboarding() {
                                         {/* Right Column */}
                                         <div className="step5-right-col">
                                             <Card>
-                                                <div style={{ padding: "0px" }}>
+                                                <div style={{ padding: "0px", display: "flex", flexDirection: "column", height: "100%" }}>
                                                     <h1 className="step5-heading">{t("onboarding.choose_your_plan")}</h1>
                                                     <p className="step5-subheading">{t("onboarding.plan_selection_subtitle")}</p>
 
                                                     {/* Billing Toggle */}
-                                                    <div className="step5-billing-toggle">
+                                                    {/* <div className="step5-billing-toggle">
                                                         <button
                                                             className={`step5-toggle-option ${billingPeriod === 'monthly' ? 'active' : ''}`}
                                                             onClick={() => setBillingPeriod('monthly')}
                                                         >
                                                             {t("onboarding.monthly_title")}
                                                         </button>
-                                                        <button
+                                                         <button
                                                             className={`step5-toggle-option ${billingPeriod === 'yearly' ? 'active' : ''}`}
                                                             onClick={() => setBillingPeriod('yearly')}
                                                         >
                                                             {t("onboarding.yearly_title")}
                                                             <span className="step5-toggle-discount">{t("onboarding.save_20_percent")}</span>
-                                                        </button>
-                                                    </div>
+                                                        </button> 
+                                                    </div> */}
 
                                                     {/* Plan Cards */}
                                                     <div className="step5-plan-cards">
@@ -6203,9 +5830,6 @@ export default function NewOnboarding() {
                                                             className={`step5-plan-card ${selectedPlan === "starter" ? "selected" : ""}`}
                                                             onClick={() => setSelectedPlan("starter")}
                                                         >
-                                                            {selectedPlan === "starter" && (
-                                                                <div className="step5-plan-badge recommended">{t("onboarding.recommended")}</div>
-                                                            )}
                                                             <div className="step5-plan-name">{t("onboarding.starter_plan")}</div>
                                                             <div className="step5-plan-price">{billingPeriod === 'yearly' ? t("onboarding.starter_yearly_price") : t("onboarding.starter_price")}</div>
                                                             <div className="step5-plan-subtitle">{t("onboarding.starter_sessions")}</div>
@@ -6303,6 +5927,7 @@ export default function NewOnboarding() {
                                                             className={`step5-plan-card ${selectedPlan === "scale" ? "selected" : ""}`}
                                                             onClick={() => setSelectedPlan("scale")}
                                                         >
+                                                            <div className="step5-plan-badge recommended">{t("onboarding.recommended")}</div>
                                                             <div className="step5-plan-name">{t("onboarding.scale_plan")}</div>
                                                             <div className="step5-plan-price">{billingPeriod === 'yearly' ? t("onboarding.scale_yearly_price") : t("onboarding.scale_price")}</div>
                                                             <div className="step5-plan-subtitle">{t("onboarding.unlimited_sessions")}</div>
@@ -6354,12 +5979,12 @@ export default function NewOnboarding() {
 
                                                     </div>
 
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '24x' }}>
                                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                             <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                                                             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                                                         </svg>
-                                                        <span style={{ fontSize: '13px', color: '#667085' }}>{t("onboarding.free_trial_note")}</span>
+                                                        <span style={{ fontSize: '13px', color: '#667085'  }}>{t("onboarding.free_trial_note")}</span>
                                                     </div>
 
                                                 </div>
