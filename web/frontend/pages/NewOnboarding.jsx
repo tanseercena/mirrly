@@ -5806,20 +5806,20 @@ export default function NewOnboarding() {
                                                     <p className="step5-subheading">{t("onboarding.plan_selection_subtitle")}</p>
 
                                                     {/* Billing Toggle */}
-                                                    <div className="step5-billing-toggle">
+                                                    {/*<div className="step5-billing-toggle">
                                                         <button
                                                             className={`step5-toggle-option ${billingPeriod === 'monthly' ? 'active' : ''}`}
                                                             onClick={() => setBillingPeriod('monthly')}
                                                         >
                                                             {t("onboarding.monthly_title")}
                                                         </button>
-                                                        <button
+                                                         <button
                                                             className={`step5-toggle-option ${billingPeriod === 'yearly' ? 'active' : ''}`}
                                                             onClick={() => setBillingPeriod('yearly')}
                                                         >
                                                             {t("onboarding.yearly_title")}
                                                             <span className="step5-toggle-discount">{t("onboarding.save_20_percent")}</span>
-                                                        </button>
+                                                        </button> */}
                                                     </div>
 
                                                     {/* Plan Cards */}
