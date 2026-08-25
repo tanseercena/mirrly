@@ -1617,6 +1617,8 @@
         "email_support": "Email support",
         "selected": "Selected",
         "choose_plan_btn": "Choose plan",
+        "get_started_free":"Get Started Free",
+        "choose_plan":"Choose Plan",
         "growth_sessions": "500 try-on sessions / month",
         "up_to_500_sessions": "Up to 500 sessions / month",
         "high_quality": "High quality",
@@ -1747,6 +1749,7 @@
         "title": "Settings",
         "subtitle": "Customize how Live Try-On works in your store.",
         "settings_saved_automatically": "Settings are saved automatically",
+        "saving":"Saving...",
         "branding_card": {
             "title": "Try-on button branding",
             "description": "Customize the try-on button to match your store's look and feel",

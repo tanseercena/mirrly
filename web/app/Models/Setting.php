@@ -38,6 +38,11 @@ class Setting extends Model
         'blocked_countries' => 'array',
         'restrict_product_access' => 'boolean',
         'restricted_products' => 'array',
+        'collections' => 'array',
+        'button_branding' => 'array',
+        'camera_fallback' => 'array',
+        'privacy_recording' => 'array',
+        'notification' => 'array',
     ];
 
     public function store()

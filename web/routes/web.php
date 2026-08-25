@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CampaignsController;
 use App\Http\Controllers\HookDeckController;
 use App\Http\Controllers\LeadsController;
@@ -54,6 +55,8 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
         Route::get("request-permissions", "requestPermissions");
         Route::post("app-setup-data", "appSetupData");
         Route::post("finish-onboarding", "onboardingFinish");
+        Route::post("button-branding", "saveButtonBranding");
+        Route::post("camera-fallback", "saveCameraFallback");
         Route::post("toggle-setup-step", "toggleSetupStep");
         Route::get("check-theme-extension", "checkThemeExtension");
         Route::post("set-theme-extension-enabled", "setThemeExtensionEnabled");
@@ -87,6 +90,11 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
     Route::get('current-plan', [PlansController::class, 'getCurrentPlan']);
     Route::get('subscription', [SubscriptionsController::class, 'show']);
 
+    // Billing routes
+    Route::post('billing', [BillingController::class, 'process']);
+    Route::post('billing/cancel', [BillingController::class, 'cancel']);
+    Route::post('billing/free', [BillingController::class, 'downgradeToFreePlan']);
+
     Route::post('send-feedback', [StoresController::class, 'sendFeedback']);
 
     Route::get('/vimeo/connect', [VimeoController::class, 'connect']);
@@ -97,6 +105,9 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
     Route::get('/delete-wistia-account', [WistiaController::class, 'delete']);
     Route::get('/wistia/videos', [WistiaController::class, 'fetchAllWistiaVideos']);
 });
+
+// Billing callback route (outside auth middleware - Shopify redirects here)
+Route::get('billing/callback', [BillingController::class, 'billingCallback'])->name('billing.callback');
 
 Route::post("hd-webhooks", [HookDeckController::class, 'handle']);
 Route::get("prev", function () {

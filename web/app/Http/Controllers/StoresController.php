@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Lib\TopLevelRedirection;
 use App\Mail\SendFeedback;
 use App\Models\Plan;
+use App\Models\Setting;
 use App\Models\Session;
 use App\Models\Store;
 use Illuminate\Http\JsonResponse;
@@ -249,15 +250,94 @@ class StoresController extends Controller
             ], 404);
         }
 
-        //  $finishOnboarding = json_decode($request->lottery_content, true);
+        // Get or create the store's setting
+        $setting = $store->setting;
 
-        // $store->finish_onboarding = $request->input('finish_onboarding');
-        // $store->save();
+        if (!$setting) {
+            $setting = $store->setting()->create([]);
+        }
 
-        $store->finish_onboarding = true;
+        // Save collection type and collections data
+        $collectionType = $request->input('collection_type', 'all');
+        $collections = $request->input('collections');
+
+        $setting->collection_type = $collectionType;
+        $setting->collections = $collectionType === 'specific' ? $collections : null;
+        $setting->save();
+
+        // Mark onboarding as complete
+        //$store->finish_onboarding = true;
         $store->save();
 
         return response()->json(['message' => 'Finish Onboarding updated successfully']);
+    }
+
+    public function saveButtonBranding(Request $request)
+    {
+        $session = $request->get('shopifySession');
+        $shop = $session->getShop();
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+
+        if (!$store) {
+            return response()->json([
+                'message' => 'Store not found',
+            ], 404);
+        }
+
+        // Get or create the store's setting
+        $setting = $store->setting;
+
+        if (!$setting) {
+            $setting = $store->setting()->create([]);
+        }
+
+        // Build button branding data structure
+        $buttonBranding = [
+            'buttonText' => $request->input('buttonText'),
+            'position' => $request->input('position', 'below_cart'),
+            'buttonStyle' => [
+                'textColor' => $request->input('textColor'),
+                'bgColor' => $request->input('bgColor'),
+                'borderRadius' => $request->input('borderRadius'),
+            ],
+            'showIcon' => $request->input('showIcon', true),
+        ];
+
+        $setting->button_branding = $buttonBranding;
+        $setting->save();
+
+        return response()->json(['success' => true, 'message' => 'Button branding saved successfully']);
+    }
+
+    public function saveCameraFallback(Request $request)
+    {
+        $session = $request->get('shopifySession');
+        $shop = $session->getShop();
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+
+        if (!$store) {
+            return response()->json([
+                'message' => 'Store not found',
+            ], 404);
+        }
+
+        // Get or create the store's setting
+        $setting = $store->setting;
+
+        if (!$setting) {
+            $setting = $store->setting()->create([]);
+        }
+
+        // Build camera fallback data structure
+        $cameraFallback = [
+            'unsupported' => $request->input('unsupported', 'ai_preview'),
+            'permission_denied' => $request->input('permission_denied', 'guidance'),
+        ];
+
+        $setting->camera_fallback = $cameraFallback;
+        $setting->save();
+
+        return response()->json(['success' => true, 'message' => 'Camera fallback settings saved successfully']);
     }
 
     public function registerOrderUpdatedWebhook(Store $store, $session, $path)

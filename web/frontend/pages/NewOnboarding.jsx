@@ -19,7 +19,6 @@ import {
     Checkbox,
     Divider,
     TextField,
-    Modal,
     DropZone,
     Icon,
     Tabs,
@@ -63,7 +62,7 @@ export default function NewOnboarding() {
     // const [onboardingCompleted, setOnboardingCompleted] = useState(false);
     const [themeExtensionActivated, setThemeExtensionActivated] =
         useState(false);
-    const [selectedProductType, setSelectedProductType] = useState(null);
+    const [selectedProductType, setSelectedProductType] = useState("all"); // Default to "all"
 
     // Step 2: Product scope selection
     const [productScope, setProductScope] = useState("all"); // "all" or "specific"
@@ -90,6 +89,8 @@ export default function NewOnboarding() {
     // Step 5: Plan selection
     const [selectedPlan, setSelectedPlan] = useState("growth"); // Default to growth plan
     const [billingPeriod, setBillingPeriod] = useState("monthly"); // "monthly" or "yearly"
+    const [plans, setPlans] = useState([]); // Plans fetched from API
+    const [isInitiatingBilling, setIsInitiatingBilling] = useState(false); // Loading state for billing
 
     const totalSteps = 5;
 
@@ -136,6 +137,75 @@ export default function NewOnboarding() {
         // Check new user status on initial load (needed for step 1)
         checkNewUsers();
     }, []);
+
+    // Fetch plans on component mount
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const response = await fetch("/api/plans");
+                const data = await response.json();
+                setPlans(data.data || []);
+            } catch (error) {
+                console.error("Failed to fetch plans:", error);
+            }
+        };
+        fetchPlans();
+    }, []);
+
+    // Function to get plan ID from selected plan name
+    const getPlanId = (planName) => {
+        const planMap = {
+            "starter": "free",
+            "growth": "Growth",
+            "scale": "Scale"
+        };
+        const plan = plans.find(p => p.name === planMap[planName]);
+        return plan ? plan.id : null;
+    };
+
+    // Function to initiate billing process
+    const initiateBilling = async () => {
+        const planId = getPlanId(selectedPlan);
+        if (!planId) {
+            console.error("Invalid plan selected");
+            alert(t("onboarding.invalid_plan_error") || "Invalid plan selected. Please try again.");
+            return;
+        }
+
+        setIsInitiatingBilling(true);
+        try {
+            const response = await fetch("/api/billing", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    id: planId,
+                    interval: billingPeriod,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to initiate billing");
+            }
+
+            // Redirect to Shopify's billing confirmation page
+            if (data.confirmationUrl) {
+                // Keep loading state active since we're redirecting
+                window.open(data.confirmationUrl, '_top');
+            } else {
+                throw new Error("No confirmation URL received");
+            }
+        } catch (error) {
+            console.error("Error initiating billing:", error);
+            alert(error.message || t("onboarding.billing_error") || "An error occurred while initiating billing. Please try again.");
+            // Only reset loading state on error
+            setIsInitiatingBilling(false);
+        }
+        // Note: We don't reset loading state on success because the page will redirect
+    };
 
     // const handleDownloadExpirationEnabledChange = (checked) => {
     //     setIsDownloadExpirationEnabled(checked);
@@ -690,7 +760,7 @@ export default function NewOnboarding() {
         if (currentStep < totalSteps) {
             const nextStep = currentStep + 1;
 
-            // Call finish-onboarding API when moving to step 5 (final step)
+            // Call finish-onboarding API when moving from step 4 to step 5
             if (nextStep === 5) {
                 setIsFinishingOnboarding(true);
                 try {
@@ -700,12 +770,26 @@ export default function NewOnboarding() {
                             "Content-Type": "application/json",
                         },
                         body: JSON.stringify({
-                            finishOnboarding: true,
+                            collection_type: productScope, // "all" or "specific"
+                            collections: productScope === "specific" ? [
+                                ...selectedProductsOrCollections.map(item => ({
+                                    id: item.id,
+                                    title: item.title,
+                                    image: item.image || '',
+                                    products_count: item.products_count || 0
+                                })),
+                                { totalProductsCount: productCount }
+                            ] : null,
+                            //totalProductsCount: productCount,// Add total across all collections
+                            selectedPlan: selectedPlan,
+                            productsEnabled: productCount,
+                            themeEmbedActive: isThemeEmbedActive,
+                            testCompleted: testFeedback !== null,
                         }),
                     });
-                    console.log("Onboarding finish marked successfully");
+                    console.log("Onboarding completed successfully");
                 } catch (error) {
-                    console.error("Error finishing onboarding:", error);
+                    console.error("Error completing onboarding:", error);
                 } finally {
                     setIsFinishingOnboarding(false);
                 }
@@ -725,7 +809,20 @@ export default function NewOnboarding() {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    finishOnboarding: true,
+                    collection_type: productScope, // "all" or "specific"
+                    collections: productScope === "specific" ? selectedProductsOrCollections.map(item => ({
+                        id: item.id,
+                        title: item.title,
+                        image: item.image || '',
+                        products_count: item.products_count || 0
+                    })).map(collection => ({
+                        ...collection,
+                        totalProductsCount: productCount // Add total across all collections
+                    })) : null,
+                    selectedPlan: selectedPlan,
+                    productsEnabled: productCount,
+                    themeEmbedActive: isThemeEmbedActive,
+                    testCompleted: testFeedback !== null,
                 }),
             });
             console.log("Onboarding skipped successfully");
@@ -755,30 +852,23 @@ export default function NewOnboarding() {
             });
 
             if (selected && selected.length > 0) {
+                console.log("Select Collection Data");
+                console.log(selected)
                 const selectedItems = selected.map((item) => ({
                     id: item.id,
                     title: item.title,
                     type: item.type, // 'product' or 'collection'
+                    image: item.image?.originalSrc ?? '',
+                    products_count: item.productsCount || 0 // Use picker's count if available, default to 0
                 }));
+
+                // Sum all the productCount of each Selected collection
+                const totalProductsCount = selectedItems.reduce((sum, item) => sum + (item.products_count || 0), 0);
+
                 setSelectedProductsOrCollections(selectedItems);
-
-                const collectionIds = selectedItems.map((item) => item.id);
-
-                const response = await fetch("/api/collections/product-count", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        collectionIds,
-                    }),
-                });
-
-                const data = await response.json();
-
-                console.log("Backend Response:", data);
-
-                setProductCount(data.total ?? 0);
+                setProductCount(totalProductsCount);
+                console.log("total products");
+                console.log(totalProductsCount);
 
                 setSelectedProductType("specific");
             }
@@ -788,32 +878,18 @@ export default function NewOnboarding() {
         }
     };
 
-    const handleRemoveSelection = async (id) => {
+    const handleRemoveSelection = (id) => {
         const updated = selectedProductsOrCollections.filter((item) => item.id !== id);
-        setSelectedProductsOrCollections(updated);
 
         if (updated.length === 0) {
+            setSelectedProductsOrCollections(updated);
             setProductCount(0);
             setSelectedProductType(null); // Disable continue button if no items
         } else {
             // Recalculate product count from remaining collections
-            const collectionIds = updated.map((item) => item.id);
-            try {
-                const response = await fetch("/api/collections/product-count", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        collectionIds,
-                    }),
-                });
-                const data = await response.json();
-                setProductCount(data.total ?? 0);
-            } catch (error) {
-                console.error('Failed to recalculate product count:', error);
-                setProductCount(0);
-            }
+            const totalProductsCount = updated.reduce((sum, item) => sum + (item.products_count || 0), 0);
+            setSelectedProductsOrCollections(updated);
+            setProductCount(totalProductsCount);
         }
     };
 
@@ -2511,7 +2587,12 @@ export default function NewOnboarding() {
 
                             <button
                                 className="step2-continue-btn"
-                                disabled={!selectedProductType || isFinishingOnboarding}
+                                disabled={
+                                    !selectedProductType ||
+                                    isFinishingOnboarding ||
+                                    (productScope === "all" && (!hasFetchedAllProducts || productCount === 0)) ||
+                                    (productScope === "specific" && (selectedProductsOrCollections.length === 0 || productCount === 0))
+                                }
                                 onClick={handleNext}
                             >
                                 {isFinishingOnboarding ? (
@@ -4744,7 +4825,11 @@ export default function NewOnboarding() {
                                     {/* Try It Now Button */}
                                     <button
                                         className="step4-try-button"
-                                        onClick={() => setIsCameraModalOpen(true)}
+                                        onClick={() => {
+                                            if (liveTestProduct) {
+                                                setIsCameraModalOpen(true);
+                                            }
+                                        }}
                                         disabled={!liveTestProduct}
                                     >
                                         <svg className="step4-try-button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -4806,19 +4891,34 @@ export default function NewOnboarding() {
                                             </div>
                                             <div className="step4-status-indicator">
                                                 <div className="step4-status-dot"></div>
-                                                {t("onboarding.ready")}
+                                                {isCameraModalOpen ? t("onboarding.working_on_your_look") : t("onboarding.ready")}
                                             </div>
                                         </div>
 
                                         <div style={{ position: 'relative' }}>
-                                            <div className="step4-preview-placeholder" style={{ display: 'flex' }}>
-                                                <div className="step4-preview-placeholder-inner">
-                                                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#DCE3EA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
-                                                    </svg>
-                                                    <div style={{ marginTop: '12px', fontSize: '14px' }}>{t("onboarding.product_preview")}</div>
+                                            {/* Show camera iframe when active, otherwise show placeholder */}
+                                            {isCameraModalOpen ? (
+                                                <iframe
+                                                    src={`/api/try-on-session?product_id=${liveTestProduct?.id || ''}`}
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '320px',
+                                                        border: 'none',
+                                                        borderRadius: '8px',
+                                                        display: 'block'
+                                                    }}
+                                                    title={t("onboarding.live_test_camera")}
+                                                />
+                                            ) : (
+                                                <div className="step4-preview-placeholder" style={{ display: 'flex' }}>
+                                                    <div className="step4-preview-placeholder-inner">
+                                                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#DCE3EA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
+                                                        </svg>
+                                                        <div style={{ marginTop: '12px', fontSize: '14px' }}>{t("onboarding.product_preview")}</div>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
 
                                             {/* Live Status Badge (visible during processing) */}
                                             {isCameraModalOpen && (
@@ -4905,26 +5005,6 @@ export default function NewOnboarding() {
                                 </div>
 
                             </div>
-
-                            {/* ── Camera Modal ── */}
-                            {isCameraModalOpen && (
-                                <Modal
-                                    open={isCameraModalOpen}
-                                    onClose={() => setIsCameraModalOpen(false)}
-                                    title={t("onboarding.live_test_camera_title")}
-                                    large
-                                >
-                                    <Modal.Section>
-                                        <div style={{ width: "100%", height: "500px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                            <iframe
-                                                src={`/api/try-on-session?product_id=${liveTestProduct?.id || ''}`}
-                                                className="step4-camera-iframe"
-                                                title={t("onboarding.live_test_camera")}
-                                            />
-                                        </div>
-                                    </Modal.Section>
-                                </Modal>
-                            )}
 
                             {/* ── Footer navigation ── */}
                             <Box padding="600" paddingBlockStart="400">
@@ -5806,21 +5886,21 @@ export default function NewOnboarding() {
                                                     <p className="step5-subheading">{t("onboarding.plan_selection_subtitle")}</p>
 
                                                     {/* Billing Toggle */}
-                                                    {/* <div className="step5-billing-toggle">
+                                                    <div className="step5-billing-toggle">
                                                         <button
                                                             className={`step5-toggle-option ${billingPeriod === 'monthly' ? 'active' : ''}`}
                                                             onClick={() => setBillingPeriod('monthly')}
                                                         >
                                                             {t("onboarding.monthly_title")}
                                                         </button>
-                                                         <button
+                                                        <button
                                                             className={`step5-toggle-option ${billingPeriod === 'yearly' ? 'active' : ''}`}
                                                             onClick={() => setBillingPeriod('yearly')}
                                                         >
                                                             {t("onboarding.yearly_title")}
                                                             <span className="step5-toggle-discount">{t("onboarding.save_20_percent")}</span>
-                                                        </button> 
-                                                    </div> */}
+                                                        </button>
+                                                    </div>
 
                                                     {/* Plan Cards */}
                                                     <div className="step5-plan-cards">
@@ -5923,6 +6003,7 @@ export default function NewOnboarding() {
                                                         </div>
 
                                                         {/* Scale Plan */}
+
                                                         <div
                                                             className={`step5-plan-card ${selectedPlan === "scale" ? "selected" : ""}`}
                                                             onClick={() => setSelectedPlan("scale")}
@@ -5984,7 +6065,7 @@ export default function NewOnboarding() {
                                                             <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                                                             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                                                         </svg>
-                                                        <span style={{ fontSize: '13px', color: '#667085'  }}>{t("onboarding.free_trial_note")}</span>
+                                                        <span style={{ fontSize: '13px', color: '#667085' }}>{t("onboarding.free_trial_note")}</span>
                                                     </div>
 
                                                 </div>
@@ -6017,41 +6098,28 @@ export default function NewOnboarding() {
                                             <span className="step5-progress-label">{t("onboarding.step5_progress_label")}</span>
                                         </div>
 
-                                        {/* Go to Dashboard Button */}
+                                        {/* Choose Plan Button */}
                                         <button
                                             className="step5-btn step5-btn-dashboard"
-                                            onClick={async () => {
-                                                // Set onboarding completed flag
-                                                try {
-                                                    await fetch("/api/complete-onboarding", {
-                                                        method: "POST",
-                                                        headers: {
-                                                            "Content-Type": "application/json",
-                                                        },
-                                                        body: JSON.stringify({
-                                                            selectedPlan: selectedPlan,
-                                                            productsEnabled: productCount,
-                                                            themeEmbedActive: isThemeEmbedActive,
-                                                            testCompleted: testFeedback !== null,
-                                                        }),
-                                                    });
-                                                    console.log("Onboarding completed successfully");
-                                                } catch (error) {
-                                                    console.error("Error completing onboarding:", error);
-                                                }
-
-                                                sessionStorage.setItem("onboardingJustCompleted", "true");
-                                                sessionStorage.setItem("selectedPlan", selectedPlan);
-                                                navigate("/");
-                                            }}
+                                            onClick={initiateBilling}
+                                            disabled={isInitiatingBilling}
                                         >
-                                            {t("onboarding.go_to_dashboard")}
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
-                                                <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
-                                                <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
-                                                <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
-                                            </svg>
+                                            {isInitiatingBilling ? (
+                                                <>
+                                                    <div className="step2-spinner"></div>
+                                                    {t("settings.email_content.loading")}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {selectedPlan === "starter" ? t("onboarding.get_started_free") : t("onboarding.choose_plan")}
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                                                        <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                                                        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                                                        <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+                                                    </svg>
+                                                </>
+                                            )}
                                         </button>
 
                                     </div>

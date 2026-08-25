@@ -99,81 +99,98 @@ QUERY;
 
     public function process(Request $request)
     {
-        $session = $request->get('shopifySession');
-        $shop = $session->getShop();
-        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
-        $store->intended_plan_interval = $request->input('interval');
-        $store->save();
-
-        $plan = Plan::find($request->input('id'));
-
-        if (!$plan) {
-            return response()->json(['error' => 'Plan not found'], 404);
-        }
-
-        $creationDate = new Carbon();
-        $cutoffDate = new Carbon('2025-05-15');
-
-        $originalPrice = $request->input('interval') == "monthly" ? $plan->monthly_charge : $plan->yearly_charge;
-
-        if ($creationDate < $cutoffDate && $request->input('interval') != 'monthly') {
-            $discountPercentage = 50;
-            $discountedPrice = $originalPrice * (1 - $discountPercentage / 100);
-        } else {
-            $discountedPrice = $originalPrice;
-        }
-
-        $trialDays = $trialDays = !$store->trial_started_on ? 7 : max(0, 7 - $store->trial_started_on->diffInDays());
-        if($plan->id == 1) {
-            $trialDays = 0;
-            $discountedPrice = 0;
-        }
-
-        $dev_test_stores = [
-            'comp-store-check.myshopify.com',
-            'digitally-demo-store.myshopify.com',
-            'digitally-tutorial-store.myshopify.com',
-            'digitally-prod-onboarding.myshopify.com',
-            'digital-dash-store.myshopify.com',
-            'farhan-digitally-store.myshopify.com',
-            'ghafoor-digitally-store.myshopify.com',
-            'furqan-digitally-test.myshopify.com',
-        ];
-
-        $billing = [
-            "chargeName" => ucfirst($plan->name),
-            "currencyCode" => "USD", // Currently only supports USD
-            "amount" => $discountedPrice,
-            "interval" => $request->input('interval') == "monthly" ? BillingController::INTERVAL_EVERY_30_DAYS :
-                BillingController::INTERVAL_ANNUAL,
-            'test' => (config('app.debug') || in_array($store->shopify_domain, $dev_test_stores)) ? true : null,
-            'trialDays' => $trialDays,
-            'usageTerms' => $plan->name == 'unlimited' ? "For each 1,000 over-plan orders you'll pay $1.50" : '$0.1 per additional order beyond monthly plan limit',
-            'usageCappedAmount' => $plan->name == 'unlimited' ? 500 : 200,
-        ];
-
-//        Log::debug("Initiated billing for $shop");
-//        Log::debug($billing);
-
         try {
-            $hostName = Context::$HOST_NAME;
+            $session = $request->get('shopifySession');
+            if (!$session) {
+                return response()->json(['error' => 'Shopify session not found'], 401);
+            }
+
             $shop = $session->getShop();
+            $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+
+            if (!$store) {
+                return response()->json(['error' => 'Store not found'], 404);
+            }
+
+            $store->intended_plan_interval = $request->input('interval');
+            $store->save();
+
+            $plan = Plan::find($request->input('id'));
+
+            if (!$plan) {
+                return response()->json(['error' => 'Plan not found'], 404);
+            }
+
+            $creationDate = new Carbon();
+            $cutoffDate = new Carbon('2025-05-15');
+
+            $originalPrice = $request->input('interval') == "monthly" ? $plan->monthly_charge : $plan->yearly_charge;
+
+            if ($creationDate < $cutoffDate && $request->input('interval') != 'monthly') {
+                $discountPercentage = 50;
+                $discountedPrice = $originalPrice * (1 - $discountPercentage / 100);
+            } else {
+                $discountedPrice = $originalPrice;
+            }
+
+            $trialDays = $trialDays = !$store->trial_started_on ? 7 : max(0, 7 - $store->trial_started_on->diffInDays());
+            if($plan->id == 1) {
+                $trialDays = 0;
+                $discountedPrice = 0;
+            }
+
+            $dev_test_stores = [
+                'comp-store-check.myshopify.com',
+                'digitally-demo-store.myshopify.com',
+                'digitally-tutorial-store.myshopify.com',
+                'digitally-prod-onboarding.myshopify.com',
+                'digital-dash-store.myshopify.com',
+                'farhan-digitally-store.myshopify.com',
+                'ghafoor-digitally-store.myshopify.com',
+                'furqan-digitally-test.myshopify.com',
+            ];
+
+            // Allow all stores in development mode to use test billing
+            if (config('app.debug') || config('app.env') === 'local') {
+                $dev_test_stores[] = $store->shopify_domain;
+            }
+
+            $billing = [
+                "chargeName" => ucfirst($plan->name),
+                "currencyCode" => "USD", // Currently only supports USD
+                "amount" => $discountedPrice,
+                "interval" => $request->input('interval') == "monthly" ? BillingController::INTERVAL_EVERY_30_DAYS :
+                    BillingController::INTERVAL_ANNUAL,
+                'test' => (config('app.debug') || in_array($store->shopify_domain, $dev_test_stores)) ? true : null,
+                'trialDays' => $trialDays,
+                'usageTerms' => $plan->name == 'unlimited' ? "For each 1,000 over-plan orders you'll pay $1.50" : '$0.1 per additional order beyond monthly plan limit',
+                'usageCappedAmount' => $plan->name == 'unlimited' ? 500 : 200,
+            ];
+
+    //        Log::debug("Initiated billing for $shop");
+    //        Log::debug($billing);
+
+            $hostName = Context::$HOST_NAME;
             $host = base64_encode("$shop/admin");
-//            $returnUrl = "https://$hostName?shop={$shop}&host=$host";
+    //            $returnUrl = "https://$hostName?shop={$shop}&host=$host";
             $returnUrl = route('billing.callback', ['plan' => $plan->name, 'store_id' => $store->id]);
 
-            $store = Store::query()->where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
             $session2 = Session::query()->where('shop', $store->shopify_domain)->first();
 
-//            $data = $this->requestRecurringPayment($shop, $session2->access_token,
-//                $billing, $returnUrl);
+            if (!$session2) {
+                return response()->json(['error' => 'Session not found'], 404);
+            }
+
+    //            $data = $this->requestRecurringPayment($shop, $session2->access_token,
+    //                $billing, $returnUrl);
             $data = $this->createSubscription($shop, $session2->access_token, $billing, $returnUrl);
             $data = $data["data"]["appSubscriptionCreate"];
 
             if (!empty($data["userErrors"])) {
                 Log::error($data["userErrors"]);
-                throw new ShopifyBillingException("Error while billing the store", $data["userErrors"]);
+                return response()->json(['error' => 'Error while billing the store', 'details' => $data["userErrors"]], 500);
             }
+
             $mixpanel = new MixpanelService();
             $mixpanel->track('Billing Charge Requested', $shop, [
                 'Plan' => $billing['chargeName'].' '.$billing['interval'],
@@ -187,7 +204,10 @@ QUERY;
             //return TopLevelRedirection::redirect($request, $data["confirmationUrl"]);
         } catch (ShopifyBillingException $e) {
             Log::error($e);
-            $proceed = false;
+            return response()->json(['error' => 'Billing error: ' . $e->getMessage()], 500);
+        } catch (\Exception $e) {
+            Log::error($e);
+            return response()->json(['error' => 'An error occurred: ' . $e->getMessage()], 500);
         }
     }
 
@@ -480,6 +500,7 @@ QUERY;
                             $currentDigitalLotteries
                         );
 
+                        
                     $store->orders_per_month = $plan->limits['orders'] === 'unlimited'
                         ? -1
                         : $this->getLimitValue(
@@ -510,24 +531,24 @@ QUERY;
             */
 
             if ($previousSubscription) {
-                $currentDigitalProducts = $store->digitalProducts()->where("deleted", false)->count();
-                $currentDigitalLotteries = $store->digitalLotteries()->count();
-                $currentFileStorageUsage = $store->files()->sum('byteSize');
+                //$currentDigitalProducts = $store->digitalProducts()->where("deleted", false)->count();
+                //$currentDigitalLotteries = $store->digitalLotteries()->count();
+                //$currentFileStorageUsage = $store->files()->sum('byteSize');
 //                $startOfSubscription = Carbon::parse($previousSubscription->created_at);
 //                $currentOrders = $store->orders()
 //                    ->where('created_at', '>=', $startOfSubscription)
 //                    ->count();
 
-                $store->digital_products_limit = $this->getLimitValue($plan->limits['digital_products'], $currentDigitalProducts);
+                //$store->digital_products_limit = $this->getLimitValue($plan->limits['digital_products'], $currentDigitalProducts);
                 // $store->digital_lotteries_limit = $this->getLimitValue($plan->limits['digital_lotteries'], $currentDigitalLotteries);
                 //$store->orders_per_month = $this->getLimitValue($plan->limits['orders'], $currentOrders);
-                $store->orders_per_month = $plan->limits['orders']; // For now just give full new order per month later we will change to prorata
-                $store->file_storage_limit = $this->getLimitValue($plan->limits['file_storage'], $currentFileStorageUsage);
+                //$store->orders_per_month = $plan->limits['orders']; // For now just give full new order per month later we will change to prorata
+                //$store->file_storage_limit = $this->getLimitValue($plan->limits['file_storage'], $currentFileStorageUsage);
             }else{
-                $store->digital_products_limit = $plan->limits['digital_products'];
+                //$store->digital_products_limit = $plan->limits['digital_products'];
                 // $store->digital_lotteries_limit = $plan->limits['digital_lotteries'];
-                $store->orders_per_month = $plan->limits['orders'];
-                $store->file_storage_limit = $plan->limits['file_storage'];
+                //$store->orders_per_month = $plan->limits['orders'];
+                //$store->file_storage_limit = $plan->limits['file_storage'];
             }
 
 
@@ -546,20 +567,24 @@ QUERY;
 //            $store->file_storage_limit = $this->getLimitValue($plan->limits['file_storage'], $currentFileStorageUsage);
 //            $store->save();
 
-            $store->per_file_limit = $plan->limits['max_file_size'];
+            //$store->per_file_limit = $plan->limits['max_file_size'];
             $store->save();
         }
 
         if (!$store->trial_started_on) {
             $store->trial_started_on = Carbon::now();
-            $store->save();
         }
+
+        // Mark onboarding as complete after billing success
+        $store->finish_onboarding = true;
+        $store->save();
 
 
         if(config("app.env") == 'production' || config("app.env") == "local") {
             try {
                 //Mail::to(config('app.new_install_email'))->send(new SubscriptionCreated($store));
-                $this->sendPlanChangeAlert($store, $previousSubscription->plan->name, $plan->name);
+                $previousPlanName = $previousSubscription ? $previousSubscription->plan->name : 'free';
+                $this->sendPlanChangeAlert($store, $previousPlanName, $plan->name);
             } catch (Exception $e) {
                 Log::error("Error sending plan slack notification: ".$e->getMessage());
             }
@@ -592,9 +617,12 @@ QUERY;
             ]);
         }
 
-        $shopifyAppUrl = "https://$store->shopify_domain/admin/apps/".config("shopify.app_handle"); // Replace YOUR_APP_HANDLE with your actual app handle
+        // Redirect to the index page with embedded app parameters
+        $hostName = Context::$HOST_NAME;
+        $host = base64_encode("$store->shopify_domain/admin");
+        $redirectUrl = "https://$hostName?shop={$store->shopify_domain}&host=$host";
 
-        return redirect($shopifyAppUrl);
+        return redirect($redirectUrl);
     }
 
     public function getLimitValue($limit, $currentUsage): int

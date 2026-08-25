@@ -44,6 +44,7 @@ class AuthController extends Controller
             $request->cookie(),
             $request->query(),
             ['App\Lib\CookieHandler', 'saveShopifyCookie'],
+            true
         );
 
         \Log::info("CHECKING NEW VERSION");
@@ -104,12 +105,12 @@ class AuthController extends Controller
                 'shopify_plan' => $shopData['plan_display_name'],
                 'timezone' => $shopData['timezone'],
                 'api_token' => bin2hex(random_bytes(32)),
-                'per_file_limit' => 104857600,
-                'digital_products_limit' => 20,
-                'digital_lotteries_limit' => 1,
-                'file_storage_limit' => 5368709120,
-                'orders_per_month' => 50,
-                'reply_to_email' =>  $shopData['email'],
+                //'per_file_limit' => 104857600,
+                //'digital_products_limit' => 20,
+                //'digital_lotteries_limit' => 1,
+                //'file_storage_limit' => 5368709120,
+                //'orders_per_month' => 50,
+                //'reply_to_email' =>  $shopData['email'],
             ]);
 
             // Create Default Setting

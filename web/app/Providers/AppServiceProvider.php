@@ -59,7 +59,7 @@ class AppServiceProvider extends ServiceProvider
             config('shopify.scopes', 'not_defined'),
             $host,
             new DbSessionStorage(),
-            ApiVersion::LATEST,
+            config('shopify.version', '2026-07'),
             true,
             false,
             null,

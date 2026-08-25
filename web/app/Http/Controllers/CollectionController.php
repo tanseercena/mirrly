@@ -15,6 +15,7 @@ class CollectionController extends Controller
         if (empty($collectionIds)) {
             return response()->json([
                 'total' => 0,
+                'counts' => [],
             ]);
         }
 
@@ -47,23 +48,28 @@ class CollectionController extends Controller
                 'variables' => $variables,
             ]);
 
+            $counts = [];
             $total = 0;
             if (isset($responseBody['data']['nodes'])) {
                 foreach ($responseBody['data']['nodes'] as $node) {
                     if (isset($node['productsCount']['count'])) {
-                        $total += (int) $node['productsCount']['count'];
+                        $count = (int) $node['productsCount']['count'];
+                        $counts[$node['id']] = $count;
+                        $total += $count;
                     }
                 }
             }
 
             return response()->json([
                 'total' => $total,
+                'counts' => $counts,
             ]);
 
         } catch (\Exception $e) {
             Log::error('Failed to fetch collection product counts: ' . $e->getMessage());
             return response()->json([
                 'total' => 0,
+                'counts' => [],
                 'error' => 'Failed to fetch product counts',
             ], 500);
         }

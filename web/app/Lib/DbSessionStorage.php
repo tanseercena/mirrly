@@ -32,6 +32,12 @@ class DbSessionStorage implements SessionStorage
             if ($dbSession->scope) {
                 $session->setScope($dbSession->scope);
             }
+            if ($dbSession->refresh_token) {
+                $session->setRefreshToken($dbSession->refresh_token);
+            }
+            if ($dbSession->refresh_token_expires_at) {
+                $session->setRefreshTokenExpiresAt($dbSession->refresh_token_expires_at);
+            }
             if ($dbSession->user_id) {
                 $onlineAccessInfo = new AccessTokenOnlineUserInfo(
                     (int)$dbSession->user_id,
@@ -63,6 +69,8 @@ class DbSessionStorage implements SessionStorage
         $dbSession->access_token = $session->getAccessToken();
         $dbSession->expires_at = $session->getExpires();
         $dbSession->scope = $session->getScope();
+        $dbSession->refresh_token = $session->getRefreshToken();
+        $dbSession->refresh_token_expires_at = $session->getRefreshTokenExpiresAt();
         if (!empty($session->getOnlineAccessInfo())) {
             $dbSession->user_id = $session->getOnlineAccessInfo()->getId();
             $dbSession->user_first_name = $session->getOnlineAccessInfo()->getFirstName();

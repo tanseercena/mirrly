@@ -18,6 +18,7 @@ import {
     ColorPicker,
     Thumbnail,
 } from '@shopify/polaris';
+import { useAppBridge } from '@shopify/app-bridge-react';
 import {
     InfoIcon,
     MobileIcon,
@@ -335,6 +336,7 @@ const BrandingCard = ({ settings, onChange, t }) => {
             </BlockStack>
         </Card>
     );
+    
 };
 
 const LivePreviewCard = ({ settings, t }) => {
@@ -530,9 +532,17 @@ const LivePreviewCard = ({ settings, t }) => {
 /* ============================================
     SECTION: CAMERA FALLBACK BEHAVIOR
     ============================================ */
-const CameraFallbackCard = ({ t }) => {
-    const [unsupported, setUnsupported] = useState('ai_preview');
-    const [permissionDenied, setPermissionDenied] = useState('guidance');
+const CameraFallbackCard = ({ settings, onChange, t }) => {
+    const [unsupported, setUnsupported] = useState(settings?.unsupported || 'ai_preview');
+    const [permissionDenied, setPermissionDenied] = useState(settings?.permission_denied || 'guidance');
+
+    // Update local state when settings prop changes
+    useEffect(() => {
+        if (settings) {
+            setUnsupported(settings.unsupported || 'ai_preview');
+            setPermissionDenied(settings.permission_denied || 'guidance');
+        }
+    }, [settings]);
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
@@ -565,7 +575,10 @@ const CameraFallbackCard = ({ t }) => {
                                         { label: t('mirrly_settings.camera_fallback_card.hide_try_on_button'), value: 'hide' },
                                     ]}
                                     value={unsupported}
-                                    onChange={setUnsupported}
+                                    onChange={(value) => {
+                                        setUnsupported(value);
+                                        onChange('unsupported', value);
+                                    }}
                                 />
                                 <Text variant="bodySm" as="p" tone="subdued">
                                     {t('mirrly_settings.camera_fallback_card.ai_preview_description')}
@@ -592,7 +605,10 @@ const CameraFallbackCard = ({ t }) => {
                                         { label: t('mirrly_settings.camera_fallback_card.show_ai_preview'), value: 'ai_preview' },
                                     ]}
                                     value={permissionDenied}
-                                    onChange={setPermissionDenied}
+                                    onChange={(value) => {
+                                        setPermissionDenied(value);
+                                        onChange('permission_denied', value);
+                                    }}
                                 />
                                 <Text variant="bodySm" as="p" tone="subdued">
                                     {t('mirrly_settings.camera_fallback_card.guidance_description')}
@@ -947,6 +963,7 @@ const AdvancedCard = ({ t }) => {
     ============================================ */
 const SettingsPage = () => {
     const { t, i18n } = useTranslation();
+    const shopify = useAppBridge();
     const [branding, setBranding] = useState({
         buttonText: t('mirrly_settings.live_preview_card.try_it_on'),
         position: 'below_cart',
@@ -955,6 +972,41 @@ const SettingsPage = () => {
         borderRadius: 'full',
         showIcon: true,
     });
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Camera fallback state
+    const [cameraFallback, setCameraFallback] = useState({
+        unsupported: 'ai_preview',
+        permission_denied: 'guidance',
+    });
+
+    // Fetch settings on mount
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const response = await fetch('/api/settings');
+                const data = await response.json();
+                if (data.data?.button_branding) {
+                    const backendData = data.data.button_branding;
+                    // Transform nested buttonStyle to flat structure for BrandingCard
+                    setBranding({
+                        buttonText: backendData.buttonText || t('mirrly_settings.live_preview_card.try_it_on'),
+                        position: backendData.position || 'below_cart',
+                        textColor: backendData.buttonStyle?.textColor || '#FFFFFF',
+                        bgColor: backendData.buttonStyle?.bgColor || '#0D9488',
+                        borderRadius: backendData.buttonStyle?.borderRadius || 'full',
+                        showIcon: backendData.showIcon !== undefined ? backendData.showIcon : true,
+                    });
+                }
+                if (data.data?.camera_fallback) {
+                    setCameraFallback(data.data.camera_fallback);
+                }
+            } catch (error) {
+                console.error('Failed to fetch settings:', error);
+            }
+        };
+        fetchSettings();
+    }, [t]);
 
     // Update buttonText when language changes
     useEffect(() => {
@@ -964,9 +1016,76 @@ const SettingsPage = () => {
         }));
     }, [i18n.language, t]);
 
-    const handleBrandingChange = useCallback((partial) => {
+    const handleBrandingChange = useCallback(async (partial) => {
+        // Update local state immediately for responsive UI
         setBranding((prev) => ({ ...prev, ...partial }));
-    }, []);
+
+        // Show saving indicator
+        setIsSaving(true);
+
+        // Get the updated state for the backend
+        const updated = { ...branding, ...partial };
+
+        // Transform flat structure to nested structure for backend
+        const backendData = {
+            buttonText: updated.buttonText,
+            position: updated.position,
+            textColor: updated.textColor,
+            bgColor: updated.bgColor,
+            borderRadius: updated.borderRadius,
+            showIcon: updated.showIcon,
+        };
+
+        try {
+            const response = await fetch('/api/button-branding', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(backendData),
+            });
+
+            if (response.ok) {
+                shopify.toast.show(t('changes_saved'));
+            } else {
+                shopify.toast.show(t('error_occur'), { isError: true });
+            }
+        } catch (error) {
+            console.error('Failed to save button branding:', error);
+            shopify.toast.show(t('error_occur'), { isError: true });
+        } finally {
+            // Add a small delay to ensure the saving indicator is visible
+            setTimeout(() => setIsSaving(false), 500);
+        }
+    }, [branding, shopify, t]);
+
+    const handleCameraFallbackChange = useCallback(async (field, value) => {
+        // Update local state immediately
+        setCameraFallback((prev) => ({ ...prev, [field]: value }));
+
+        // Show saving indicator
+        setIsSaving(true);
+
+        try {
+            const response = await fetch('/api/camera-fallback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...cameraFallback,
+                    [field]: value,
+                }),
+            });
+
+            if (response.ok) {
+                shopify.toast.show(t('changes_saved'));
+            } else {
+                shopify.toast.show(t('error_occur'), { isError: true });
+            }
+        } catch (error) {
+            console.error('Failed to save camera fallback settings:', error);
+            shopify.toast.show(t('error_occur'), { isError: true });
+        } finally {
+            setTimeout(() => setIsSaving(false), 500);
+        }
+    }, [cameraFallback, shopify, t]);
 
     return (
         <Page fullWidth>
@@ -985,13 +1104,13 @@ const SettingsPage = () => {
                     <LivePreviewCard settings={branding} t={t} />
                 </div>
 
-                <CameraFallbackCard t={t} />
+                <CameraFallbackCard settings={cameraFallback} onChange={handleCameraFallbackChange} t={t} />
                 <PrivacyCard t={t} />
                 <NotificationsCard t={t} />
                 <AdvancedCard t={t} />
 
                 <Text variant="bodySm" as="p" tone="subdued">
-                    {t('mirrly_settings.settings_saved_automatically')}
+                    {isSaving ? (t('mirrly_settings.saving') || 'Saving') + '...' : t('mirrly_settings.settings_saved_automatically')}
                 </Text>
             </BlockStack>
         </Page>
