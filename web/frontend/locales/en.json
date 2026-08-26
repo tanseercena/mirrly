@@ -1,4 +1,7 @@
 {
+    "changes_saved": "Changes saved successfully",
+    "error_occur": "An error occurred. Please try again.",
+    "save": "Save",
     "digtal_product_listing": {
         "digital_products": "Digital Products",
         "digital_product_setup_guide": "Digital Product Setup & Guide",

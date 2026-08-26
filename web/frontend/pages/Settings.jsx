@@ -653,9 +653,17 @@ const CameraFallbackCard = ({ settings, onChange, t }) => {
 /* ============================================
     SECTION: PRIVACY & RECORDING
     ============================================ */
-const PrivacyCard = ({ t }) => {
-    const [recording, setRecording] = useState(false);
-    const [retention, setRetention] = useState('7');
+const PrivacyCard = ({ settings, onChange, t }) => {
+    const [recording, setRecording] = useState(settings?.recording || false);
+    const [retention, setRetention] = useState(settings?.retention || '7');
+
+    // Update local state when settings prop changes
+    useEffect(() => {
+        if (settings) {
+            setRecording(settings.recording || false);
+            setRetention(settings.retention || '7');
+        }
+    }, [settings]);
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
@@ -679,7 +687,13 @@ const PrivacyCard = ({ t }) => {
                                 {t('mirrly_settings.privacy_card.record_shopper_videos_description')}
                             </Text>
                         </BlockStack>
-                        <Toggle checked={recording} onChange={setRecording} />
+                        <Toggle
+                            checked={recording}
+                            onChange={(value) => {
+                                setRecording(value);
+                                onChange('recording', value);
+                            }}
+                        />
                     </InlineStack>
 
                     <Box paddingInlineStart="400">
@@ -708,7 +722,10 @@ const PrivacyCard = ({ t }) => {
                                         { label: t('mirrly_settings.privacy_card.90_days'), value: '90' },
                                     ]}
                                     value={retention}
-                                    onChange={setRetention}
+                                    onChange={(value) => {
+                                        setRetention(value);
+                                        onChange('retention', value);
+                                    }}
                                 />
                             </div>
                         </InlineStack>
@@ -761,13 +778,25 @@ const PrivacyCard = ({ t }) => {
 /* ============================================
     SECTION: NOTIFICATIONS
     ============================================ */
-const NotificationsCard = ({ t }) => {
-    const [weeklySummary, setWeeklySummary] = useState(true);
-    const [spendAlert, setSpendAlert] = useState(true);
-    const [completionAlert, setCompletionAlert] = useState(true);
-    const [spendThreshold, setSpendThreshold] = useState('80');
-    const [completionThreshold, setCompletionThreshold] = useState('60');
-    const [email, setEmail] = useState('you@yourstore.com');
+const NotificationsCard = ({ settings, onChange, t }) => {
+    const [weeklySummary, setWeeklySummary] = useState(settings?.weekly_summary ?? true);
+    const [spendAlert, setSpendAlert] = useState(settings?.spend_alert ?? true);
+    const [completionAlert, setCompletionAlert] = useState(settings?.completion_alert ?? true);
+    const [spendThreshold, setSpendThreshold] = useState(settings?.spend_threshold ?? '80');
+    const [completionThreshold, setCompletionThreshold] = useState(settings?.completion_threshold ?? '60');
+    const [email, setEmail] = useState(settings?.email ?? 'you@yourstore.com');
+
+    // Update local state when settings prop changes
+    useEffect(() => {
+        if (settings) {
+            setWeeklySummary(settings.weekly_summary ?? true);
+            setSpendAlert(settings.spend_alert ?? true);
+            setCompletionAlert(settings.completion_alert ?? true);
+            setSpendThreshold(settings.spend_threshold ?? '80');
+            setCompletionThreshold(settings.completion_threshold ?? '60');
+            setEmail(settings.email ?? 'you@yourstore.com');
+        }
+    }, [settings]);
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
@@ -790,7 +819,13 @@ const NotificationsCard = ({ t }) => {
                             title={t('mirrly_settings.notifications_card.weekly_summary_email')}
                             description={t('mirrly_settings.notifications_card.weekly_summary_description')}
                         />
-                        <Toggle checked={weeklySummary} onChange={setWeeklySummary} />
+                        <Toggle
+                            checked={weeklySummary}
+                            onChange={(value) => {
+                                setWeeklySummary(value);
+                                onChange('weekly_summary', value);
+                            }}
+                        />
                     </InlineStack>
 
                     <InlineStack align="space-between" blockAlign="center" wrap={false} gap="300">
@@ -812,10 +847,19 @@ const NotificationsCard = ({ t }) => {
                                         { label: t('mirrly_settings.notifications_card.100_percent_monthly'), value: '100' },
                                     ]}
                                     value={spendThreshold}
-                                    onChange={setSpendThreshold}
+                                    onChange={(value) => {
+                                        setSpendThreshold(value);
+                                        onChange('spend_threshold', value);
+                                    }}
                                 />
                             </div>
-                            <Toggle checked={spendAlert} onChange={setSpendAlert} />
+                            <Toggle
+                                checked={spendAlert}
+                                onChange={(value) => {
+                                    setSpendAlert(value);
+                                    onChange('spend_alert', value);
+                                }}
+                            />
                         </InlineStack>
                     </InlineStack>
 
@@ -838,10 +882,19 @@ const NotificationsCard = ({ t }) => {
                                         { label: t('mirrly_settings.notifications_card.below_80_percent'), value: '80' },
                                     ]}
                                     value={completionThreshold}
-                                    onChange={setCompletionThreshold}
+                                    onChange={(value) => {
+                                        setCompletionThreshold(value);
+                                        onChange('completion_threshold', value);
+                                    }}
                                 />
                             </div>
-                            <Toggle checked={completionAlert} onChange={setCompletionAlert} />
+                            <Toggle
+                                checked={completionAlert}
+                                onChange={(value) => {
+                                    setCompletionAlert(value);
+                                    onChange('completion_alert', value);
+                                }}
+                            />
                         </InlineStack>
                     </InlineStack>
 
@@ -857,7 +910,10 @@ const NotificationsCard = ({ t }) => {
                                     label={t('mirrly_settings.notifications_card.send_notifications_to')}
                                     labelHidden
                                     value={email}
-                                    onChange={setEmail}
+                                    onChange={(value) => {
+                                        setEmail(value);
+                                        onChange('email', value);
+                                    }}
                                     autoComplete="off"
                                     type="email"
                                 />
@@ -972,12 +1028,27 @@ const SettingsPage = () => {
         borderRadius: 'full',
         showIcon: true,
     });
-    const [isSaving, setIsSaving] = useState(false);
 
     // Camera fallback state
     const [cameraFallback, setCameraFallback] = useState({
         unsupported: 'ai_preview',
         permission_denied: 'guidance',
+    });
+
+    // Privacy recording state
+    const [privacyRecording, setPrivacyRecording] = useState({
+        recording: false,
+        retention: '7',
+    });
+
+    // Notification state
+    const [notification, setNotification] = useState({
+        weekly_summary: true,
+        spend_alert: true,
+        completion_alert: true,
+        spend_threshold: '80',
+        completion_threshold: '60',
+        email: 'you@yourstore.com',
     });
 
     // Fetch settings on mount
@@ -1001,6 +1072,12 @@ const SettingsPage = () => {
                 if (data.data?.camera_fallback) {
                     setCameraFallback(data.data.camera_fallback);
                 }
+                if (data.data?.privacy_recording) {
+                    setPrivacyRecording(data.data.privacy_recording);
+                }
+                if (data.data?.notification) {
+                    setNotification(data.data.notification);
+                }
             } catch (error) {
                 console.error('Failed to fetch settings:', error);
             }
@@ -1019,9 +1096,6 @@ const SettingsPage = () => {
     const handleBrandingChange = useCallback(async (partial) => {
         // Update local state immediately for responsive UI
         setBranding((prev) => ({ ...prev, ...partial }));
-
-        // Show saving indicator
-        setIsSaving(true);
 
         // Get the updated state for the backend
         const updated = { ...branding, ...partial };
@@ -1051,18 +1125,12 @@ const SettingsPage = () => {
         } catch (error) {
             console.error('Failed to save button branding:', error);
             shopify.toast.show(t('error_occur'), { isError: true });
-        } finally {
-            // Add a small delay to ensure the saving indicator is visible
-            setTimeout(() => setIsSaving(false), 500);
         }
     }, [branding, shopify, t]);
 
     const handleCameraFallbackChange = useCallback(async (field, value) => {
         // Update local state immediately
         setCameraFallback((prev) => ({ ...prev, [field]: value }));
-
-        // Show saving indicator
-        setIsSaving(true);
 
         try {
             const response = await fetch('/api/camera-fallback', {
@@ -1082,10 +1150,58 @@ const SettingsPage = () => {
         } catch (error) {
             console.error('Failed to save camera fallback settings:', error);
             shopify.toast.show(t('error_occur'), { isError: true });
-        } finally {
-            setTimeout(() => setIsSaving(false), 500);
         }
     }, [cameraFallback, shopify, t]);
+
+    const handlePrivacyRecordingChange = useCallback(async (field, value) => {
+        // Update local state immediately
+        setPrivacyRecording((prev) => ({ ...prev, [field]: value }));
+
+        try {
+            const response = await fetch('/api/privacy-recording', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...privacyRecording,
+                    [field]: value,
+                }),
+            });
+
+            if (response.ok) {
+                shopify.toast.show(t('changes_saved'));
+            } else {
+                shopify.toast.show(t('error_occur'), { isError: true });
+            }
+        } catch (error) {
+            console.error('Failed to save privacy recording settings:', error);
+            shopify.toast.show(t('error_occur'), { isError: true });
+        }
+    }, [privacyRecording, shopify, t]);
+
+    const handleNotificationChange = useCallback(async (field, value) => {
+        // Update local state immediately
+        setNotification((prev) => ({ ...prev, [field]: value }));
+
+        try {
+            const response = await fetch('/api/notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...notification,
+                    [field]: value,
+                }),
+            });
+
+            if (response.ok) {
+                shopify.toast.show(t('changes_saved'));
+            } else {
+                shopify.toast.show(t('error_occur'), { isError: true });
+            }
+        } catch (error) {
+            console.error('Failed to save notification settings:', error);
+            shopify.toast.show(t('error_occur'), { isError: true });
+        }
+    }, [notification, shopify, t]);
 
     return (
         <Page fullWidth>
@@ -1105,13 +1221,9 @@ const SettingsPage = () => {
                 </div>
 
                 <CameraFallbackCard settings={cameraFallback} onChange={handleCameraFallbackChange} t={t} />
-                <PrivacyCard t={t} />
-                <NotificationsCard t={t} />
+                <PrivacyCard settings={privacyRecording} onChange={handlePrivacyRecordingChange} t={t} />
+                <NotificationsCard settings={notification} onChange={handleNotificationChange} t={t} />
                 <AdvancedCard t={t} />
-
-                <Text variant="bodySm" as="p" tone="subdued">
-                    {isSaving ? (t('mirrly_settings.saving') || 'Saving') + '...' : t('mirrly_settings.settings_saved_automatically')}
-                </Text>
             </BlockStack>
         </Page>
     );
