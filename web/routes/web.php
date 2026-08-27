@@ -2,9 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
-use App\Http\Controllers\CampaignsController;
 use App\Http\Controllers\HookDeckController;
-use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\PlansController;
 use App\Http\Controllers\StoresController;
 use App\Http\Controllers\SubscriptionsController;
@@ -74,17 +72,6 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
     Route::post('/update-language', [StoresController::class, 'updateLanguage']);
 
     Route::post("/sendsmtp", [TestSmtpController::class, 'sendSmtpMail']);
-
-    Route::controller(CampaignsController::class)->prefix('campaigns')->group(function () {
-        Route::get('status', 'status');
-        Route::post('/', 'save');
-        Route::get('/', 'index');
-    });
-
-    Route::controller(LeadsController::class)->prefix('leads')->group(function () {
-        Route::get('/', 'index');
-        Route::post('export', 'export');
-    });
 
     Route::get('plans', [PlansController::class, 'index']);
     Route::get('check-new-user', [StoresController::class, 'checkNewUser']);

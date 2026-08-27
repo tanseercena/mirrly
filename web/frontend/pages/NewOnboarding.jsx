@@ -155,7 +155,7 @@ export default function NewOnboarding() {
     // Function to get plan ID from selected plan name
     const getPlanId = (planName) => {
         const planMap = {
-            "starter": "free",
+            "starter": "Free",
             "growth": "Growth",
             "scale": "Scale"
         };

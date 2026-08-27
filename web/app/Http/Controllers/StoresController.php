@@ -128,7 +128,7 @@ class StoresController extends Controller
         if ($store->subscription) {
             $plan = Plan::find($store->subscription->plan_id);
         } else {
-            $plan = Plan::where('name', 'free')->first();
+            $plan = Plan::whereRaw('LOWER(name) = ?', ['free'])->first();
         }
 
 

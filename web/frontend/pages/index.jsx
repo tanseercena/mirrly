@@ -56,7 +56,7 @@ const IndexPage = () => {
     const { isLoadingData, store } = useContext(AppContext);
     const { t } = useTranslation();
 
-    const handlePricing = () => navigate("/pricing");
+    const handlePricing = () => navigate("/plans");
 
     // Shopify Review Modal Hook - triggers after 5 seconds on dashboard
     const { hasRequested: hasRequestedReview } = useReviewModal({
@@ -65,7 +65,42 @@ const IndexPage = () => {
         enabled: true,
     });
 
-    const [subscription, setSubscription] = useState(null);
+    const [subscriptionData, setSubscriptionData] = useState(null);
+
+    /**
+     * Plan/usage derived values
+     * plan + subscription come from /api/subscription, used count from store context.
+     */
+    const plan = subscriptionData?.plan ?? null;
+    const activeSubscription = subscriptionData?.subscription ?? null;
+
+    // limits key standardized to 'sessions', but fall back to 'session' for older rows
+    const sessionLimitRaw = plan?.limits?.sessions ?? plan?.limits?.session ?? null;
+    const isUnlimitedSessions = sessionLimitRaw === 'unlimited';
+    const sessionLimit = typeof sessionLimitRaw === 'number' ? sessionLimitRaw : null;
+
+    const usedSessions = Number(store?.monthly_sessions ?? 0);
+    const usagePercent = sessionLimit
+        ? Math.min(100, Math.round((usedSessions / sessionLimit) * 100))
+        : 0;
+    const remainingSessions = sessionLimit !== null ? Math.max(0, sessionLimit - usedSessions) : null;
+
+    const formatNumber = (n) => Number(n || 0).toLocaleString();
+
+    const planDisplayName = plan?.name
+        ? plan.name.charAt(0).toUpperCase() + plan.name.slice(1)
+        : '';
+    const planPrice = activeSubscription?.interval === 'yearly'
+        ? plan?.yearly_charge
+        : plan?.monthly_charge;
+
+    const resetDate = activeSubscription?.next_reset_date
+        ? new Date(activeSubscription.next_reset_date).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        })
+        : null;
 
     const sessions = [
         {
@@ -128,7 +163,7 @@ const IndexPage = () => {
                 const response = await fetch("/api/subscription");
                 if (response.ok) {
                     const data = await response.json();
-                    setSubscription(data.data.subscription);
+                    setSubscriptionData(data.data);
                 }
             } catch (error) {
                 console.error("Error fetching subscription:", error);
@@ -503,9 +538,11 @@ const IndexPage = () => {
                                     </Text>
                                     <Icon source={InfoIcon} tone="subdued" />
                                 </InlineStack>
-                                <Text variant="bodySm" as="span" tone="subdued">
-                                    {t('dashboard.session_usage.resets_on', { date: 'May 31, 2025' })}
-                                </Text>
+                                {resetDate && (
+                                    <Text variant="bodySm" as="span" tone="subdued">
+                                        {t('dashboard.session_usage.resets_on', { date: resetDate })}
+                                    </Text>
+                                )}
                             </InlineStack>
                         </Box>
 
@@ -523,28 +560,34 @@ const IndexPage = () => {
                                         <BlockStack gap="500">
                                             <InlineStack gap="200" blockAlign="center">
                                                 <Text variant="headingMd" as="p" fontWeight="semibold">
-                                                    {t('dashboard.session_usage.growth_plan')}
+                                                    {planDisplayName}
                                                 </Text>
                                                 <Badge tone="success">{t('dashboard.session_usage.current_plan')}</Badge>
                                             </InlineStack>
 
                                             <InlineStack align="space-between" blockAlign="center">
                                                 <Text variant="headingLg" as="p">
-                                                    2,847{' '}
+                                                    {formatNumber(usedSessions)}{' '}
                                                     <Text variant="bodyMd" as="span" tone="subdued" fontWeight="regular">
-                                                        {t('dashboard.session_usage.of_sessions', { count: '5,000' })}
+                                                        {isUnlimitedSessions
+                                                            ? t('plans_page.of_unlimited_sessions')
+                                                            : t('dashboard.session_usage.of_sessions', { count: formatNumber(sessionLimit) })}
                                                     </Text>
                                                 </Text>
-                                                <Text variant="bodyMd" as="span" tone="subdued">
-                                                    {t('dashboard.session_usage.used', { percentage: '57%' })}
-                                                </Text>
+                                                {!isUnlimitedSessions && (
+                                                    <Text variant="bodyMd" as="span" tone="subdued">
+                                                        {t('dashboard.session_usage.used', { percentage: `${usagePercent}%` })}
+                                                    </Text>
+                                                )}
                                             </InlineStack>
                                         </BlockStack>
-                                        <ProgressBar progress={57} size="medium" tone="primary" />
+                                        {!isUnlimitedSessions && (
+                                            <ProgressBar progress={usagePercent} size="medium" tone="primary" />
+                                        )}
                                     </BlockStack>
                                 </Box>
 
-                                {/* Sessions remaining callout */}
+                                {/* Sessions remaining callout / unlimited note */}
                                 <Box
                                     background="bg-fill-info-secondary"
                                     borderRadius="200"
@@ -553,12 +596,25 @@ const IndexPage = () => {
                                     <InlineStack gap="300" blockAlign="center" wrap={false}>
                                         <Text> <Icon source={ChartVerticalFilledIcon} tone="info" /> </Text>
                                         <BlockStack gap="050">
-                                            <Text variant="bodyMd" as="p" fontWeight="semibold" tone="info">
-                                                {t('dashboard.session_usage.sessions_remaining', { count: '2,153' })}
-                                            </Text>
-                                            <Text variant="bodySm" as="p" tone="subdued">
-                                                {t('dashboard.session_usage.need_more_upgrade')}
-                                            </Text>
+                                            {isUnlimitedSessions ? (
+                                                <>
+                                                    <Text variant="bodyMd" as="p" fontWeight="semibold" tone="info">
+                                                        {t('dashboard.session_usage.unlimited_active')}
+                                                    </Text>
+                                                    <Text variant="bodySm" as="p" tone="subdued">
+                                                        {t('dashboard.session_usage.unlimited_note')}
+                                                    </Text>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Text variant="bodyMd" as="p" fontWeight="semibold" tone="info">
+                                                        {t('dashboard.session_usage.sessions_remaining', { count: formatNumber(remainingSessions) })}
+                                                    </Text>
+                                                    <Text variant="bodySm" as="p" tone="subdued">
+                                                        {t('dashboard.session_usage.need_more_upgrade')}
+                                                    </Text>
+                                                </>
+                                            )}
                                         </BlockStack>
                                     </InlineStack>
                                 </Box>
@@ -573,7 +629,7 @@ const IndexPage = () => {
                                 <Text variant="headingLg" as="h5" fontWeight={600}>
                                     {t('dashboard.current_plan.title')}
                                 </Text>
-                                <Badge tone="magic">Growth</Badge>
+                                <Badge tone="magic">{planDisplayName}</Badge>
                             </InlineStack>
                         </Box>
 
@@ -582,45 +638,43 @@ const IndexPage = () => {
                                 <BlockStack gap="100">
                                     <InlineStack gap="100" blockAlign="baseline">
                                         <Text variant="headingXl" as="p">
-                                            $29
+                                            ${formatNumber(planPrice)}
                                         </Text>
                                         <Text variant="bodyMd" as="span" tone="subdued">
-                                            {t('plans.per_month')}
+                                            {t('dashboard.current_plan.per_month')}
                                         </Text>
                                     </InlineStack>
                                     <Text variant="bodyMd" as="p" tone="subdued">
-                                        {t('dashboard.current_plan.up_to_sessions', { count: '5,000' })}
+                                        {sessionLimit !== null
+                                            ? t('dashboard.current_plan.up_to_sessions', { count: formatNumber(sessionLimit) })
+                                            : t('plans_page.unlimited_tryon_sessions')}
                                     </Text>
                                 </BlockStack>
 
-                                <BlockStack gap="150">
-                                    {[
-                                        t('dashboard.current_plan.all_core_features'),
-                                        t('dashboard.current_plan.sessions_per_month', { count: '5,000' }),
-                                        t('dashboard.current_plan.high_quality_results'),
-                                        t('dashboard.current_plan.priority_support'),
-                                        t('dashboard.current_plan.usage_analytics'),
-                                    ].map((feature) => (
-                                        <InlineStack key={feature} gap="150" blockAlign="center">
-                                            <Box
-                                                background="bg-fill-success-secondary"
-                                                borderRadius="full"
-                                                padding="025"
-                                            >
-                                                <Icon source={CheckIcon} tone="success" />
-                                            </Box>
-                                            <Text variant="bodysm" as="span">
-                                                {feature}
-                                            </Text>
-                                        </InlineStack>
-                                    ))}
-                                </BlockStack>
+                                {!!plan?.features?.length && (
+                                    <BlockStack gap="150">
+                                        {plan.features.map((feature) => (
+                                            <InlineStack key={feature} gap="150" blockAlign="center">
+                                                <Box
+                                                    background="bg-fill-success-secondary"
+                                                    borderRadius="full"
+                                                    padding="025"
+                                                >
+                                                    <Icon source={CheckIcon} tone="success" />
+                                                </Box>
+                                                <Text variant="bodysm" as="span">
+                                                    {feature}
+                                                </Text>
+                                            </InlineStack>
+                                        ))}
+                                    </BlockStack>
+                                )}
 
                                 <InlineStack gap="200">
-                                    <Button size="large">{t('dashboard.current_plan.manage_plan')}</Button>
-                                    <Button size="large" variant="primary" >
+                                    <Button size="large" onClick={handlePricing}>{t('dashboard.current_plan.manage_plan')}</Button>
+                                    {/* <Button size="large" variant="primary" >
                                         {t('dashboard.current_plan.view_all_plans')}
-                                    </Button>
+                                    </Button> */}
                                 </InlineStack>
                             </BlockStack>
                         </Box>

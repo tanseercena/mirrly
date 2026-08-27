@@ -1351,7 +1351,8 @@ const Step1 = ({ onComplete }) => {
             try {
                 const response = await fetch("/api/user-plan");
                 const data = await response.json();
-                setUserPlan(data.plan);
+                // normalize casing so "free" checks below keep working regardless of DB value
+                setUserPlan(String(data.plan ?? "").toLowerCase());
             } catch (error) {
                 console.error("Failed to fetch user plan:", error);
             }
