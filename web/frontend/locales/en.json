@@ -1196,8 +1196,10 @@
     "sessions_page": {
         "title": "Sessions",
         "subtitle": "Track how shoppers engage with your live try-on experience.",
-        "compared_to": "Compared to {startDate} &ndash; {endDate}",
+        "compared_to": "Compared to {{startDate}} &ndash; {{endDate}}",
         "vs_previous_30_days": "vs. previous 30 days",
+        "vs_previous_day": "vs. previous day",
+        "vs_previous_days": "vs. previous {{count}} days",
         "kpi_cards": {
             "sessions": "Sessions",
             "completion_rate": "Completion rate",

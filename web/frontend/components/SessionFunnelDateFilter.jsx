@@ -54,8 +54,11 @@ const formatDate = (date) =>
 /**
  * Date range filter button + popover (preset list + calendar), matching
  * the standard Shopify admin "Last 30 days" date filter pattern.
+ *
+ * @param {function} [onChange] - optional callback receiving the committed
+ *   {start, end} Date range when Apply is clicked.
  */
-const SessionFunnelDateFilter = () => {
+const SessionFunnelDateFilter = ({ onChange }) => {
     const { t } = useTranslation();
     const [popoverActive, setPopoverActive] = useState(false);
 
@@ -105,7 +108,11 @@ const SessionFunnelDateFilter = () => {
         setSelectedRangeValue(tempRangeValue);
         setSelectedDates(tempDates);
         setPopoverActive(false);
-    }, [tempRangeValue, tempDates]);
+        // Notify parent pages that consume the selected range
+        if (onChange) {
+            onChange(tempDates);
+        }
+    }, [tempRangeValue, tempDates, onChange]);
 
     const handleCancel = useCallback(() => {
         // Reset temp state to committed state

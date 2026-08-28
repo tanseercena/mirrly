@@ -6,6 +6,7 @@ use App\Http\Controllers\HookDeckController;
 use App\Http\Controllers\PlansController;
 use App\Http\Controllers\StoresController;
 use App\Http\Controllers\SubscriptionsController;
+use App\Http\Controllers\TrySessionsController;
 use App\Http\Controllers\TestSmtpController;
 use App\Http\Controllers\WebhooksController;
 use App\Http\Controllers\VimeoController;
@@ -78,6 +79,7 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
     Route::get('user-plan', [PlansController::class, 'getUserPlan']);
     Route::get('current-plan', [PlansController::class, 'getCurrentPlan']);
     Route::get('subscription', [SubscriptionsController::class, 'show']);
+    Route::get('sessions/analytics', [TrySessionsController::class, 'analytics']);
 
     // Billing routes
     Route::post('billing', [BillingController::class, 'process']);
