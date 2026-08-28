@@ -32,7 +32,7 @@ class PlansController extends Controller
         }
 
         return response()->json([
-            'plan' => 'free',
+            'plan' => 'Free',
         ]);
     }
 

@@ -360,7 +360,7 @@ QUERY;
                 'status' => 'cancelled',
             ]);
 
-        $freePlan = Plan::where('name', 'free')->first();
+        $freePlan = Plan::whereRaw('LOWER(name) = ?', ['free'])->first();
         $store->subscription()->create([
             'plan_id' => $freePlan->id,
             'status' => 'active',
@@ -598,7 +598,7 @@ QUERY;
 
 
         // Add Paying tag to brevo contact if paid plan
-        if(!empty($store->brevo_id) && config("app.env") == 'production' && $plan->name != 'free') {
+        if(!empty($store->brevo_id) && config("app.env") == 'production' && strtolower($plan->name) != 'free') {
             $brevo = new BrevoService($store);
             $brevo->updateContact([
                 'attributes' => [
@@ -608,7 +608,7 @@ QUERY;
         }
 
         // Remove paying tag if plan is free
-        if(!empty($store->brevo_id) && config("app.env") == 'production' && $plan->name == 'free') {
+        if(!empty($store->brevo_id) && config("app.env") == 'production' && strtolower($plan->name) == 'free') {
             $brevo = new BrevoService($store);
             $brevo->updateContact([
                 'attributes' => [

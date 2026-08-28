@@ -17,7 +17,7 @@ class PlansSeeder extends Seeder
         Plan::truncate();
 
         Plan::create([
-            'name' => 'free',
+            'name' => 'Free',
             'monthly_charge' => 0.00,
             'yearly_charge' => 0.00,
             'features' => [
@@ -28,8 +28,8 @@ class PlansSeeder extends Seeder
                 
             ],
             'limits' => [
-                'session' => 50,
-                
+                'sessions' => 50,
+                'session_rate' => 0.05,
             ],
             'can' => [
                
@@ -50,7 +50,7 @@ class PlansSeeder extends Seeder
             ],
             'limits' => [
                 'sessions' => 500,
-                
+                'session_rate' => 0.04,
             ],
             'can' => [
                 
@@ -71,8 +71,8 @@ class PlansSeeder extends Seeder
                 
             ],
             'limits' => [
-                'session' => 'unlimited',
-                
+                'sessions' => 'unlimited',
+                'session_rate' => 0.03,
             ],
             'can' => [
                 

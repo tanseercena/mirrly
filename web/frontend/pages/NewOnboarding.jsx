@@ -155,7 +155,7 @@ export default function NewOnboarding() {
     // Function to get plan ID from selected plan name
     const getPlanId = (planName) => {
         const planMap = {
-            "starter": "free",
+            "starter": "Free",
             "growth": "Growth",
             "scale": "Scale"
         };
@@ -1189,7 +1189,7 @@ export default function NewOnboarding() {
                         }
 
                         .progress-dot--active {
-                            background-color: #088395;
+                            background-color: #0F8B8D;
                         }
 
                         .progress-dot--inactive {
@@ -1199,13 +1199,13 @@ export default function NewOnboarding() {
                         .progress-label {
                             font-size: 16px;
                             font-weight: 600;
-                            color: #088395;
+                            color: #0F8B8D;
                             white-space: nowrap;
                         }
 
                         /* ── Next button ── */
                         .onboarding-next-btn {
-                            background-color: #088395;
+                            background-color: #0F8B8D;
                             color: white;
                             border: none;
                             border-radius: 8px;
@@ -1221,7 +1221,7 @@ export default function NewOnboarding() {
                         }
 
                         .onboarding-next-btn:hover:not(:disabled) {
-                            background-color: #09637E;
+                            background-color: #0F8B8D;
                             transform: translateY(-1px);
                         }
 
@@ -3811,7 +3811,7 @@ export default function NewOnboarding() {
 
                         .ob2-btn-prev {
                             background-color: white;
-                            color: #303030;
+                            color: #0F8B8D;
                             border: 1.5px solid #d0d0d0;
                         }
 
@@ -3826,14 +3826,14 @@ export default function NewOnboarding() {
                         }
 
                         .ob2-btn-next {
-                            background-color: #088395;
+                            background-color: #0F8B8D;
                             color: white;
                             border: none;
                             padding: 12px 28px;
                         }
 
                         .ob2-btn-next:hover:not(:disabled) {
-                            background-color: #09637E;
+                            background-color: #0F8B8D;
                             transform: translateY(-1px);
                         }
 
@@ -3864,13 +3864,13 @@ export default function NewOnboarding() {
                             border-radius: 3px;
                         }
 
-                        .ob2-dot--active  { background-color: #09637E; }
+                        .ob2-dot--active  { background-color: #0F8B8D; }
                         .ob2-dot--inactive { background-color: #e0e0e0; }
 
                         .ob2-progress-label {
                             font-size: 16px;
                             font-weight: 600;
-                            color: #09637E;
+                            color: #0F8B8D;
                             white-space: nowrap;
                         }
 

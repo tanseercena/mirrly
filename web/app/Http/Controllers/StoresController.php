@@ -128,7 +128,7 @@ class StoresController extends Controller
         if ($store->subscription) {
             $plan = Plan::find($store->subscription->plan_id);
         } else {
-            $plan = Plan::where('name', 'free')->first();
+            $plan = Plan::whereRaw('LOWER(name) = ?', ['free'])->first();
         }
 
 
@@ -338,6 +338,72 @@ class StoresController extends Controller
         $setting->save();
 
         return response()->json(['success' => true, 'message' => 'Camera fallback settings saved successfully']);
+    }
+
+    public function savePrivacyRecording(Request $request)
+    {
+        $session = $request->get('shopifySession');
+        $shop = $session->getShop();
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+
+        if (!$store) {
+            return response()->json([
+                'message' => 'Store not found',
+            ], 404);
+        }
+
+        // Get or create the store's setting
+        $setting = $store->setting;
+
+        if (!$setting) {
+            $setting = $store->setting()->create([]);
+        }
+
+        // Build privacy recording data structure
+        $privacyRecording = [
+            'recording' => $request->input('recording', false),
+            'retention' => $request->input('retention', '7'),
+        ];
+
+        $setting->privacy_recording = $privacyRecording;
+        $setting->save();
+
+        return response()->json(['success' => true, 'message' => 'Privacy recording settings saved successfully']);
+    }
+
+    public function saveNotification(Request $request)
+    {
+        $session = $request->get('shopifySession');
+        $shop = $session->getShop();
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+
+        if (!$store) {
+            return response()->json([
+                'message' => 'Store not found',
+            ], 404);
+        }
+
+        // Get or create the store's setting
+        $setting = $store->setting;
+
+        if (!$setting) {
+            $setting = $store->setting()->create([]);
+        }
+
+        // Build notification data structure
+        $notificationData = [
+            'weekly_summary' => $request->input('weekly_summary', true),
+            'spend_alert' => $request->input('spend_alert', true),
+            'completion_alert' => $request->input('completion_alert', true),
+            'spend_threshold' => $request->input('spend_threshold', '80'),
+            'completion_threshold' => $request->input('completion_threshold', '60'),
+            'email' => $request->input('email', 'you@yourstore.com'),
+        ];
+
+        $setting->notification = $notificationData;
+        $setting->save();
+
+        return response()->json(['success' => true, 'message' => 'Notification settings saved successfully']);
     }
 
     public function registerOrderUpdatedWebhook(Store $store, $session, $path)
