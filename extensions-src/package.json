@@ -1,23 +1,16 @@
 {
-  "name": "assets",
-  "version": "1.0.0",
-  "main": "index.js",
-  "license": "MIT",
-  "devDependencies": {
-    "@babel/preset-react": "^7.18.6",
-    "dotenv-webpack": "^8.0.1",
-    "laravel-mix": "^6.0.49"
-  },
-  "dependencies": {
-    "@sweetalert/with-react": "^0.1.1",
-    "copy-to-clipboard": "^3.3.3",
-    "moment": "^2.29.4",
-    "react": "^18.2.0",
-    "react-countdown": "^2.3.5",
-    "react-dom": "^18.2.0",
-    "react-loader-spinner": "^5.3.4",
-    "react-toastify": "^9.1.1",
-    "sweetalert": "^2.1.2",
-    "use-exit-intent": "^1.0.7"
-  }
+    "name": "tryon-widget",
+    "private": true,
+    "scripts": {
+        "build": "node build.js",
+        "watch": "node build.js --watch"
+    },
+    "dependencies": {
+        "preact": "^10.19.0",
+        "@decartai/sdk": "^0.1.22"
+    },
+    "devDependencies": {
+        "esbuild": "^0.21.0",
+        "typescript": "^5.4.0"
+    }
 }

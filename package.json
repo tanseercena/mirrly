@@ -1,5 +1,5 @@
 {
-    "name": "digitally",
+    "name": "mirrly",
     "version": "1.0.0",
     "license": "UNLICENSED",
     "scripts": {
@@ -13,7 +13,7 @@
     },
     "dependencies": {
         "@shopify/app": "3.51.2",
-        "@shopify/cli": "^3.86.1",
+        "@shopify/cli": "^4.7.0",
         "@shopify/polaris-viz": "^15.0.4",
         "@shopify/theme": "^3.51.2",
         "@shopify/ui-extensions": "2024.10.x",

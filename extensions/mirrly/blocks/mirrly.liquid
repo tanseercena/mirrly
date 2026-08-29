@@ -1,0 +1,16 @@
+<div
+  id="tryon-root-{{ product.id }}"
+  data-product-id="{{ product.id }}"
+  data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+  data-shop="{{ shop.permanent_domain }}"
+  data-button-text="{{ block.settings.button_text }}"
+  data-widget-url="{{ 'tryon-widget.js' | asset_url }}"
+></div>
+<script src="{{ 'tryon-loader.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+    "name": "Mirrly",
+    "target": "body"
+}
+{% endschema %}
