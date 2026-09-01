@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import {
     Page,
     Card,
@@ -21,11 +21,13 @@ import {
     useIndexResourceState
 } from "@shopify/polaris";
 import { AppContext } from "../components/providers/AppProvider.jsx";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { useTranslation } from "react-i18next";
 import LanguageSelector from "../components/LanguageSelector.jsx";
 import { useNavigate } from "react-router-dom";
 import { PageLoader } from "../components/PageLoader.jsx";
 import SessionFunnelDateFilter from '../components/SessionFunnelDateFilter';
+import { isCardDismissed, dismissCard } from "../utils/sessionStorage.js";
 
 
 import useReviewModal from "../hooks/useReviewModal.js";
@@ -37,6 +39,7 @@ import {
     XSmallIcon,
     PlayIcon,
     ArrowUpIcon,
+    ArrowDownIcon,
     CartIcon,
     DatabaseIcon,
     CheckSmallIcon,
@@ -51,10 +54,333 @@ import {
     MenuHorizontalIcon
 } from "@shopify/polaris-icons";
 
+// Theme extension deep link + polling (setup progress banner)
+const APP_ID = '9d72bb0915715baf6d8d8b6b9bb15d29';
+const EXTENSION_HANDLE = 'mirrly';
+const THEME_POLL_INTERVAL_MS = 1000;
+const THEME_POLL_MAX_ATTEMPTS = 30; // checks every 1s for up to 30s
+
+/* ============================================
+    OVERVIEW ANALYTICS
+    Date-range helpers + dynamic KPI cards — mirrors the Sessions page
+    pattern, but keeps the dashboard's own card look (no sparklines).
+    ============================================ */
+
+/* Default "Last 30 days" window */
+const defaultRange = () => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 29);
+    return { start, end };
+};
+
+/* Local-date YYYY-MM-DD (no UTC shifting) */
+const toISODate = (d) =>
+    d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+/* Previous period of equal length, immediately before [start, end].
+   Works uniformly for today (-> yesterday), last 7 days (-> prior 7)
+   and any custom range (-> N days before its start). */
+const getPreviousPeriod = (start, end) => {
+    const length = Math.max(1, Math.round((end - start) / 86400000) + 1);
+    const prevEnd = new Date(start);
+    prevEnd.setDate(prevEnd.getDate() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevStart.getDate() - (length - 1));
+    return { start: prevStart, end: prevEnd };
+};
+
+const formatCount = (n) => Number(n || 0).toLocaleString();
+const rate = (part, whole) => (whole > 0 ? (part / whole) * 100 : 0);
+
+const pctChange = (cur, prev) => {
+    if (prev > 0) return ((cur - prev) / prev) * 100;
+    return cur > 0 ? 100 : 0;
+};
+
+const changeLabel = (delta) => parseFloat(Math.abs(delta).toFixed(1)).toLocaleString() + '%';
+const directionOf = (delta) => (delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat');
+
+/* "42" -> "42s", "95" -> "1m 35s" */
+const formatDuration = (seconds) => {
+    const s = Math.round(seconds || 0);
+    if (s < 60) return s + 's';
+    return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+};
+
+/**
+ * Metric Card Skeleton Component
+ * Placeholder for overview metrics
+ * Structure: Icon → Title → Value → Trend → Supporting text
+ */
+const MetricCardSkeleton = () => (
+    <Card>
+        <Box padding="500" minHeight="280px">
+            <BlockStack gap="400">
+                {/* Icon at top */}
+                <Box width="56px" height="56px" background="bg-surface-secondary" borderRadius="200" />
+
+                {/* Metric Title */}
+                <SkeletonBodyText lines={1} />
+
+                {/* Large Metric Value */}
+                <Box width="50%">
+                    <SkeletonDisplayText size="extraLarge" />
+                </Box>
+
+                {/* Growth/Change Row */}
+                <Box width="35%">
+                    <SkeletonBodyText lines={1} />
+                </Box>
+
+                {/* Supporting Comparison Text */}
+                <Box width="85%">
+                    <SkeletonBodyText lines={1} />
+                </Box>
+            </BlockStack>
+        </Box>
+    </Card>
+);
+
+/* One overview metric card — keeps the dashboard's current look (no sparkline) */
+const OverviewCard = ({ icon, iconBg, iconTone, label, value, change, direction, sublabel }) => {
+    const changeTone = direction === 'up' ? 'success' : direction === 'down' ? 'critical' : 'subdued';
+    const ChangeIcon = direction === 'up' ? ArrowUpIcon : direction === 'down' ? ArrowDownIcon : ArrowRightIcon;
+
+    return (
+        <Card>
+            <BlockStack gap="300" align="start">
+                <Box background={iconBg} borderRadius="200" padding="200" minWidth="40px" maxWidth="40px">
+                    <Icon source={icon} tone={iconTone} />
+                </Box>
+                <BlockStack gap="200">
+                    <Text variant="bodyMd" as="p" tone="subdued">
+                        {label}
+                    </Text>
+                    <Text variant="heading2xl" as="h3">
+                        {value}
+                    </Text>
+                    <InlineStack gap="100" blockAlign="center">
+                        <Text> <Icon source={ChangeIcon} tone={changeTone} /> </Text>
+                        <Text variant="bodyLg" as="span" tone={changeTone} fontWeight="bold">
+                            {change}
+                        </Text>
+                    </InlineStack>
+                    <Text variant="bodySm" as="p" tone="subdued">
+                        {sublabel}
+                    </Text>
+                </BlockStack>
+            </BlockStack>
+        </Card>
+    );
+};
+
+/* The 4 overview metric cards, driven by /api/sessions/analytics */
+const OverviewKpiCards = ({ analytics, range, isLoading }) => {
+    const { t } = useTranslation();
+
+    if (isLoading || !analytics) {
+        return (
+            <InlineGrid columns={{ xs: 1, sm: 2, md: 4, lg: 4 }} gap="400">
+                <MetricCardSkeleton />
+                <MetricCardSkeleton />
+                <MetricCardSkeleton />
+                <MetricCardSkeleton />
+            </InlineGrid>
+        );
+    }
+
+    const { kpis } = analytics;
+    const cur = kpis.funnel.current;
+    const prev = kpis.funnel.previous;
+    const avgLen = kpis.avg_session_length ?? { current: 0, previous: 0 };
+
+    /* Comparison sublabel mirrors the real previous window (equal-length prior period) */
+    const previousPeriod = getPreviousPeriod(range.start, range.end);
+    const windowDays = Math.max(1, Math.round((previousPeriod.end - previousPeriod.start) / 86400000) + 1);
+    const compareSublabel = windowDays === 1
+        ? t('dashboard.overview.vs_previous_day')
+        : t('dashboard.overview.vs_previous_days', { count: windowDays });
+
+    const cards = [
+        {
+            icon: PlayIcon,
+            iconBg: 'bg-fill-info-secondary',
+            iconTone: 'info',
+            label: t('dashboard.overview.sessions_this_cycle'),
+            value: formatCount(kpis.sessions.current),
+            change: changeLabel(pctChange(kpis.sessions.current, kpis.sessions.previous)),
+            direction: directionOf(pctChange(kpis.sessions.current, kpis.sessions.previous)),
+            sublabel: compareSublabel,
+        },
+        {
+            icon: CartIcon,
+            iconBg: 'bg-fill-success-secondary',
+            iconTone: 'success',
+            label: t('dashboard.overview.add_to_cart_after_try_on'),
+            value: formatCount(cur.added_to_cart),
+            change: changeLabel(pctChange(cur.added_to_cart, prev.added_to_cart)),
+            direction: directionOf(pctChange(cur.added_to_cart, prev.added_to_cart)),
+            sublabel: rate(cur.added_to_cart, cur.started).toFixed(1) + '% ' + t('dashboard.overview.conversion_rate'),
+        },
+        {
+            icon: ClockIcon,
+            iconBg: 'bg-fill-info-secondary',
+            iconTone: 'info',
+            label: t('dashboard.overview.avg_session_length'),
+            value: formatDuration(avgLen.current),
+            change: changeLabel(pctChange(avgLen.current, avgLen.previous)),
+            direction: directionOf(pctChange(avgLen.current, avgLen.previous)),
+            sublabel: compareSublabel,
+        },
+        {
+            icon: DatabaseIcon,
+            iconBg: 'bg-fill-magic-secondary',
+            iconTone: 'magic',
+            label: t('dashboard.overview.spend_this_cycle'),
+            value: '-',
+            change: '-',
+            direction: 'flat',
+            sublabel: t('dashboard.overview.per_session'),
+        },
+    ];
+
+    return (
+        <InlineGrid columns={{ xs: 1, sm: 2, md: 4, lg: 4 }} gap="400">
+            {cards.map((kpi) => (
+                <OverviewCard key={kpi.label} {...kpi} />
+            ))}
+        </InlineGrid>
+    );
+};
+
+/* One funnel step box — keeps the dashboard's current look.
+   While data is loading (value/percent null) it shows skeletons. */
+const FunnelStepBox = ({ icon, value, label, percent, caption }) => (
+    <Box width="100%">
+        <BlockStack gap="200" inlineAlign="center">
+            <div style={{ position: 'relative', width: '100%', marginTop: "15px" }}>
+                <Box
+                    borderWidth="025"
+                    borderColor="border-subdued"
+                    borderRadius="200"
+                    paddingBlockStart="600"
+                    paddingBlockEnd="400"
+                    paddingInline="300"
+                >
+                    <BlockStack gap="050" inlineAlign="center">
+                        {value !== null ? (
+                            <Text variant="headingLg" as="p">
+                                {value}
+                            </Text>
+                        ) : (
+                            <SkeletonDisplayText size="medium" />
+                        )}
+                        <Text variant="bodyMd" as="p" tone="subdued">
+                            {label}
+                        </Text>
+                    </BlockStack>
+                </Box>
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                    }}
+                >
+                    <Box
+                        background="bg-fill-info-secondary"
+                        borderRadius="full"
+                        padding="300"
+                    >
+                        <Icon source={icon} tone="info" />
+                    </Box>
+                </div>
+            </div>
+            <BlockStack gap="0" inlineAlign="center">
+                {percent !== null ? (
+                    <Text variant="bodyMd" as="p" fontWeight="semibold">
+                        {percent}
+                    </Text>
+                ) : (
+                    <SkeletonBodyText lines={1} />
+                )}
+                <Text variant="bodySm" as="p" tone="subdued">
+                    {caption}
+                </Text>
+            </BlockStack>
+        </BlockStack>
+    </Box>
+);
+
+/* The 4 session funnel steps, driven by /api/sessions/analytics.
+   Percent at each step is relative to the previous step. */
+const SessionFunnelSteps = ({ analytics }) => {
+    const { t } = useTranslation();
+
+    const f = analytics?.kpis?.funnel?.current ?? null;
+    const pct = (step, before) => rate(step, before).toFixed(1) + '%';
+
+    const steps = [
+        {
+            icon: CameraIcon,
+            label: t('dashboard.session_funnel.camera_opened'),
+            caption: t('dashboard.session_funnel.of_product_page_clicks'),
+            value: f ? formatCount(f.opened) : null,
+            percent: f ? '100%' : null,
+        },
+        {
+            icon: ImageIcon,
+            label: t('dashboard.session_funnel.try_on_started'),
+            caption: t('dashboard.session_funnel.continued_after_camera'),
+            value: f ? formatCount(f.started) : null,
+            percent: f ? pct(f.started, f.opened) : null,
+        },
+        {
+            icon: MagicIcon,
+            label: t('dashboard.session_funnel.try_on_completed'),
+            caption: t('dashboard.session_funnel.completed_try_on'),
+            value: f ? formatCount(f.completed) : null,
+            percent: f ? pct(f.completed, f.started) : null,
+        },
+        {
+            icon: CartIcon,
+            label: t('dashboard.session_funnel.added_to_cart'),
+            caption: t('dashboard.session_funnel.added_to_cart_step'),
+            value: f ? formatCount(f.added_to_cart) : null,
+            percent: f ? pct(f.added_to_cart, f.completed) : null,
+        },
+    ];
+
+    return (
+        <InlineStack align="space-between" blockAlign="center" wrap={false} gap="200">
+            {steps.map((step, index) => (
+                <React.Fragment key={step.label}>
+                    <FunnelStepBox {...step} />
+                    {index < steps.length - 1 && (
+                        <Text> <Icon source={ChevronRightIcon} tone="subdued" /> </Text>
+                    )}
+                </React.Fragment>
+            ))}
+        </InlineStack>
+    );
+};
+
 const IndexPage = () => {
     const navigate = useNavigate();
     const { isLoadingData, store } = useContext(AppContext);
     const { t } = useTranslation();
+    const shopify = useAppBridge();
+
+    // Theme extension status (setup progress banner)
+    const [themeExtensionEnabled, setThemeExtensionEnabled] = useState(false);
+    const [isEnabling, setIsEnabling] = useState(false);
+    const themePollIntervalRef = useRef(null);
+    const themePollBusyRef = useRef(false);
+
+    // Setup progress banner visibility (X dismiss)
+    const [isBannerDismissed, setIsBannerDismissed] = useState(isCardDismissed('setup_progress_banner'));
 
     const handlePricing = () => navigate("/plans");
 
@@ -172,43 +498,109 @@ const IndexPage = () => {
         fetchSubscription();
     }, []);
 
+    /* ============================================
+        OVERVIEW ANALYTICS (4 KPI cards)
+        Same pattern as the Sessions page: range -> /api/sessions/analytics
+        ============================================ */
+    const [overviewRange, setOverviewRange] = useState(defaultRange);
+    const [overviewAnalytics, setOverviewAnalytics] = useState(null);
+    const [isOverviewLoading, setIsOverviewLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const load = async () => {
+            setIsOverviewLoading(true);
+            try {
+                const params = new URLSearchParams({
+                    from: toISODate(overviewRange.start),
+                    to: toISODate(overviewRange.end),
+                });
+                const response = await fetch('/api/sessions/analytics?' + params.toString());
+                const payload = response.ok ? await response.json() : null;
+                if (!cancelled && payload && payload.data) {
+                    setOverviewAnalytics(payload.data);
+                }
+            } catch (error) {
+                console.error('Failed loading overview analytics:', error);
+            } finally {
+                if (!cancelled) {
+                    setIsOverviewLoading(false);
+                }
+            }
+        };
+
+        load();
+        return () => {
+            cancelled = true;
+        };
+    }, [overviewRange]);
+
+    /* ============================================
+        THEME EXTENSION (Setup progress banner)
+        Same flow as onboarding Step 3
+        ============================================ */
+    const checkThemeExtension = async () => {
+        try {
+            const extensions = await shopify.app.extensions();
+
+            // --- Theme App Extension ---
+            const themeExtension = extensions.find(e => e.type === 'theme_app_extension');
+            // Get the specific block by handle (e.g. 'mirrly')
+            const themeBlock = themeExtension?.activations.find(a => a.handle === EXTENSION_HANDLE);
+            const themeExtensionStatus = themeBlock?.status ?? 'unavailable'; // 'active' | 'available' | 'unavailable'
+            const enabled = themeExtensionStatus === 'active';
+            setThemeExtensionEnabled(enabled);
+            return enabled;
+        } catch (error) {
+            console.error('Error checking theme extension status:', error);
+            return false;
+        }
+    };
+
+    // Check theme extension status automatically on page load
+    useEffect(() => {
+        checkThemeExtension();
+    }, []);
+
+    // Stop polling if the component unmounts
+    useEffect(() => () => {
+        if (themePollIntervalRef.current) clearInterval(themePollIntervalRef.current);
+    }, []);
+
+    const handleEnableThemeExtension = () => {
+        if (isEnabling || themeExtensionEnabled) return; // no re-click while polling / already active
+
+        setIsEnabling(true);
+        // Deep link to theme editor with the app block pre-activated (new tab so polling keeps running)
+        const themeEditorUrl = `https://${shopify.config.shop}/admin/themes/current/editor?context=apps&activateAppId=${APP_ID}/${EXTENSION_HANDLE}`;
+        window.open(themeEditorUrl, '_blank');
+
+        // Poll for activation every 1s, for up to 30s
+        let attempts = 0;
+        themePollIntervalRef.current = setInterval(async () => {
+            if (themePollBusyRef.current) return; // skip tick if the previous check is still in flight
+            themePollBusyRef.current = true;
+            attempts++;
+
+            const enabled = await checkThemeExtension();
+            themePollBusyRef.current = false;
+
+            if (enabled) {
+                clearInterval(themePollIntervalRef.current);
+                setIsEnabling(false);
+                shopify.toast.show(t("onboarding.theme_extension_enabled_success"));
+            } else if (attempts >= THEME_POLL_MAX_ATTEMPTS) {
+                clearInterval(themePollIntervalRef.current);
+                setIsEnabling(false);
+                shopify.toast.show(t("onboarding.theme_extension_not_detected"), { isError: true });
+            }
+        }, THEME_POLL_INTERVAL_MS);
+    };
+
     if (isLoadingData) {
         return <PageLoader />;
     }
-
-    /**
-     * Metric Card Skeleton Component
-     * Placeholder for overview metrics
-     * Structure: Icon → Title → Value → Trend → Supporting text
-     */
-    const MetricCardSkeleton = () => (
-        <Card>
-            <Box padding="500" minHeight="280px">
-                <BlockStack gap="400">
-                    {/* Icon at top */}
-                    <Box width="56px" height="56px" background="bg-surface-secondary" borderRadius="200" />
-
-                    {/* Metric Title */}
-                    <SkeletonBodyText lines={1} />
-
-                    {/* Large Metric Value */}
-                    <Box width="50%">
-                        <SkeletonDisplayText size="extraLarge" />
-                    </Box>
-
-                    {/* Growth/Change Row */}
-                    <Box width="35%">
-                        <SkeletonBodyText lines={1} />
-                    </Box>
-
-                    {/* Supporting Comparison Text */}
-                    <Box width="85%">
-                        <SkeletonBodyText lines={1} />
-                    </Box>
-                </BlockStack>
-            </Box>
-        </Card>
-    );
 
     /**
      * Status configuration lookup - defined once outside the component
@@ -301,12 +693,74 @@ const IndexPage = () => {
         SETUP PROGRESS BANNER
         Full-width section
         ============================================ */
+    /* ============================================
+        SETUP PROGRESS BANNER
+        Steps are checked in order: first incomplete step = current (yellow),
+        steps before it = completed (green), steps after it = pending (grey).
+        ============================================ */
+    const productTypeDone = !!store?.setting?.collection_type; // set by onboarding step 2
+    const planDone = !!activeSubscription?.plan_selected; // plan chosen: paid via billing (plan_selected=true) or Free selected (defaults true); false on install's default free sub
+    const liveTestDone = !!store?.setup_steps?.live_test_done; // saved by onboarding step 4
+
+    const stepDoneFlags = [productTypeDone, themeExtensionEnabled, planDone, liveTestDone];
+    const allStepsDone = stepDoneFlags.every(Boolean);
+    const currentStepIndex = stepDoneFlags.indexOf(false); // -1 when all completed
+
     const setupSteps = [
-        { label: t('dashboard.setup_progress_banner.steps.product_type'), status: 'completed' },
-        { label: t('dashboard.setup_progress_banner.steps.theme_embed'), status: 'completed' },
-        { label: t('dashboard.setup_progress_banner.steps.live_test'), status: 'current' },
-        { label: t('dashboard.setup_progress_banner.steps.choose_plan'), status: 'pending' },
-    ];
+        { label: t('dashboard.setup_progress_banner.steps.product_type') },
+        { label: t('dashboard.setup_progress_banner.steps.theme_embed') },
+        { label: t('dashboard.setup_progress_banner.steps.choose_plan') },
+        { label: t('dashboard.setup_progress_banner.steps.live_test') },
+    ].map((step, index) => ({
+        ...step,
+        status: currentStepIndex === -1 || index < currentStepIndex
+            ? 'completed'
+            : index === currentStepIndex ? 'current' : 'pending',
+    }));
+
+    // Banner stays hidden permanently (per user) once dismissed with all steps completed;
+    // while setup is incomplete, X only hides it for the current session.
+    const showBanner = !(allStepsDone && store?.dismissed_banners?.setup_progress_banner) && !isBannerDismissed;
+
+    const handleDismissBanner = () => {
+        if (allStepsDone) {
+            // Persist: never show again for this user
+            fetch('/api/dismiss-banner', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ banner: 'setup_progress_banner' }),
+            }).catch(error => console.error('Failed to dismiss banner:', error));
+        } else {
+            // Session-only dismissal
+            dismissCard('setup_progress_banner');
+        }
+        setIsBannerDismissed(true);
+    };
+
+    // CTA label + action follow the current (first incomplete) step
+    const bannerCtaLabel = [
+        t('dashboard.setup_progress_banner.select_products'),
+        t('dashboard.setup_progress_banner.enable_theme_extension'),
+        t('dashboard.setup_progress_banner.choose_plan'),
+        t('dashboard.setup_progress_banner.continue_live_test'),
+    ][currentStepIndex];
+
+    const handleBannerCta = () => {
+        switch (currentStepIndex) {
+            case 0: // Product type → onboarding (product selection)
+                navigate("/NewOnboarding");
+                break;
+            case 1: // Theme embed → open theme editor + poll for activation
+                handleEnableThemeExtension();
+                break;
+            case 2: // Choose plan → plans / billing flow
+                handlePricing();
+                break;
+            case 3: // Live test → redirect link to be provided later
+            default:
+                break;
+        }
+    };
 
 
     return (
@@ -321,6 +775,7 @@ const IndexPage = () => {
                     SETUP PROGRESS BANNER
                     Full-width section
                     ============================================ */}
+                {showBanner && (
                 <div
                     style={{
                         background: '#FFFBEB',
@@ -359,10 +814,22 @@ const IndexPage = () => {
                             </InlineStack>
 
                             <InlineStack gap="200" blockAlign="center" wrap={false}>
-                                <Button variant="primary" icon={ArrowRightIcon}>
-                                    {t('dashboard.setup_progress_banner.continue_live_test')}
-                                </Button>
-                                <Button icon={XSmallIcon} variant="tertiary" accessibilityLabel={t('dashboard.dismiss')} />
+                                {!allStepsDone && (
+                                    <Button
+                                        variant="primary"
+                                        icon={ArrowRightIcon}
+                                        loading={isEnabling}
+                                        onClick={handleBannerCta}
+                                    >
+                                        {bannerCtaLabel}
+                                    </Button>
+                                )}
+                                <Button
+                                    icon={XSmallIcon}
+                                    variant="tertiary"
+                                    accessibilityLabel={t('dashboard.dismiss')}
+                                    onClick={handleDismissBanner}
+                                />
                             </InlineStack>
                         </InlineStack>
 
@@ -370,6 +837,7 @@ const IndexPage = () => {
                         <SetupStepsRow steps={setupSteps} />
                     </BlockStack>
                 </div>
+                )}
 
                 {/* ============================================
                     OVERVIEW SECTION
@@ -381,7 +849,7 @@ const IndexPage = () => {
                         <Text variant="headingLg" as="h2" fontWeight={600}>
                             {t('dashboard.overview.title')}
                         </Text>
-                        <SessionFunnelDateFilter />
+                        <SessionFunnelDateFilter onChange={setOverviewRange} />
                     </InlineStack>
 
                     {/* Description below heading */}
@@ -390,137 +858,11 @@ const IndexPage = () => {
                     </Text>
 
                     {/* Metric Cards Grid - 4 real columns */}
-                    <InlineGrid columns={{ xs: 1, sm: 2, md: 4, lg: 4 }} gap="400">
-
-                        {/* Sessions this cycle */}
-                        <Card>
-                            <BlockStack gap="300" align="start">
-                                <Box
-                                    background="bg-fill-info-secondary"
-                                    borderRadius="200"
-                                    padding="200"
-                                    minWidth="40px"
-                                    maxWidth="40px"
-                                >
-                                    <Icon source={PlayIcon} tone="info" />
-                                </Box>
-                                <BlockStack gap="200">
-                                    <Text variant="bodyMd" as="p" tone="subdued">
-                                        {t('dashboard.overview.sessions_this_cycle')}
-                                    </Text>
-                                    <Text variant="heading2xl" as="h3">
-                                        2,847
-                                    </Text>
-                                    <InlineStack direction="row" alignItems="start">
-                                        <Text><Icon source={ArrowUpIcon} tone="success" /> </Text>
-                                        <Text variant="bodyLg" as="span" tone="success" fontWeight="bold">
-                                            12%
-                                        </Text>
-                                    </InlineStack>
-                                    <Text gap="200" variant="bodySm" as="p" tone="subdued">
-                                        {t('dashboard.overview.vs_previous_30_days')}
-                                    </Text>
-                                </BlockStack>
-                            </BlockStack>
-                        </Card>
-
-                        {/* Add-to-cart after try-on */}
-                        <Card>
-                            <BlockStack gap="300">
-                                <Box
-                                    background="bg-fill-success-secondary"
-                                    borderRadius="200"
-                                    padding="200"
-                                    minWidth="40px"
-                                    maxWidth="40px"
-                                >
-                                    <Icon source={CartIcon} tone="success" />
-                                </Box>
-                                <BlockStack gap="200">
-                                    <Text variant="bodyMd" as="p" tone="subdued">
-                                        {t('dashboard.overview.add_to_cart_after_try_on')}
-                                    </Text>
-                                    <Text variant="heading2xl" as="h3">
-                                        342
-                                    </Text>
-                                    <InlineStack blockAlign="center">
-                                        <Text> <Icon source={ArrowUpIcon} tone="success" /> </Text>
-                                        <Text variant="bodyLg" as="span" tone="success" fontWeight="bold">
-                                            18%
-                                        </Text>
-                                    </InlineStack>
-                                    <Text gap="200" variant="bodySm" as="p" tone="subdued">
-                                        12.0% {t('dashboard.overview.conversion_rate')}
-                                    </Text>
-                                </BlockStack>
-                            </BlockStack>
-                        </Card>
-
-                        {/* Avg. session length */}
-                        <Card>
-                            <BlockStack gap="300">
-                                <Box
-                                    background="bg-fill-info-secondary"
-                                    borderRadius="200"
-                                    padding="200"
-                                    minWidth="40px"
-                                    maxWidth="40px"
-                                >
-                                    <Icon source={ClockIcon} tone="info" />
-                                </Box>
-                                <BlockStack gap="200">
-                                    <Text variant="bodyMd" as="p" tone="subdued">
-                                        {t('dashboard.overview.avg_session_length')}
-                                    </Text>
-                                    <Text variant="heading2xl" as="h3">
-                                        42s
-                                    </Text>
-                                    <InlineStack gap="100" blockAlign="center">
-                                        <Text> <Icon source={ArrowUpIcon} tone="success" /> </Text>
-                                        <Text variant="bodyLg" as="span" tone="success" fontWeight="bold">
-                                            6%
-                                        </Text>
-                                    </InlineStack>
-                                    <Text gap="200" variant="bodySm" as="p" tone="subdued">
-                                        {t('dashboard.overview.vs_previous_30_days')}
-                                    </Text>
-                                </BlockStack>
-                            </BlockStack>
-                        </Card>
-
-                        {/* Spend this cycle */}
-                        <Card>
-                            <BlockStack gap="300">
-                                <Box
-                                    background="bg-fill-magic-secondary"
-                                    borderRadius="200"
-                                    padding="200"
-                                    minWidth="40px"
-                                    maxWidth="40px"
-                                >
-                                    <Icon source={DatabaseIcon} tone="magic" />
-                                </Box>
-                                <BlockStack gap="200">
-                                    <Text variant="bodyMd" as="p" tone="subdued">
-                                        {t('dashboard.overview.spend_this_cycle')}
-                                    </Text>
-                                    <Text variant="heading2xl" as="h3">
-                                        $18.42
-                                    </Text>
-                                    <InlineStack blockAlign="center">
-                                        <Text> <Icon source={ArrowUpIcon} tone="success" /> </Text>
-                                        <Text variant="bodyLg" as="span" tone="success" fontWeight="bold">
-                                            8%
-                                        </Text>
-                                    </InlineStack>
-                                    <Text gap="200" variant="bodySm" as="p" tone="subdued">
-                                        $0.0065 {t('dashboard.overview.per_session')}
-                                    </Text>
-                                </BlockStack>
-                            </BlockStack>
-                        </Card>
-
-                    </InlineGrid>
+                    <OverviewKpiCards
+                        analytics={overviewAnalytics}
+                        range={overviewRange}
+                        isLoading={isOverviewLoading && !overviewAnalytics}
+                    />
                 </BlockStack>
 
                 {/* ============================================
@@ -696,217 +1038,12 @@ const IndexPage = () => {
                                     {t('dashboard.session_funnel.description')}
                                 </Text>
                             </BlockStack>
-                            <SessionFunnelDateFilter />
+                            {/* <SessionFunnelDateFilter onChange={setOverviewRange} /> */}
                         </InlineStack>
                     </Box>
 
                     <Box padding="400">
-                        <InlineStack align="space-between" blockAlign="center" wrap={false} gap="200">
-
-                            {/* Step 1 - Camera opened */}
-                            <Box width="100%">
-                                <BlockStack gap="200" inlineAlign="center">
-                                    <div style={{ position: 'relative', width: '100%', marginTop: "15px" }}>
-                                        <Box
-                                            borderWidth="025"
-                                            borderColor="border-subdued"
-                                            borderRadius="200"
-                                            paddingBlockStart="600"
-                                            paddingBlockEnd="400"
-                                            paddingInline="300"
-                                        >
-                                            <BlockStack gap="050" inlineAlign="center">
-                                                <Text variant="headingLg" as="p">
-                                                    3,421
-                                                </Text>
-                                                <Text variant="bodyMd" as="p" tone="subdued">
-                                                    {t('dashboard.session_funnel.camera_opened')}
-                                                </Text>
-                                            </BlockStack>
-                                        </Box>
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                top: 0,
-                                                left: '50%',
-                                                transform: 'translate(-50%, -50%)',
-                                            }}
-                                        >
-                                            <Box
-                                                background="bg-fill-info-secondary"
-                                                borderRadius="full"
-                                                padding="300"
-                                            >
-                                                <Icon source={CameraIcon} tone="info" />
-                                            </Box>
-                                        </div>
-                                    </div>
-                                    <BlockStack gap="0" inlineAlign="center">
-                                        <Text variant="bodyMd" as="p" fontWeight="semibold">
-                                            100%
-                                        </Text>
-                                        <Text variant="bodySm" as="p" tone="subdued">
-                                            {t('dashboard.session_funnel.of_product_page_clicks')}
-                                        </Text>
-                                    </BlockStack>
-                                </BlockStack>
-                            </Box>
-
-
-                            <Text blockAlign="center" > <Icon source={ChevronRightIcon} tone="subdued" /> </Text>
-
-                            {/* Step 2 - Try-on started */}
-                            <Box width="100%">
-                                <BlockStack gap="200" inlineAlign="center">
-                                    <div style={{ position: 'relative', width: '100%', marginTop: "15px" }}>
-                                        <Box
-                                            borderWidth="025"
-                                            borderColor="border-subdued"
-                                            borderRadius="200"
-                                            paddingBlockStart="600"
-                                            paddingBlockEnd="400"
-                                            paddingInline="300"
-                                        >
-                                            <BlockStack gap="050" inlineAlign="center">
-                                                <Text variant="headingLg" as="p">
-                                                    2,847
-                                                </Text>
-                                                <Text variant="bodyMd" as="p" tone="subdued">
-                                                    {t('dashboard.session_funnel.try_on_started')}
-                                                </Text>
-                                            </BlockStack>
-                                        </Box>
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                top: 0,
-                                                left: '50%',
-                                                transform: 'translate(-50%, -50%)',
-                                            }}
-                                        >
-                                            <Box
-                                                background="bg-fill-info-secondary"
-                                                borderRadius="full"
-                                                padding="300"
-                                            >
-                                                <Icon source={ImageIcon} tone="info" />
-                                            </Box>
-                                        </div>
-                                    </div>
-                                    <BlockStack gap="0" inlineAlign="center">
-                                        <Text variant="bodyMd" as="p" fontWeight="semibold">
-                                            83.2%
-                                        </Text>
-                                        <Text variant="bodySm" as="p" tone="subdued">
-                                            {t('dashboard.session_funnel.continued_after_camera')}
-                                        </Text>
-                                    </BlockStack>
-                                </BlockStack>
-                            </Box>
-
-                            <Text> <Icon source={ChevronRightIcon} tone="subdued" /> </Text>
-
-                            {/* Step 3 - Try-on completed */}
-                            <Box width="100%">
-                                <BlockStack gap="200" inlineAlign="center">
-                                    <div style={{ position: 'relative', width: '100%', marginTop: "15px" }}>
-                                        <Box
-                                            borderWidth="025"
-                                            borderColor="border-subdued"
-                                            borderRadius="200"
-                                            paddingBlockStart="600"
-                                            paddingBlockEnd="400"
-                                            paddingInline="300"
-                                        >
-                                            <BlockStack gap="050" inlineAlign="center">
-                                                <Text variant="headingLg" as="p">
-                                                    2,156
-                                                </Text>
-                                                <Text variant="bodyMd" as="p" tone="subdued">
-                                                    {t('dashboard.session_funnel.try_on_completed')}
-                                                </Text>
-                                            </BlockStack>
-                                        </Box>
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                top: 0,
-                                                left: '50%',
-                                                transform: 'translate(-50%, -50%)',
-                                            }}
-                                        >
-                                            <Box
-                                                background="bg-fill-info-secondary"
-                                                borderRadius="full"
-                                                padding="300"
-                                            >
-                                                <Icon source={MagicIcon} tone="info" />
-                                            </Box>
-                                        </div>
-                                    </div>
-                                    <BlockStack gap="0" inlineAlign="center">
-                                        <Text variant="bodyMd" as="p" fontWeight="semibold">
-                                            75.7%
-                                        </Text>
-                                        <Text variant="bodySm" as="p" tone="subdued">
-                                            {t('dashboard.session_funnel.completed_try_on')}
-                                        </Text>
-                                    </BlockStack>
-                                </BlockStack>
-                            </Box>
-
-                            <Text > <Icon source={ChevronRightIcon} tone="subdued" /> </Text>
-
-                            {/* Step 4 - Added to cart */}
-                            <Box width="100%">
-                                <BlockStack gap="200" inlineAlign="center">
-                                    <div style={{ position: 'relative', width: '100%', marginTop: "15px" }}>
-                                        <Box
-                                            borderWidth="025"
-                                            borderColor="subdued"
-                                            borderRadius="200"
-                                            paddingBlockStart="600"
-                                            paddingBlockEnd="400"
-                                            paddingInline="300"
-                                        >
-                                            <BlockStack gap="050" inlineAlign="center">
-                                                <Text variant="headingLg" as="p">
-                                                    342
-                                                </Text>
-                                                <Text variant="bodyMd" as="p" tone="subdued">
-                                                    {t('dashboard.session_funnel.added_to_cart')}
-                                                </Text>
-                                            </BlockStack>
-                                        </Box>
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                top: 0,
-                                                left: '50%',
-                                                transform: 'translate(-50%, -50%)',
-                                            }}
-                                        >
-                                            <Box
-                                                background="bg-fill-info-secondary"
-                                                borderRadius="full"
-                                                padding="300"
-                                            >
-                                                <Icon source={CartIcon} tone="info" />
-                                            </Box>
-                                        </div>
-                                    </div>
-                                    <BlockStack gap="0" inlineAlign="center">
-                                        <Text variant="bodyMd" as="p" fontWeight="semibold">
-                                            15.9%
-                                        </Text>
-                                        <Text variant="bodySm" as="p" tone="subdued">
-                                            {t('dashboard.session_funnel.added_to_cart_step')}
-                                        </Text>
-                                    </BlockStack>
-                                </BlockStack>
-                            </Box>
-
-                        </InlineStack>
+                        <SessionFunnelSteps analytics={overviewAnalytics} />
                     </Box>
                 </Card>
 

@@ -265,6 +265,11 @@ class StoresController extends Controller
         $setting->collections = $collectionType === 'specific' ? $collections : null;
         $setting->save();
 
+        // Save live test completion into setup steps (checked by the dashboard setup banner)
+        $setupSteps = $store->setup_steps ?? [];
+        $setupSteps['live_test_done'] = $request->boolean('testCompleted');
+        $store->setup_steps = $setupSteps;
+
         // Mark onboarding as complete
         //$store->finish_onboarding = true;
         $store->save();

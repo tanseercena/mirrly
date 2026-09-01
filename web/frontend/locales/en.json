@@ -348,6 +348,9 @@
             "subtitle": "You're almost there! Finish setting up your try-on to make it live for your customers.",
             "close": "Close",
             "continue_live_test": "Continue live test",
+            "enable_theme_extension": "Enable theme extension",
+            "select_products": "Select products",
+            "choose_plan": "Choose plan",
             "steps": {
                 "product_type": "Product Type",
                 "theme_embed": "Theme Embed",
@@ -415,6 +418,8 @@
             "avg_session_length": "Avg. session length",
             "spend_this_cycle": "Spend this cycle",
             "vs_previous_30_days": "vs. previous 30 days",
+            "vs_previous_day": "vs. previous day",
+            "vs_previous_days": "vs. previous {{count}} days",
             "conversion_rate": "conversion rate",
             "per_session": "per session"
         },
