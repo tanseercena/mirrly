@@ -62,6 +62,8 @@ class TrySessionsController extends Controller
                 'kpis' => [
                     'sessions' => ['current' => $current['opened'], 'previous' => $previous['opened']],
                     'orders' => ['current' => $current['orders'], 'previous' => $previous['orders']],
+                    // Average try-on duration in seconds (started -> completed)
+                    'avg_session_length' => ['current' => $current['avg_duration'], 'previous' => $previous['avg_duration']],
                     'funnel' => ['current' => $current, 'previous' => $previous],
                 ],
                 'trend' => [
@@ -115,6 +117,7 @@ class TrySessionsController extends Controller
             ->selectRaw('SUM(added_to_cart_at IS NOT NULL) as added_to_cart')
             ->selectRaw('SUM(purchased_at IS NOT NULL) as purchased')
             ->selectRaw('SUM(order_id IS NOT NULL) as orders')
+            ->selectRaw('COALESCE(AVG(CASE WHEN tryon_started_at IS NOT NULL AND tryon_completed_at IS NOT NULL THEN TIMESTAMPDIFF(SECOND, tryon_started_at, tryon_completed_at) END), 0) as avg_duration')
             ->first();
 
         return [
@@ -124,6 +127,7 @@ class TrySessionsController extends Controller
             'added_to_cart' => (int) ($row->added_to_cart ?? 0),
             'purchased' => (int) ($row->purchased ?? 0),
             'orders' => (int) ($row->orders ?? 0),
+            'avg_duration' => (int) round($row->avg_duration ?? 0),
         ];
     }
 
