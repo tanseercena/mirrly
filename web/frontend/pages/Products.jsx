@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Page,
@@ -16,6 +16,7 @@ import {
     Thumbnail,
     Badge,
 } from '@shopify/polaris';
+import { useAppBridge } from '@shopify/app-bridge-react';
 import {
     RefreshIcon,
     CheckCircleIcon,
@@ -81,88 +82,82 @@ const Toggle = ({ checked, onChange, disabled = false }) => {
 };
 
 /* ============================================
-    SAMPLE DATA
-    ============================================ */
-const INITIAL_PRODUCTS = [
-    {
-        id: '1',
-        name: 'Linen wrap dress',
-        warning: 'No usable image',
-        collection: 'Dresses',
-        sessions: 28,
-        tryOn: true,
-    },
-    {
-        id: '2',
-        name: 'Denim jacket',
-        warning: null,
-        collection: 'Outerwear',
-        sessions: 19,
-        tryOn: true,
-    },
-    {
-        id: '3',
-        name: 'Canvas tote bag',
-        warning: null,
-        collection: 'Accessories',
-        sessions: null,
-        tryOn: false,
-    },
-    {
-        id: '4',
-        name: 'Silk blouse',
-        warning: null,
-        collection: 'Tops',
-        sessions: 41,
-        tryOn: true,
-    },
-    {
-        id: '5',
-        name: 'Essential hoodie',
-        warning: 'Low quality image',
-        collection: 'Hoodies',
-        sessions: 3,
-        tryOn: false,
-    },
-    {
-        id: '6',
-        name: 'Relaxed tee',
-        warning: null,
-        collection: 'Tops',
-        sessions: null,
-        tryOn: false,
-    },
-    {
-        id: '7',
-        name: 'Cargo pants',
-        warning: null,
-        collection: 'Bottoms',
-        sessions: 7,
-        tryOn: true,
-    },
-];
-
-/* ============================================
     PRODUCTS PAGE
     ============================================ */
 const ProductsPage = () => {
     const { t } = useTranslation();
-    const [products, setProducts] = useState(INITIAL_PRODUCTS);
+    const shopify = useAppBridge();
+    const [products, setProducts] = useState([]);
+    const [pagination, setPagination] = useState(null);
+    const [stats, setStats] = useState({ total: 0, enabled: 0, lastSyncedAt: null });
+    const [collections, setCollections] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const syncPollRef = useRef(null);
+
+    const [searchInput, setSearchInput] = useState('');
     const [searchValue, setSearchValue] = useState('');
     const [collectionFilter, setCollectionFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
-    const [perPage, setPerPage] = useState('25');
+    // Per-page preference persists for the browser session so it survives
+    // navigating between pages
+    const [perPage, setPerPage] = useState(() => {
+        try {
+            const stored = sessionStorage.getItem('products_per_page');
+            return ['10', '25', '50', '100'].includes(stored) ? stored : '25';
+        } catch {
+            return '25';
+        }
+    });
+    const [page, setPage] = useState(1);
     const [drawerProduct, setDrawerProduct] = useState(null);
 
-    const COLLECTION_OPTIONS = [
+    // Debounce the search box before it drives a refetch
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setSearchValue(searchInput);
+            setPage(1);
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [searchInput]);
+
+    const fetchProducts = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const params = new URLSearchParams({
+                page: String(page),
+                per_page: perPage,
+                status: statusFilter,
+            });
+            if (searchValue) {
+                params.set('search', searchValue);
+            }
+            if (collectionFilter !== 'all') {
+                params.set('collection_id', collectionFilter);
+            }
+
+            const response = await fetch(`/api/products?${params.toString()}`);
+            const data = await response.json();
+
+            setProducts(data.products ?? []);
+            setPagination(data.pagination ?? null);
+            setStats(data.stats ?? { total: 0, enabled: 0, lastSyncedAt: null });
+            setCollections(data.collections ?? []);
+        } catch (error) {
+            console.error('Failed to fetch products:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [page, perPage, statusFilter, searchValue, collectionFilter]);
+
+    useEffect(() => {
+        fetchProducts();
+    }, [fetchProducts]);
+
+    const COLLECTION_OPTIONS = useMemo(() => [
         { label: t('products_page.all_collections'), value: 'all' },
-        { label: 'Dresses', value: 'dresses' },
-        { label: 'Outerwear', value: 'outerwear' },
-        { label: 'Accessories', value: 'accessories' },
-        { label: 'Tops', value: 'tops' },
-        { label: 'Hoodies', value: 'hoodies' },
-        { label: 'Bottoms', value: 'bottoms' },
-    ];
+        ...collections.map((c) => ({ label: c.title ?? `#${c.id}`, value: c.id })),
+    ], [collections, t]);
 
     const STATUS_OPTIONS = [
         { label: t('products_page.all_statuses'), value: 'all' },
@@ -171,6 +166,7 @@ const ProductsPage = () => {
     ];
 
     const PER_PAGE_OPTIONS = [
+        { label: t('products_page.x_per_page', { count: '10' }), value: '10' },
         { label: t('products_page.x_per_page', { count: '25' }), value: '25' },
         { label: t('products_page.x_per_page', { count: '50' }), value: '50' },
         { label: t('products_page.x_per_page', { count: '100' }), value: '100' },
@@ -179,40 +175,134 @@ const ProductsPage = () => {
     const { selectedResources, allResourcesSelected, handleSelectionChange, clearSelection } =
         useIndexResourceState(products);
 
-    const handleToggle = useCallback((id, value) => {
+    const handleToggle = useCallback(async (id, value, name) => {
         setProducts((prev) =>
             prev.map((product) => (product.id === id ? { ...product, tryOn: value } : product))
         );
+        try {
+            const response = await fetch('/api/products/toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: id, try_on: value }),
+            });
+            if (!response.ok) {
+                throw new Error(`Toggle failed with status ${response.status}`);
+            }
+            shopify.toast.show(
+                t(value ? 'products_page.try_on_enabled_toast' : 'products_page.try_on_disabled_toast', { name })
+            );
+        } catch (error) {
+            console.error('Failed to toggle product:', error);
+            setProducts((prev) =>
+                prev.map((product) => (product.id === id ? { ...product, tryOn: !value } : product))
+            );
+            shopify.toast.show(t('products_page.failed_to_update'), { isError: true });
+        }
+    }, [t, shopify]);
+
+    const handleBulkToggle = useCallback(async (value) => {
+        const selectedCount = selectedResources.length;
+        setProducts((prev) =>
+            prev.map((product) =>
+                selectedResources.includes(product.id) ? { ...product, tryOn: value } : product
+            )
+        );
+        try {
+            const response = await fetch('/api/products/bulk-toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_ids: selectedResources, try_on: value }),
+            });
+            if (!response.ok) {
+                throw new Error(`Bulk toggle failed with status ${response.status}`);
+            }
+            shopify.toast.show(
+                t(value ? 'products_page.bulk_try_on_enabled_toast' : 'products_page.bulk_try_on_disabled_toast', { count: selectedCount })
+            );
+        } catch (error) {
+            console.error('Failed to bulk toggle products:', error);
+            fetchProducts();
+            shopify.toast.show(t('products_page.failed_to_update'), { isError: true });
+        }
+        clearSelection();
+    }, [selectedResources, clearSelection, fetchProducts, t, shopify]);
+
+    const handleSyncNow = useCallback(async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        try {
+            await fetch('/api/products/sync', { method: 'POST' });
+
+            const poll = async () => {
+                try {
+                    const response = await fetch('/api/sync-status');
+                    const data = await response.json();
+                    if (data.sync && data.sync.status === 'running') {
+                        syncPollRef.current = setTimeout(poll, 2000);
+                        return;
+                    }
+                    setIsSyncing(false);
+                    if (data.sync && data.sync.status === 'completed') {
+                        setPage(1);
+                        fetchProducts();
+                        shopify.toast.show(t('products_page.sync_completed'));
+                    } else if (data.sync && data.sync.status === 'failed') {
+                        shopify.toast.show(t('products_page.sync_failed'), { isError: true });
+                    }
+                } catch (error) {
+                    syncPollRef.current = setTimeout(poll, 2000);
+                }
+            };
+            poll();
+        } catch (error) {
+            console.error('Failed to start sync:', error);
+            setIsSyncing(false);
+            shopify.toast.show(t('products_page.sync_failed'), { isError: true });
+        }
+    }, [isSyncing, fetchProducts, t, shopify]);
+
+    useEffect(() => () => {
+        if (syncPollRef.current) {
+            clearTimeout(syncPollRef.current);
+        }
     }, []);
 
-    const handleEnableSelected = useCallback(() => {
+    const enabledCount = stats.enabled;
+    const syncTimeAgo = useMemo(() => {
+        if (!stats.lastSyncedAt) return null;
+        const mins = Math.floor((Date.now() - new Date(stats.lastSyncedAt).getTime()) / 60000);
+        if (mins < 1) return '1 min';
+        if (mins < 60) return `${mins} min`;
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return `${hours} hr`;
+        return `${Math.floor(hours / 24)} d`;
+    }, [stats.lastSyncedAt]);
+
+    const pageButtons = useMemo(() => {
+        if (!pagination || pagination.last_page <= 1) return [];
+        const { current_page, last_page } = pagination;
+        const pages = [...new Set(
+            [1, last_page, current_page - 1, current_page, current_page + 1]
+                .filter((p) => p >= 1 && p <= last_page)
+        )].sort((a, b) => a - b);
+        return pages;
+    }, [pagination]);
+
+    // Merge drawer saves back into the table row and the open drawer
+    const handleProductSaved = useCallback((updated) => {
         setProducts((prev) =>
-            prev.map((product) =>
-                selectedResources.includes(product.id) ? { ...product, tryOn: true } : product
-            )
+            prev.map((product) => (product.id === updated.id ? { ...product, ...updated } : product))
         );
-        clearSelection();
-    }, [selectedResources, clearSelection]);
+        setDrawerProduct((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
+    }, []);
 
-    const handleDisableSelected = useCallback(() => {
-        setProducts((prev) =>
-            prev.map((product) =>
-                selectedResources.includes(product.id) ? { ...product, tryOn: false } : product
-            )
-        );
-        clearSelection();
-    }, [selectedResources, clearSelection]);
-
-    const enabledCount = products.filter((product) => product.tryOn).length;
-
-    const promotedBulkActions = [
-        {
+    const promotedBulkActions = [        {
             content: t('products_page.enable_try_on'),
-            onAction: handleEnableSelected,
+            onAction: () => handleBulkToggle(true),
         },
         {
             content: t('products_page.disable_try_on'),
-            onAction: handleDisableSelected,
+            onAction: () => handleBulkToggle(false),
         },
     ];
 
@@ -226,16 +316,16 @@ const ProductsPage = () => {
             {/* Product */}
             <IndexTable.Cell>
                 <InlineStack gap="300" blockAlign="center" wrap={false}>
-                    <Thumbnail source={ImageIcon} alt={product.name} size="small" />
+                    <Thumbnail source={product.image || ImageIcon} alt={product.name} size="small" />
                     <BlockStack gap="0">
                         <Text variant="bodyMd" as="span" fontWeight="semibold">
                             {product.name}
                         </Text>
                         {product.warning && (
                             <InlineStack gap="100" blockAlign="center">
-                                <Icon source={AlertTriangleIcon} tone="warning" />
+                                <Text> <Icon source={AlertTriangleIcon} tone="warning" /> </Text>
                                 <Text variant="bodySm" as="span" tone="caution">
-                                    {t(`products_page.${product.warning === 'No usable image' ? 'no_usable_image' : 'low_quality_image'}`)}
+                                    {t(`products_page.${product.warning}`)}
                                 </Text>
                             </InlineStack>
                         )}
@@ -246,7 +336,7 @@ const ProductsPage = () => {
             {/* Collection */}
             <IndexTable.Cell>
                 <Text variant="bodyMd" as="span">
-                    {product.collection}
+                    {product.collection ?? '—'}
                 </Text>
             </IndexTable.Cell>
 
@@ -260,7 +350,7 @@ const ProductsPage = () => {
             {/* Try-on toggle */}
             <IndexTable.Cell>
                 <div onClick={(e) => e.stopPropagation()}>
-                    <Toggle checked={product.tryOn} onChange={(value) => handleToggle(product.id, value)} />
+                    <Toggle checked={product.tryOn} onChange={(value) => handleToggle(product.id, value, product.name)} />
                 </div>
             </IndexTable.Cell>
 
@@ -304,13 +394,25 @@ const ProductsPage = () => {
                                 }}
                             />
                             <Text variant="bodyMd" as="span" tone="subdued">
-                                {t('products_page.of_products_enabled', { enabled: enabledCount, total: products.length })} &middot; {t('products_page.synced_time_ago', { time: '2 min' })}
+                                {t('products_page.of_products_enabled', { enabled: enabledCount, total: stats.total })}
+                                {syncTimeAgo && (
+                                    <>
+                                        {' · '}
+                                        {t('products_page.synced_time_ago', { time: syncTimeAgo })}
+                                    </>
+                                )}
                             </Text>
                         </InlineStack>
                     </BlockStack>
 
                     <InlineStack gap="400" blockAlign="center">
-                        <Button icon={RefreshIcon}>{t('products_page.sync_now')}</Button>
+                        <Button
+                            icon={isSyncing ? undefined : RefreshIcon}
+                            loading={isSyncing}
+                            onClick={handleSyncNow}
+                        >
+                            {isSyncing ? t('products_page.syncing') : t('products_page.sync_now')}
+                        </Button>
                         <InlineStack gap="100" blockAlign="center">
                             <Icon source={CheckCircleIcon} tone="success" />
                             <Text variant="bodyMd" as="span" tone="success">
@@ -328,11 +430,17 @@ const ProductsPage = () => {
                                 <TextField
                                     prefix={<Icon source={SearchIcon} tone="subdued" />}
                                     placeholder={t('products_page.search_products')}
-                                    value={searchValue}
-                                    onChange={setSearchValue}
+                                    value={searchInput}
+                                    onChange={setSearchInput}
                                     autoComplete="off"
                                     label={t('products_page.search_products')}
                                     labelHidden
+                                    clearButton
+                                    onClearButtonClick={() => {
+                                        setSearchInput('');
+                                        setSearchValue('');
+                                        setPage(1);
+                                    }}
                                 />
                             </div>
                             <Select
@@ -349,7 +457,7 @@ const ProductsPage = () => {
                                 value={statusFilter}
                                 onChange={setStatusFilter}
                             />
-                            <Button icon={FilterIcon}>{t('products_page.more_filters')}</Button>
+                            {/* <Button icon={FilterIcon}>{t('products_page.more_filters')}</Button> */}
                         </InlineStack>
                     </Box>
 
@@ -360,6 +468,15 @@ const ProductsPage = () => {
                         selectedItemsCount={allResourcesSelected ? 'All' : selectedResources.length}
                         onSelectionChange={handleSelectionChange}
                         promotedBulkActions={promotedBulkActions}
+                        emptyState={
+                            <Box padding="600">
+                                <Text alignment="center" tone="subdued" as="p">
+                                    {isLoading
+                                        ? t('products_page.loading_products')
+                                        : t('products_page.no_products_found')}
+                                </Text>
+                            </Box>
+                        }
                         headings={[
                             { title: t('products_page.product') },
                             { title: t('products_page.collection') },
@@ -385,27 +502,46 @@ const ProductsPage = () => {
                     <Box padding="400" borderBlockStartWidth="025" borderColor="border-subdued">
                         <InlineStack align="space-between" blockAlign="center">
                             <Text variant="bodyMd" as="span" tone="subdued">
-                                {t('products_page.showing_x_of_y_products', { start: '1', end: '25', total: '214' })}
+                                {t('products_page.showing_x_of_y_products', {
+                                    start: pagination?.from ?? 0,
+                                    end: pagination?.to ?? 0,
+                                    total: pagination?.total ?? 0,
+                                })}
                             </Text>
 
                             <InlineStack gap="150" blockAlign="center">
-                                <Button icon={ChevronLeftIcon} variant="tertiary" disabled accessibilityLabel={t('products_page.previous_page')} />
-                                <Button variant="primary" size="slim">
-                                    1
-                                </Button>
-                                <Button variant="tertiary" size="slim">
-                                    2
-                                </Button>
-                                <Button variant="tertiary" size="slim">
-                                    3
-                                </Button>
-                                <Text variant="bodyMd" as="span" tone="subdued">
-                                    &hellip;
-                                </Text>
-                                <Button variant="tertiary" size="slim">
-                                    9
-                                </Button>
-                                <Button icon={ChevronRightIcon} variant="tertiary" accessibilityLabel={t('products_page.next_page')} />
+                                <Button
+                                    icon={ChevronLeftIcon}
+                                    variant="tertiary"
+                                    disabled={!pagination || pagination.current_page <= 1}
+                                    accessibilityLabel={t('products_page.previous_page')}
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                />
+                                {pageButtons.map((p, idx) => (
+                                    <Box key={`gap-${p}`} padding="0">
+                                        <InlineStack gap="150" blockAlign="center">
+                                            {idx > 0 && p - pageButtons[idx - 1] > 1 && (
+                                                <Text variant="bodyMd" as="span" tone="subdued">
+                                                    &hellip;
+                                                </Text>
+                                            )}
+                                            <Button
+                                                size="slim"
+                                                variant={p === page ? 'primary' : 'tertiary'}
+                                                onClick={() => setPage(p)}
+                                            >
+                                                {p}
+                                            </Button>
+                                        </InlineStack>
+                                    </Box>
+                                ))}
+                                <Button
+                                    icon={ChevronRightIcon}
+                                    variant="tertiary"
+                                    disabled={!pagination || pagination.current_page >= pagination.last_page}
+                                    accessibilityLabel={t('products_page.next_page')}
+                                    onClick={() => setPage((p) => (pagination ? Math.min(pagination.last_page, p + 1) : p))}
+                                />
                             </InlineStack>
 
                             <Select
@@ -413,7 +549,15 @@ const ProductsPage = () => {
                                 labelHidden
                                 options={PER_PAGE_OPTIONS}
                                 value={perPage}
-                                onChange={setPerPage}
+                                onChange={(value) => {
+                                    setPerPage(value);
+                                    setPage(1);
+                                    try {
+                                        sessionStorage.setItem('products_per_page', value);
+                                    } catch {
+                                        // storage unavailable — selection just won't persist
+                                    }
+                                }}
                             />
                         </InlineStack>
                     </Box>
@@ -424,6 +568,7 @@ const ProductsPage = () => {
                     product={drawerProduct}
                     open={drawerProduct !== null}
                     onClose={() => setDrawerProduct(null)}
+                    onSaved={handleProductSaved}
                 />
 
             </BlockStack>

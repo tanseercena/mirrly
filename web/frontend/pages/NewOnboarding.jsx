@@ -89,6 +89,10 @@ export default function NewOnboarding() {
     const [testFeedback, setTestFeedback] = useState(null); // 'positive' or 'negative'
     const [showPhotoTip, setShowPhotoTip] = useState(false);
 
+    // Catalog sync progress (polled while the bulk sync runs)
+    const [syncStatus, setSyncStatus] = useState(null);
+    const syncPollRef = useRef(null);
+
     // Step 5: Plan selection
     const [selectedPlan, setSelectedPlan] = useState("growth"); // Default to growth plan
     const [billingPeriod, setBillingPeriod] = useState("monthly"); // "monthly" or "yearly"
@@ -140,6 +144,42 @@ export default function NewOnboarding() {
         // Check new user status on initial load (needed for step 1)
         checkNewUsers();
     }, []);
+
+    // Poll the catalog sync status while on Step 4 (and stop when done).
+    useEffect(() => {
+        if (currentStep !== 4) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const poll = async () => {
+            try {
+                const response = await fetch("/api/sync-status");
+                const data = await response.json();
+                if (cancelled) return;
+                setSyncStatus(data.sync);
+                if (data.sync && data.sync.status === "running") {
+                    syncPollRef.current = setTimeout(poll, 2000);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    console.error("Failed to poll sync status:", error);
+                    syncPollRef.current = setTimeout(poll, 2000);
+                }
+            }
+        };
+
+        poll();
+
+        return () => {
+            cancelled = true;
+            if (syncPollRef.current) {
+                clearTimeout(syncPollRef.current);
+                syncPollRef.current = null;
+            }
+        };
+    }, [currentStep]);
 
     // Fetch plans on component mount
     useEffect(() => {
@@ -303,6 +343,34 @@ export default function NewOnboarding() {
     const handleNext = async () => {
         if (currentStep < totalSteps) {
             const nextStep = currentStep + 1;
+
+            // Save the product scope when leaving Step 2 — this kicks off
+            // the catalog bulk sync while the merchant keeps going.
+            if (nextStep === 3) {
+                try {
+                    await fetch("/api/product-scope", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            collection_type: productScope,
+                            collections: productScope === "specific"
+                                ? selectedProductsOrCollections
+                                    .filter(item => item.id)
+                                    .map(item => ({
+                                        id: item.id,
+                                        title: item.title,
+                                        image: item.image || '',
+                                        products_count: item.products_count || 0
+                                    }))
+                                : null,
+                        }),
+                    });
+                } catch (error) {
+                    console.error("Error saving product scope:", error);
+                }
+            }
 
             // Call finish-onboarding API when moving from step 4 to step 5
             if (nextStep === 5) {
@@ -3537,6 +3605,46 @@ export default function NewOnboarding() {
                             line-height: 1.4;
                         }
 
+                        /* ── Catalog Sync Progress Card ── */
+                        .step4-sync-card {
+                            background-color: #F0FAF5;
+                            border: 1px solid #BEE3D3;
+                            border-radius: 12px;
+                            padding: 16px;
+                            display: flex;
+                            flex-direction: column;
+                            gap: 10px;
+                        }
+
+                        .step4-sync-card--failed {
+                            background-color: #FEF3F2;
+                            border-color: #F2C4C4;
+                        }
+
+                        .step4-sync-header {
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                        }
+
+                        .step4-sync-title {
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #12324B;
+                        }
+
+                        .step4-sync-count {
+                            font-size: 13px;
+                            font-weight: 600;
+                            color: #0F8B8D;
+                        }
+
+                        .step4-sync-note {
+                            font-size: 13px;
+                            color: #667085;
+                            line-height: 1.4;
+                        }
+
                         /* ── Product Selector ── */
                         .step4-product-section {
                             display: flex;
@@ -4274,6 +4382,39 @@ export default function NewOnboarding() {
                                             <div className="step4-info-desc">{t("onboarding.live_test_info_desc")}</div>
                                         </div>
                                     </div>
+
+                                    {/* Catalog Sync Progress */}
+                                    {syncStatus && syncStatus.status === "failed" && (
+                                        <div className="step4-sync-card step4-sync-card--failed">
+                                            <div className="step4-sync-header">
+                                                <span className="step4-sync-title">Catalog sync failed</span>
+                                            </div>
+                                            <div className="step4-sync-note">
+                                                {syncStatus.error || "Something went wrong while syncing your catalog."} You can continue with the live test —{" "}
+                                                <Link url="/products">retry the sync</Link> from the products page.
+                                            </div>
+                                        </div>
+                                    )}
+                                    {syncStatus && syncStatus.status === "running" && (
+                                        <div className="step4-sync-card">
+                                            <div className="step4-sync-header">
+                                                <span className="step4-sync-title">Syncing your catalog…</span>
+                                                <span className="step4-sync-count">
+                                                    {syncStatus.processed}{syncStatus.total_estimated ? ` / ${syncStatus.total_estimated}` : ""}
+                                                </span>
+                                            </div>
+                                            <ProgressBar
+                                                progress={syncStatus.total_estimated
+                                                    ? Math.min(100, Math.round((syncStatus.processed / syncStatus.total_estimated) * 100))
+                                                    : 15}
+                                                size="slim"
+                                                color="primary"
+                                            />
+                                            <div className="step4-sync-note">
+                                                Your products are syncing in the background — you can keep going, this updates automatically.
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Product Selector */}
                                     <div className="step4-product-section">

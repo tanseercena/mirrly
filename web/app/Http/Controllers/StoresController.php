@@ -8,6 +8,8 @@ use App\Models\Plan;
 use App\Models\Setting;
 use App\Models\Session;
 use App\Models\Store;
+use App\Models\SyncJob;
+use App\Jobs\TriggerCatalogSyncJob;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -275,6 +277,53 @@ class StoresController extends Controller
         $store->save();
 
         return response()->json(['message' => 'Finish Onboarding updated successfully']);
+    }
+
+    /**
+     * Save the merchant's try-on product scope (onboarding Step 2) and kick
+     * off the catalog bulk sync immediately — not waiting for onboarding to
+     * finish, so the catalog syncs while the merchant keeps moving forward.
+     */
+    public function saveProductScope(Request $request)
+    {
+        $request->validate([
+            'collection_type' => 'required|in:all,specific',
+            'collections' => 'nullable|array',
+        ]);
+
+        $session = $request->get('shopifySession');
+        $shop = $session->getShop();
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+
+        if (!$store) {
+            return response()->json([
+                'message' => 'Store not found',
+            ], 404);
+        }
+
+        $setting = $store->setting ?: $store->setting()->create([]);
+
+        $collectionType = $request->input('collection_type');
+        $collections = $collectionType === 'specific' ? $request->input('collections', []) : null;
+
+        $scopeChanged = $setting->collection_type !== $collectionType
+            || $setting->collections !== $collections;
+
+        $setting->collection_type = $collectionType;
+        $setting->collections = $collections;
+        $setting->save();
+
+        // Re-sync when the scope changes; on the first save (nothing synced
+        // before) always kick off the initial catalog sync.
+        $syncedBefore = SyncJob::where('store_id', $store->id)
+            ->where('type', SyncJob::TYPE_CATALOG_SYNC)
+            ->exists();
+
+        if ($scopeChanged || !$syncedBefore) {
+            TriggerCatalogSyncJob::dispatch($store);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Product scope saved successfully']);
     }
 
     public function saveButtonBranding(Request $request)
