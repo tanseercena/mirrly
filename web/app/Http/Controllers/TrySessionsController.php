@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\Shopify;
+use App\Models\Product;
 use App\Models\Store;
 use App\Models\TrySession;
 use Carbon\Carbon;
@@ -11,6 +13,235 @@ use Illuminate\Http\Request;
 
 class TrySessionsController extends Controller
 {
+    /**
+     * Latest try-on sessions with their product — feeds the dashboard's
+     * "Recent sessions" table.
+     */
+    public function recent(Request $request): JsonResponse
+    {
+        $store = $this->resolveStore($request);
+
+        if (!$store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        $sessions = TrySession::where('store_id', $store->id)
+            ->with('product:id,title,shopify_product')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        return response()->json([
+            'data' => $sessions->map(fn ($session) => [
+                'id' => $session->id,
+                'product' => $session->product?->title,
+                'product_image' => $session->product?->shopify_product['featuredImage']['url'] ?? null,
+                'variant' => $this->variantTitle(
+                    $session->product?->shopify_product,
+                    $session->shopify_variant_id
+                ),
+                'created_at' => $session->created_at?->toIso8601String(),
+                'duration_seconds' => $session->duration_seconds,
+                'device_type' => $session->device_type,
+                'browser' => $session->browser,
+                'result' => $this->resultSlug($session),
+            ])->all(),
+        ]);
+    }
+
+    /**
+     * Per-product session aggregates over a range — feeds the Sessions
+     * page's top / lowest performing products tables.
+     */
+    public function productPerformance(Request $request): JsonResponse
+    {
+        $store = $this->resolveStore($request);
+
+        if (!$store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        $to = $request->filled('to')
+            ? Carbon::parse($request->input('to'))->endOfDay()
+            : Carbon::today()->endOfDay();
+        $from = $request->filled('from')
+            ? Carbon::parse($request->input('from'))->startOfDay()
+            : Carbon::today()->subDays(29)->startOfDay();
+
+        $rows = TrySession::where('try_sessions.store_id', $store->id)
+            ->whereBetween('try_sessions.created_at', [$from, $to])
+            ->join('products', 'products.id', '=', 'try_sessions.product_id')
+            ->groupBy('products.id')
+            ->selectRaw('try_sessions.product_id as product_id')
+            ->selectRaw('products.title as title')
+            ->selectRaw('products.shopify_product as payload')
+            ->selectRaw('COUNT(*) as sessions')
+            ->selectRaw('SUM(tryon_started_at IS NOT NULL) as started')
+            ->selectRaw('SUM(tryon_completed_at IS NOT NULL) as completed')
+            ->selectRaw('SUM(added_to_cart_at IS NOT NULL) as added_to_cart')
+            ->get()
+            ->map(fn ($row) => [
+                'id' => (int) $row->product_id,
+                'name' => $row->title,
+                'image' => json_decode((string) $row->payload, true)['featuredImage']['url'] ?? null,
+                'sessions' => (int) $row->sessions,
+                'completion' => $row->sessions > 0
+                    ? round(((int) $row->completed / $row->sessions) * 100, 1)
+                    : 0,
+                'addToCart' => (int) $row->started > 0
+                    ? round(((int) $row->added_to_cart / $row->started) * 100, 1)
+                    : 0,
+            ]);
+
+        // Precomputed rankings per metric, so the UI can switch between
+        // them without a refetch. Lowest lists exclude the products already
+        // shown in the matching top list, keeping the tables disjoint.
+        $topSessions = $rows->sortByDesc('sessions')->take(5)->values();
+        $topCompletion = $rows->sortBy([['completion', 'desc'], ['sessions', 'desc']])->take(5)->values();
+        $topAddToCart = $rows->sortBy([['addToCart', 'desc'], ['sessions', 'desc']])->take(5)->values();
+
+        return response()->json([
+            'data' => [
+                'top' => [
+                    'sessions' => $topSessions->all(),
+                    'completion' => $topCompletion->all(),
+                    'addToCart' => $topAddToCart->all(),
+                ],
+                'lowest' => [
+                    'sessions' => $this->lowestRows($rows, $topSessions, [['sessions', 'asc'], ['completion', 'desc']]),
+                    'completion' => $this->lowestRows($rows, $topCompletion, [['completion', 'asc'], ['sessions', 'desc']]),
+                    'addToCart' => $this->lowestRows($rows, $topAddToCart, [['addToCart', 'asc'], ['sessions', 'desc']]),
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Lowest-performing rows for one metric, excluding the products already
+     * shown in that metric's top list.
+     */
+    private function lowestRows($rows, $top, array $sort): array
+    {
+        $topIds = $top->pluck('id');
+
+        return $rows
+            ->reject(fn ($row) => $topIds->contains($row['id']))
+            ->sortBy($sort)
+            ->take(5)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Session performance for ONE product over a range plus the equal-length
+     * window before it — feeds the product drawer's performance stats.
+     */
+    public function productStats(Request $request): JsonResponse
+    {
+        $store = $this->resolveStore($request);
+
+        if (!$store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        $product = Product::query()
+            ->where('store_id', $store->id)
+            ->where('id', (int) $request->input('product_id'))
+            ->first();
+
+        if (!$product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        $to = $request->filled('to')
+            ? Carbon::parse($request->input('to'))->endOfDay()
+            : Carbon::today()->endOfDay();
+        $from = $request->filled('from')
+            ? Carbon::parse($request->input('from'))->startOfDay()
+            : Carbon::today()->subDays(29)->startOfDay();
+
+        [$prevFrom, $prevTo] = $this->previousWindow($from, $to);
+
+        $statsFor = fn (Carbon $rangeFrom, Carbon $rangeTo) => TrySession::where('store_id', $store->id)
+            ->where('product_id', $product->id)
+            ->whereBetween('created_at', [$rangeFrom, $rangeTo])
+            ->selectRaw('COUNT(*) as sessions')
+            ->selectRaw('SUM(tryon_completed_at IS NOT NULL) as completed')
+            ->selectRaw('COALESCE(AVG(duration_seconds), 0) as avg_duration')
+            ->first();
+
+        $current = $statsFor($from, $to);
+        $previous = $statsFor($prevFrom, $prevTo);
+
+        $completionRate = fn ($row) => $row->sessions > 0
+            ? round(($row->completed / $row->sessions) * 100, 1)
+            : 0;
+
+        return response()->json([
+            'data' => [
+                'sessions' => [
+                    'current' => (int) $current->sessions,
+                    'previous' => (int) $previous->sessions,
+                ],
+                'completion_rate' => [
+                    'current' => $completionRate($current),
+                    'previous' => $completionRate($previous),
+                ],
+                'avg_session_length' => [
+                    'current' => (int) round($current->avg_duration),
+                    'previous' => (int) round($previous->avg_duration),
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Furthest funnel milestone reached — one slug the UI can translate
+     * and tone-map.
+     */
+    private function resultSlug(TrySession $session): string
+    {
+        if ($session->purchased_at) {
+            return 'purchased';
+        }
+        if ($session->added_to_cart_at) {
+            return 'added_to_cart';
+        }
+        if ($session->tryon_completed_at) {
+            return 'completed';
+        }
+        if ($session->tryon_started_at) {
+            return 'started';
+        }
+
+        return 'opened';
+    }
+
+    /**
+     * Resolve a variant's title from the product's stored payload.
+     */
+    private function variantTitle($payload, $shopifyVariantId): ?string
+    {
+        if (!$payload || !$shopifyVariantId) {
+            return null;
+        }
+
+        foreach ($payload['variants'] ?? [] as $variant) {
+            if (Shopify::numericId($variant['id'] ?? '') === (int) $shopifyVariantId) {
+                return $variant['title'] ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveStore(Request $request): ?Store
+    {
+        $shop = $request->get('shopifySession')?->getShop();
+
+        return Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+    }
+
     /**
      * Aggregated analytics for the Sessions page.
      * Returns KPI totals, funnel stage counts and a time-bucketed trend

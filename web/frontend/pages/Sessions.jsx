@@ -12,6 +12,7 @@ import {
     InlineGrid,
     Badge,
     IndexTable,
+    Select,
     Thumbnail,
 } from '@shopify/polaris';
 import {
@@ -519,26 +520,30 @@ const TryOnFunnel = ({ analytics }) => {
 
 /* ============================================
     SECTION 6: TOP / LOWEST PERFORMING PRODUCTS
-    (static mock data - not yet wired to try_sessions)
+    (live: /api/sessions/product-performance)
+    Each table ships all three rankings from the API; the select just
+    switches between them.
     ============================================ */
-const TOP_PRODUCTS = [
-    { id: 't1', name: 'Silk blouse', sessions: 41, completion: '89%', addToCart: '44%' },
-    { id: 't2', name: 'Linen wrap dress', sessions: 28, completion: '86%', addToCart: '39%' },
-    { id: 't3', name: 'Denim jacket', sessions: 19, completion: '74%', addToCart: '28%' },
-    { id: 't4', name: 'Canvas tote bag', sessions: 6, completion: '52%', addToCart: '11%' },
-    { id: 't5', name: 'Essential hoodie', sessions: 5, completion: '60%', addToCart: '20%' },
+const METRIC_OPTIONS = (t) => [
+    { label: t('sessions_page.top_performing_products.table.sessions'), value: 'sessions' },
+    { label: t('sessions_page.top_performing_products.table.completion_rate'), value: 'completion' },
+    { label: t('sessions_page.top_performing_products.table.add_to_cart_rate'), value: 'addToCart' },
 ];
 
-const LOWEST_PRODUCTS = [
-    { id: 'l1', name: 'Relaxed tee', sessions: 7, completion: '42%', addToCart: '6%' },
-    { id: 'l2', name: 'Ivory linen shirt', sessions: 4, completion: '45%', addToCart: '8%' },
-    { id: 'l3', name: 'Cargo pants', sessions: 9, completion: '48%', addToCart: '10%' },
-    { id: 'l4', name: 'Wool beanie', sessions: 3, completion: '50%', addToCart: '0%' },
-    { id: 'l5', name: 'Canvas tote bag', sessions: 6, completion: '52%', addToCart: '11%' },
-];
-
-const ProductPerformanceTable = ({ title, products, sortLabel, lowPerforming }) => {
+const ProductPerformanceTable = ({ title, rankings, defaultMetric, lowPerforming, emptyLabel }) => {
     const { t } = useTranslation();
+    const [metric, setMetric] = useState(defaultMetric);
+    const products = rankings?.[metric] ?? [];
+
+    // Only the selected metric gets a column, next to Product
+    const headings = [{ title: t('sessions_page.top_performing_products.table.product') }];
+    if (metric === 'sessions') {
+        headings.push({ title: t('sessions_page.top_performing_products.table.sessions') });
+    } else if (metric === 'completion') {
+        headings.push({ title: t('sessions_page.top_performing_products.table.completion_rate') });
+    } else if (metric === 'addToCart') {
+        headings.push({ title: t('sessions_page.top_performing_products.table.add_to_cart_rate') });
+    }
 
     return (
         <Card padding="400">
@@ -547,7 +552,15 @@ const ProductPerformanceTable = ({ title, products, sortLabel, lowPerforming }) 
                     <Text variant="headingMd" as="h3" fontWeight={600}>
                         {title}
                     </Text>
-                    <Button disclosure>{t('sessions_page.top_performing_products.sort_by')} {sortLabel}</Button>
+                    <div style={{ minWidth: '170px' }}>
+                        <Select
+                            label={t('sessions_page.top_performing_products.sort_by')}
+                            labelHidden
+                            options={METRIC_OPTIONS(t)}
+                            value={metric}
+                            onChange={setMetric}
+                        />
+                    </div>
                 </InlineStack>
             </Box>
 
@@ -555,38 +568,46 @@ const ProductPerformanceTable = ({ title, products, sortLabel, lowPerforming }) 
                 resourceName={{ singular: 'product', plural: 'products' }}
                 itemCount={products.length}
                 selectable={false}
-                headings={[
-                    { title: t('sessions_page.top_performing_products.table.product') },
-                    { title: t('sessions_page.top_performing_products.table.sessions') },
-                    { title: t('sessions_page.top_performing_products.table.completion_rate') },
-                    { title: t('sessions_page.top_performing_products.table.add_to_cart_rate') },
-                ]}
+                emptyState={
+                    <Box padding="400">
+                        <Text alignment="center" tone="subdued" as="p">
+                            {emptyLabel}
+                        </Text>
+                    </Box>
+                }
+                headings={headings}
             >
                 {products.map((product, index) => (
                     <IndexTable.Row id={product.id} key={product.id} position={index}>
                         <IndexTable.Cell>
                             <InlineStack gap="200" blockAlign="center" wrap={false}>
-                                <Thumbnail source={ImageIcon} alt={product.name} size="small" />
+                                <Thumbnail source={product.image || ImageIcon} alt={product.name} size="small" />
                                 <Text variant="bodyMd" as="span" fontWeight="medium">
                                     {product.name}
                                 </Text>
                             </InlineStack>
                         </IndexTable.Cell>
-                        <IndexTable.Cell>
-                            <Text variant="bodyMd" as="span">
-                                {product.sessions}
-                            </Text>
-                        </IndexTable.Cell>
-                        <IndexTable.Cell>
-                            <Text variant="bodyMd" as="span" tone={lowPerforming ? 'critical' : undefined}>
-                                {product.completion}
-                            </Text>
-                        </IndexTable.Cell>
-                        <IndexTable.Cell>
-                            <Text variant="bodyMd" as="span">
-                                {product.addToCart}
-                            </Text>
-                        </IndexTable.Cell>
+                        {metric === 'sessions' && (
+                            <IndexTable.Cell>
+                                <Text variant="bodyMd" as="span">
+                                    {formatCount(product.sessions)}
+                                </Text>
+                            </IndexTable.Cell>
+                        )}
+                        {metric === 'completion' && (
+                            <IndexTable.Cell>
+                                <Text variant="bodyMd" as="span" tone={lowPerforming ? 'critical' : undefined}>
+                                    {product.completion.toFixed(1)}%
+                                </Text>
+                            </IndexTable.Cell>
+                        )}
+                        {metric === 'addToCart' && (
+                            <IndexTable.Cell>
+                                <Text variant="bodyMd" as="span">
+                                    {product.addToCart.toFixed(1)}%
+                                </Text>
+                            </IndexTable.Cell>
+                        )}
                     </IndexTable.Row>
                 ))}
             </IndexTable>
@@ -598,21 +619,57 @@ const ProductPerformanceTable = ({ title, products, sortLabel, lowPerforming }) 
     );
 };
 
-const SessionsProductTables = () => {
+const SessionsProductTables = ({ range }) => {
+    const [performance, setPerformance] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const load = async () => {
+            setIsLoading(true);
+            try {
+                const params = new URLSearchParams({
+                    from: toISODate(range.start),
+                    to: toISODate(range.end),
+                });
+                const response = await fetch('/api/sessions/product-performance?' + params.toString());
+                const payload = response.ok ? await response.json() : null;
+                if (!cancelled && payload && payload.data) {
+                    setPerformance(payload.data);
+                }
+            } catch (error) {
+                console.error('Failed loading product performance:', error);
+            } finally {
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        load();
+        return () => {
+            cancelled = true;
+        };
+    }, [range]);
+
     const { t } = useTranslation();
+    const emptyLabel = t('sessions_page.top_performing_products.empty');
 
     return (
         <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
             <ProductPerformanceTable
                 title={t('sessions_page.top_performing_products.title')}
-                products={TOP_PRODUCTS}
-                sortLabel={t('sessions_page.top_performing_products.sort_by_sessions')}
+                rankings={performance?.top}
+                defaultMetric="sessions"
+                emptyLabel={isLoading ? t('sessions_page.top_performing_products.loading') : emptyLabel}
             />
             <ProductPerformanceTable
                 title={t('sessions_page.lowest_performing_products.title')}
-                products={LOWEST_PRODUCTS}
-                sortLabel={t('sessions_page.lowest_performing_products.sort_by_completion_rate')}
+                rankings={performance?.lowest}
+                defaultMetric="completion"
                 lowPerforming
+                emptyLabel={isLoading ? t('sessions_page.top_performing_products.loading') : emptyLabel}
             />
         </InlineGrid>
     );
@@ -667,7 +724,7 @@ const SessionsPage = () => {
                 <SessionsKpiCards analytics={analytics} range={range} />
                 <SessionsOverTimeChart analytics={analytics} />
                 <TryOnFunnel analytics={analytics} />
-                <SessionsProductTables />
+                <SessionsProductTables range={range} />
             </BlockStack>
         </Page>
     );

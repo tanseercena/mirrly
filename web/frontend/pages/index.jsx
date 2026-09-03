@@ -428,60 +428,48 @@ const IndexPage = () => {
         })
         : null;
 
-    const sessions = [
-        {
-            id: '1',
-            initials: 'JS',
-            name: 'Jane Smith',
-            location: 'New York, US',
-            product: 'Classic Crewneck',
-            variant: 'Gray / M',
-            date: 'May 20, 2025',
-            time: '2:34 PM',
-            length: '48s',
-            result: 'Added to cart',
-            resultTone: 'success',
-        },
-        {
-            id: '2',
-            initials: 'MK',
-            name: 'Mike Chen',
-            location: 'Toronto, CA',
-            product: 'Essential Hoodie',
-            variant: 'Black / L',
-            date: 'May 20, 2025',
-            time: '1:12 PM',
-            length: '37s',
-            result: 'Completed',
-            resultTone: 'info',
-        },
-        {
-            id: '3',
-            initials: 'AT',
-            name: 'Anna Taylor',
-            location: 'London, UK',
-            product: 'Relaxed Tee',
-            variant: 'White / M',
-            date: 'May 20, 2025',
-            time: '11:48 AM',
-            length: '52s',
-            result: 'Completed',
-            resultTone: 'info',
-        },
-        {
-            id: '4',
-            initials: 'DR',
-            name: 'David Rodriguez',
-            location: 'Madrid, ES',
-            product: 'Zip Jacket',
-            variant: 'Green / L',
-            date: 'May 20, 2025',
-            time: '11:18 AM',
-            length: '29s',
-            result: 'Started',
-            resultTone: 'attention',
-        },
-    ];
+    /* ============================================
+        RECENT SESSIONS (live: /api/sessions/recent)
+        ============================================ */
+    const [recentSessions, setRecentSessions] = useState([]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const load = async () => {
+            try {
+                const response = await fetch('/api/sessions/recent');
+                const payload = response.ok ? await response.json() : null;
+                if (!cancelled && payload && payload.data) {
+                    setRecentSessions(payload.data);
+                }
+            } catch (error) {
+                console.error('Failed loading recent sessions:', error);
+            }
+        };
+
+        load();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const formatSessionDate = (iso) => {
+        if (!iso) return { date: '—', time: '' };
+        const d = new Date(iso);
+        return {
+            date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        };
+    };
+
+    const sessionResult = (slug) => ({
+        purchased: { label: t('dashboard.recent_sessions.results.purchased'), tone: 'success' },
+        added_to_cart: { label: t('dashboard.recent_sessions.results.added_to_cart'), tone: 'success' },
+        completed: { label: t('dashboard.recent_sessions.results.completed'), tone: 'info' },
+        started: { label: t('dashboard.recent_sessions.results.started'), tone: 'attention' },
+        opened: { label: t('dashboard.recent_sessions.results.opened'), tone: 'subdued' },
+    }[slug] ?? { label: slug, tone: 'subdued' });
 
     useEffect(() => {
         const fetchSubscription = async () => {
@@ -1062,12 +1050,12 @@ const IndexPage = () => {
                                     {t('dashboard.recent_sessions.description')}
                                 </Text>
                             </BlockStack>
-                            <Button>{t('dashboard.recent_sessions.view_all_sessions')}</Button>
+                            <Button onClick={() => navigate('/sessions')}>{t('dashboard.recent_sessions.view_all_sessions')}</Button>
                         </InlineStack>
                     </Box>
 
                     <IndexTable
-                        itemCount={sessions.length}
+                        itemCount={recentSessions.length}
                         headings={[
                             { title: t('dashboard.recent_sessions.table_headers.customer') },
                             { title: t('dashboard.recent_sessions.table_headers.product') },
@@ -1077,19 +1065,26 @@ const IndexPage = () => {
                             { title: t('dashboard.recent_sessions.table_headers.action') },
                         ]}
                         selectable={false}
+                        emptyState={
+                            <Box padding="400">
+                                <Text alignment="center" tone="subdued" as="p">
+                                    {t('dashboard.recent_sessions.empty')}
+                                </Text>
+                            </Box>
+                        }
                     >
-                        {sessions.map((session, index) => (
+                        {recentSessions.map((session, index) => (
                             <IndexTable.Row id={session.id} key={session.id} position={index}>
-                                {/* Customer */}
+                                {/* Customer (sessions are anonymous — show device info) */}
                                 <IndexTable.Cell>
                                     <InlineStack gap="200" blockAlign="center" wrap={false}>
-                                        <Avatar initials={session.initials} name={session.name} size="md" />
+                                        <Avatar customer name={t('dashboard.recent_sessions.guest')} size="md" />
                                         <BlockStack gap="0">
                                             <Text variant="bodyMd" as="span" fontWeight="semibold">
-                                                {session.name}
+                                                {t('dashboard.recent_sessions.guest')}
                                             </Text>
                                             <Text variant="bodySm" as="span" tone="subdued">
-                                                {session.location}
+                                                {[session.device_type, session.browser].filter(Boolean).join(' · ') || '—'}
                                             </Text>
                                         </BlockStack>
                                     </InlineStack>
@@ -1098,14 +1093,16 @@ const IndexPage = () => {
                                 {/* Product */}
                                 <IndexTable.Cell>
                                     <InlineStack gap="200" blockAlign="center" wrap={false}>
-                                        <Thumbnail source={ImageIcon} alt={session.product} size="small" />
+                                        <Thumbnail source={session.product_image || ImageIcon} alt={session.product} size="small" />
                                         <BlockStack gap="0">
                                             <Text variant="bodyMd" as="span" fontWeight="semibold">
-                                                {session.product}
+                                                {session.product ?? '—'}
                                             </Text>
-                                            <Text variant="bodySm" as="span" tone="subdued">
-                                                {session.variant}
-                                            </Text>
+                                            {session.variant && (
+                                                <Text variant="bodySm" as="span" tone="subdued">
+                                                    {session.variant}
+                                                </Text>
+                                            )}
                                         </BlockStack>
                                     </InlineStack>
                                 </IndexTable.Cell>
@@ -1114,10 +1111,10 @@ const IndexPage = () => {
                                 <IndexTable.Cell>
                                     <BlockStack gap="0">
                                         <Text variant="bodyMd" as="span">
-                                            {session.date}
+                                            {formatSessionDate(session.created_at).date}
                                         </Text>
                                         <Text variant="bodySm" as="span" tone="subdued">
-                                            {session.time}
+                                            {formatSessionDate(session.created_at).time}
                                         </Text>
                                     </BlockStack>
                                 </IndexTable.Cell>
@@ -1125,13 +1122,15 @@ const IndexPage = () => {
                                 {/* Session length */}
                                 <IndexTable.Cell>
                                     <Text variant="bodyMd" as="span">
-                                        {session.length}
+                                        {session.duration_seconds ? `${session.duration_seconds}s` : '—'}
                                     </Text>
                                 </IndexTable.Cell>
 
                                 {/* Result */}
                                 <IndexTable.Cell>
-                                    <Badge tone={session.resultTone}>{session.result}</Badge>
+                                    <Badge tone={sessionResult(session.result).tone}>
+                                        {sessionResult(session.result).label}
+                                    </Badge>
                                 </IndexTable.Cell>
 
                                 {/* Action */}
