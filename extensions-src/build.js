@@ -1,6 +1,22 @@
 const esbuild = require('esbuild');
+const fs = require('fs');
+const path = require('path');
 
 const watch = process.argv.includes('--watch');
+
+// esbuild doesn't load .env itself — parse it here and inject values via
+// `define` so src/ files can reference process.env.API_BASE_URL, which is
+// replaced with the literal string at build time (no runtime cost).
+const env = Object.fromEntries(
+  fs
+    .readFileSync(path.join(__dirname, '.env'), 'utf-8')
+    .split('\n')
+    .filter((line) => line.trim() && !line.trim().startsWith('#'))
+    .map((line) => {
+      const idx = line.indexOf('=');
+      return [line.slice(0, idx).trim(), line.slice(idx + 1).trim()];
+    })
+);
 
 // Two independent builds, deliberately different formats:
 //
@@ -21,6 +37,9 @@ const shared = {
   bundle: true,
   minify: true,
   sourcemap: watch ? 'inline' : false,
+  define: {
+    'process.env.API_BASE_URL': JSON.stringify(env.API_BASE_URL ?? ''),
+  },
   // es2020 minimum — the Decart SDK's WebRTC diagnostics use BigInt literals
   // (0n), which don't exist before ES2020. es2019 will fail the build.
   target: 'es2020',

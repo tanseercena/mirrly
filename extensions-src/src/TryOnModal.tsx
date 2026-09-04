@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { startSession, sendEvent } from './session-api';
+import { startSession, sendEvent, buildUrl } from './session-api';
 import { connectEngine, type EngineConnection } from './realtime-engine';
 
 type Status = 'requesting_camera' | 'connecting' | 'streaming' | 'ended' | 'error';
@@ -111,7 +111,7 @@ export function TryOnModal({ configToken, productId, variantId, onClose }: Props
 
     // Lightweight lookup, not a full session restart — swapping the prompt
     // is what makes variant switching instant on an already-open connection.
-    fetch(`/apps/tryon/variant-prompt?product_id=${productId}&variant_id=${newVariantId}`)
+    fetch(buildUrl('/variant-prompt', { product_id: productId, variant_id: newVariantId }))
       .then((r) => r.json())
       .then((data: { prompt: string }) => {
         engineRef.current?.setPrompt(data.prompt);

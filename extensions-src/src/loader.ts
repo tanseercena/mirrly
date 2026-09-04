@@ -1,5 +1,5 @@
 import type { ButtonSettings, RootDataset } from './types';
-import { fetchConfig } from './session-api';
+import { fetchApiToken, fetchConfig } from './session-api';
 import { insertButton } from './insertion';
 
 const RADIUS_MAP: Record<ButtonSettings['border_radius'], string> = {
@@ -22,6 +22,9 @@ async function setUpRoot(root: HTMLElement) {
 
   let config;
   try {
+    // Token first — cached in sessionStorage after the first call, so later
+    // pages/calls reuse it instead of hitting the api-token route again.
+    await fetchApiToken(data.shop);
     config = await fetchConfig(data.productId, data.variantId);
   } catch (err) {
     // Fail silently on the storefront — a broken config fetch should never

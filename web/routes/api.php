@@ -25,4 +25,5 @@ Route::get('{shop}/api-token', [StoresController::class, 'getApiToken']);
 Route::group(['prefix' => '{shop}', 'middleware' => EnsureApiTokenIsValid::class], function () {
     Route::get('/currency', [StoresController::class, 'currency']);
     Route::get('usage', [StoresController::class, 'usage']);
+    Route::get('config', [StoresController::class, 'config']);
 });

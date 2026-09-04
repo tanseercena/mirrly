@@ -39,6 +39,59 @@ class StoresController extends Controller
         ]);
     }
 
+    public function config(Request $request, $shop)
+    {
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+        $branding = $store->setting->button_branding ?? [];
+
+        // Map admin-saved vocabulary to the storefront widget's contract
+        $positionMap = ['below_cart' => 'below_add_to_cart', 'above_cart' => 'above_add_to_cart'];
+        $radiusMap = ['full' => 'pill'];
+        $style = $branding['buttonStyle'] ?? [];
+
+        return response()->json([
+            'enabled' => true, // later changed based on products try on enable or disabled from products table
+            'button' => [
+                'text' => $branding['buttonText'] ?? 'Try it on live',
+                'position' => $positionMap[$branding['position']] ?? 'below_add_to_cart',
+                'text_color' => $style['textColor'] ?? '#FFFFFF',
+                'background_color' => $style['bgColor'] ?? '#0B0B0B',
+                'border_radius' => $radiusMap[$style['borderRadius']] ?? 'rounded',
+                'show_icon' => (bool) ($branding['showIcon'] ?? true),
+            ],
+            'config_token' => $this->createConfigToken(
+                $shop,
+                $request->input('product_id'),
+                $request->input('variant_id')
+            ),
+        ]);
+    }
+
+    // Short-lived (~5 min) signed JWT tying a /session call back to the exact
+    // product/variant the shopper was shown. Signed with the app key so it can
+    // only be minted server-side; verified when /session is implemented.
+    private function createConfigToken(string $shop, ?string $productId, ?string $variantId): string
+    {
+        $segments = [
+            $this->base64UrlEncode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])),
+            $this->base64UrlEncode(json_encode([
+                'shop' => $shop,
+                'product_id' => $productId,
+                'variant_id' => $variantId,
+                'exp' => time() + 300,
+            ])),
+        ];
+        $signature = hash_hmac('sha256', implode('.', $segments), (string) config('app.key'), true);
+        $segments[] = $this->base64UrlEncode($signature);
+
+        return implode('.', $segments);
+    }
+
+    private function base64UrlEncode(string $data): string
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    }
+
 
     public function show(Request $request)
     {
