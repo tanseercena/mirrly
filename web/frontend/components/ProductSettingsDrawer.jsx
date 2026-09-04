@@ -332,7 +332,7 @@ const VariantDrawer = ({ variant, product, onClose, onUploaded }) => {
             shopify.toast.show(t('product_drawer.images_uploaded'));
         } catch (error) {
             console.error('Failed to upload variant images:', error);
-            shopify.toast.show(t('product_drawer.save_failed'), { isError: true });
+            shopify.toast.show(t('product_drawer.save_failed'), { isError: true , duration: 999999});
         } finally {
             setIsUploading(false);
         }
@@ -637,7 +637,7 @@ const ProductSettingsDrawer = ({ product, open, onClose, onSaved }) => {
             shopify.toast.show(t('product_drawer.changes_saved'));
         } catch (error) {
             console.error('Failed to save product settings:', error);
-            shopify.toast.show(t('product_drawer.save_failed'), { isError: true });
+            shopify.toast.show(t('product_drawer.save_failed'), { isError: true , duration: 999999 });
         } finally {
             setIsSaving(false);
         }

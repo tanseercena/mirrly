@@ -60,3 +60,23 @@ export const objectToKeyValuesArrays = (object) => {
 
     return { labels: keys, data: values };
 };
+
+/**
+ * Shows an error toast that stays visible until the merchant closes it (X).
+ * The admin may cap the toast duration, so if the toast dismisses on its own
+ * (after ~5s) it is shown again; a manual X close (always earlier) leaves it closed.
+ * Success/save toasts keep their default auto-dismiss behaviour.
+ */
+export const showErrorToast = (shopify, message) => {
+    const attempt = () => {
+        const shownAt = Date.now();
+        shopify.toast.show(message, {
+            isError: true,
+            duration: 9999999,
+            onDismiss: () => {
+                if (Date.now() - shownAt >= 4750) attempt();
+            },
+        });
+    };
+    attempt();
+};

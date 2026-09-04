@@ -196,7 +196,7 @@ const ProductsPage = () => {
             setProducts((prev) =>
                 prev.map((product) => (product.id === id ? { ...product, tryOn: !value } : product))
             );
-            shopify.toast.show(t('products_page.failed_to_update'), { isError: true });
+            shopify.toast.show(t('products_page.failed_to_update'), { isError: true , duration: 999999});
         }
     }, [t, shopify]);
 
@@ -222,7 +222,7 @@ const ProductsPage = () => {
         } catch (error) {
             console.error('Failed to bulk toggle products:', error);
             fetchProducts();
-            shopify.toast.show(t('products_page.failed_to_update'), { isError: true });
+            shopify.toast.show(t('products_page.failed_to_update'), { isError: true , duration: 999999});
         }
         clearSelection();
     }, [selectedResources, clearSelection, fetchProducts, t, shopify]);
@@ -247,7 +247,7 @@ const ProductsPage = () => {
                         fetchProducts();
                         shopify.toast.show(t('products_page.sync_completed'));
                     } else if (data.sync && data.sync.status === 'failed') {
-                        shopify.toast.show(t('products_page.sync_failed'), { isError: true });
+                        shopify.toast.show(t('products_page.sync_failed'), { isError: true , duration: 999999 });
                     }
                 } catch (error) {
                     syncPollRef.current = setTimeout(poll, 2000);
@@ -257,7 +257,7 @@ const ProductsPage = () => {
         } catch (error) {
             console.error('Failed to start sync:', error);
             setIsSyncing(false);
-            shopify.toast.show(t('products_page.sync_failed'), { isError: true });
+            shopify.toast.show(t('products_page.sync_failed'), { isError: true , duration: 999999 });
         }
     }, [isSyncing, fetchProducts, t, shopify]);
 

@@ -35,6 +35,7 @@ import {
     ImageIcon,
     ArrowDiagonalIcon
 } from '@shopify/polaris-icons';
+import { showErrorToast } from '../helpers/functions';
 
 /* ============================================
     TOGGLE SWITCH (reused across the app)
@@ -518,8 +519,8 @@ const LivePreviewCard = ({ settings, t }) => {
                     </BlockStack>
                 </InlineStack>
 
-                <InlineStack gap="100" blockAlign="start" wrap={false}>
-                    <Icon source={InfoIcon} tone="subdued" />
+                <InlineStack gap="100" blockAlign="start" align="start" wrap={false}>
+                    <Text>  <Icon source={InfoIcon} tone="subdued" /> </Text>
                     <Text variant="bodySm" as="p" tone="subdued">
                         {t('mirrly_settings.live_preview_card.preview_note')}
                     </Text>
@@ -1120,11 +1121,11 @@ const SettingsPage = () => {
             if (response.ok) {
                 shopify.toast.show(t('changes_saved'));
             } else {
-                shopify.toast.show(t('error_occur'), { isError: true });
+                showErrorToast(shopify, t('error_occur'));
             }
         } catch (error) {
             console.error('Failed to save button branding:', error);
-            shopify.toast.show(t('error_occur'), { isError: true });
+            shopify.toast.show(t('error_occur'), { isError: true , duration:999999} );
         }
     }, [branding, shopify, t]);
 
@@ -1145,11 +1146,11 @@ const SettingsPage = () => {
             if (response.ok) {
                 shopify.toast.show(t('changes_saved'));
             } else {
-                shopify.toast.show(t('error_occur'), { isError: true });
+                showErrorToast(shopify, t('error_occur'));
             }
         } catch (error) {
             console.error('Failed to save camera fallback settings:', error);
-            shopify.toast.show(t('error_occur'), { isError: true });
+            shopify.toast.show(t('error_occur'), { isError: true , duration: 999999});
         }
     }, [cameraFallback, shopify, t]);
 
@@ -1170,11 +1171,11 @@ const SettingsPage = () => {
             if (response.ok) {
                 shopify.toast.show(t('changes_saved'));
             } else {
-                shopify.toast.show(t('error_occur'), { isError: true });
+                showErrorToast(shopify, t('error_occur'));
             }
         } catch (error) {
             console.error('Failed to save privacy recording settings:', error);
-            shopify.toast.show(t('error_occur'), { isError: true });
+            shopify.toast.show(t('error_occur'), { isError: true , duration:999999 });
         }
     }, [privacyRecording, shopify, t]);
 
@@ -1195,11 +1196,11 @@ const SettingsPage = () => {
             if (response.ok) {
                 shopify.toast.show(t('changes_saved'));
             } else {
-                shopify.toast.show(t('error_occur'), { isError: true });
+                showErrorToast(shopify, t('error_occur'));
             }
         } catch (error) {
             console.error('Failed to save notification settings:', error);
-            shopify.toast.show(t('error_occur'), { isError: true });
+            shopify.toast.show(t('error_occur'), { isError: true , duration: 999999 });
         }
     }, [notification, shopify, t]);
 

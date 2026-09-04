@@ -357,6 +357,8 @@ const PlansPage = () => {
         const rate = plan ? rateOf(plan) : 0;
         const isActiveCard = planKey === activeKey;
         const pad = meta.popular ? '800' : '500';
+        // Features come from the seeded plans; translated descriptors only as fallback
+        const features = plan?.features?.length ? plan.features : meta.features;
 
         return (
             <Card padding={pad}>
@@ -428,7 +430,7 @@ const PlansPage = () => {
                                         {meta.includesLabel}
                                     </Text>
                                     <BlockStack gap="300">
-                                        {meta.features.map((feature) => {
+                                        {features.map((feature) => {
                                             const isObj = typeof feature === 'object';
                                             return (
                                                 <PricingFeature

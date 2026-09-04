@@ -1134,14 +1134,14 @@ const IndexPage = () => {
                                 </IndexTable.Cell>
 
                                 {/* Action */}
-                                <IndexTable.Cell>
+                                {/* <IndexTable.Cell>
                                     <InlineStack gap="200" blockAlign="center" wrap={false}>
                                         <Button icon={ExternalIcon} size="slim">
                                             {t('dashboard.recent_sessions.view')}
                                         </Button>
                                         <Button icon={MenuHorizontalIcon} variant="tertiary" accessibilityLabel={t('dashboard.recent_sessions.more_actions')} />
                                     </InlineStack>
-                                </IndexTable.Cell>
+                                </IndexTable.Cell> */}
                             </IndexTable.Row>
                         ))}
                     </IndexTable>
