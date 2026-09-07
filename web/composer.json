@@ -32,6 +32,7 @@
         "mailchimp/marketing": "^3.0",
         "mailerlite/mailerlite-api-v2-php-sdk": "^0.3.2",
         "mixpanel/mixpanel-php": "^2.11",
+        "predis/predis": "^3.6",
         "setasign/fpdi": "^2.6",
         "setasign/fpdi-protection": "^2.1",
         "shopify/shopify-api": "dev-feature/oauth-token-exchange-refresh",

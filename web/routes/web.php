@@ -66,6 +66,14 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
     Route::post('/collections/product-count', [CollectionController::class, 'productCount']);
     Route::post('/collections/products', [CollectionController::class, 'getProducts']);
     Route::post('/products/all', [ProductsController::class, 'getAllProducts']);
+    Route::get('products', [ProductsController::class, 'index']);
+    Route::post('products/toggle', [ProductsController::class, 'toggleTryOn']);
+    Route::post('products/bulk-toggle', [ProductsController::class, 'bulkToggleTryOn']);
+    Route::post('products/settings', [ProductsController::class, 'updateSettings']);
+    Route::post('products/variant-images', [ProductsController::class, 'uploadVariantImages']);
+    Route::post('products/sync', [ProductsController::class, 'syncNow']);
+    Route::post('product-scope', [StoresController::class, 'saveProductScope']);
+    Route::get('sync-status', [ProductsController::class, 'syncStatus']);
 
     Route::post('/update-reply-to-email', [StoresController::class, 'updateReplyToEmail']);
     Route::post('/update-cc-bcc-email', [StoresController::class, 'updateCcBccEmail']);
@@ -80,6 +88,9 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
     Route::get('current-plan', [PlansController::class, 'getCurrentPlan']);
     Route::get('subscription', [SubscriptionsController::class, 'show']);
     Route::get('sessions/analytics', [TrySessionsController::class, 'analytics']);
+    Route::get('sessions/recent', [TrySessionsController::class, 'recent']);
+    Route::get('sessions/product-performance', [TrySessionsController::class, 'productPerformance']);
+    Route::get('sessions/product-stats', [TrySessionsController::class, 'productStats']);
 
     // Billing routes
     Route::post('billing', [BillingController::class, 'process']);
