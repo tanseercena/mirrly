@@ -22,7 +22,7 @@ import {
 } from '@shopify/polaris-icons';
 import { AppContext } from '../components/providers/AppProvider.jsx';
 import { PageLoader } from '../components/PageLoader.jsx';
-
+import '../App.css'
 /* Plan hierarchy - lowest to highest rank */
 const PLAN_RANK = ['free', 'growth', 'scale'];
 
@@ -199,7 +199,8 @@ const PlansPage = () => {
     const BillingCycleToggle = ({ value, onChange }) => {
         const options = [
             { label: t('plans_page.monthly'), value: 'monthly' },
-            { label: t('plans_page.yearly'), value: 'yearly', badge: t('plans_page.save_20') },
+            // Yearly billing not wired up yet - show only Monthly until yearly plans ship
+            // { label: t('plans_page.yearly'), value: 'yearly', badge: t('plans_page.save_20') },
         ];
 
         return (
@@ -345,6 +346,7 @@ const PlansPage = () => {
         borderRadius: '14px',
         boxShadow: selectedPlan === planKey ? '0 4px 12px rgba(15, 110, 92, 0.15)' : 'none',
         display: 'grid',
+        gridTemplateRows: '1fr',
         cursor: 'pointer',
     });
 
@@ -356,109 +358,113 @@ const PlansPage = () => {
         const limit = plan ? limitOf(plan) : null;
         const rate = plan ? rateOf(plan) : 0;
         const isActiveCard = planKey === activeKey;
-        const pad = meta.popular ? '800' : '500';
+        const pad = meta.popular ? '500' : '500';
         // Features come from the seeded plans; translated descriptors only as fallback
         const features = plan?.features?.length ? plan.features : meta.features;
 
         return (
             <Card padding={pad}>
-                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '28px' }}>
-                    <div style={{ flex: 1 }}>
-                        <BlockStack gap="500">
-                            <InlineStack align="space-between" blockAlign="start" wrap={false}>
-                                <BlockStack gap="050">
-                                    <Text variant="headingMd" as="h3" fontWeight={600}>
-                                        {meta.title}
-                                    </Text>
-                                    <Text variant="bodySm" as="p" tone="subdued">
-                                        {meta.note}
-                                    </Text>
-                                </BlockStack>
+                <Box minHeight="100%">
+                    <div className="pricing-card-fill">
+                        <BlockStack align="space-between" gap="0" as="div">
 
-                                {meta.popular && (
-                                    <div
-                                        style={{
-                                            background: '#0F6E5C',
-                                            color: '#FFFFFF',
-                                            fontSize: '12px',
-                                            fontWeight: 600,
-                                            padding: '4px 12px',
-                                            borderRadius: '999px',
-                                            whiteSpace: 'nowrap',
-                                            flexShrink: 0,
-                                        }}
-                                    >
-                                        {t('plans_page.most_popular')}
-                                    </div>
-                                )}
-                            </InlineStack>
+                            <BlockStack gap="500">
+                                <InlineStack align="space-between" blockAlign="start" gap="050" wrap={false}>
+                                    <BlockStack gap="050">
+                                        <Text variant="headingMd" as="h3" fontWeight={600}>
+                                            {meta.title}
+                                        </Text>
+                                        <Text variant="bodySm" as="p" tone="subdued">
+                                            {meta.note}
+                                        </Text>
+                                    </BlockStack>
 
-                            <BlockStack gap="100">
-                                <InlineStack gap="100" blockAlign="baseline">
-                                    <Text variant="heading2xl" as="p">
-                                        ${formatMoney(priceOf(plan))}
-                                    </Text>
-                                    <Text variant="bodyMd" as="span" tone="subdued">
-                                        /month
-                                    </Text>
+                                    {meta.popular && (
+                                        <div
+                                            style={{
+                                                background: '#0F6E5C',
+                                                color: '#FFFFFF',
+                                                fontSize: '12px',
+                                                fontWeight: 600,
+                                                padding: '4px 12px',
+                                                borderRadius: '999px',
+                                                whiteSpace: 'nowrap',
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            {t('plans_page.most_popular')}
+                                        </div>
+                                    )}
                                 </InlineStack>
 
-                                {/* Included sessions line - unlimited plans use their own label */}
-                                {unlimited ? (
-                                    <Text variant="bodySm" as="p" fontWeight="medium">
-                                        {t('plans_page.scale_included')}
-                                    </Text>
-                                ) : (
-                                    <Text variant="bodySm" as="p" fontWeight="medium">
-                                        {limit !== null
-                                            ? t('plans_page.sessions_included', { count: formatNumber(limit) })
-                                            : meta.note}
-                                    </Text>
-                                )}
+                                <BlockStack gap="100">
+                                    <InlineStack gap="100" blockAlign="baseline">
+                                        <Text variant="heading2xl" as="p">
+                                            ${formatMoney(priceOf(plan))}
+                                        </Text>
+                                        <Text variant="bodyMd" as="span" tone="subdued">
+                                            /month
+                                        </Text>
+                                    </InlineStack>
 
-                                {/* Extra-session rate - rendered for every plan, from the seed */}
-                                {rate > 0 && (
-                                    <Text variant="bodySm" as="p" fontWeight="medium">
-                                        {t('plans_page.per_extra_session', { price: rate.toFixed(2) })}
-                                    </Text>
-                                )}
+                                    {/* Included sessions line - unlimited plans use their own label */}
+                                    {unlimited ? (
+                                        <Text variant="bodySm" as="p" fontWeight="medium">
+                                            {t('plans_page.scale_included')}
+                                        </Text>
+                                    ) : (
+                                        <Text variant="bodySm" as="p" fontWeight="medium">
+                                            {limit !== null
+                                                ? t('plans_page.sessions_included', { count: formatNumber(limit) })
+                                                : meta.note}
+                                        </Text>
+                                    )}
+
+                                    {/* Extra-session rate - rendered for every plan, from the seed */}
+                                    {rate > 0 && (
+                                        <Text variant="bodySm" as="p" fontWeight="medium">
+                                            {t('plans_page.per_extra_session', { price: rate.toFixed(2) })}
+                                        </Text>
+                                    )}
+                                </BlockStack>
+
+                                <Box borderBlockStartWidth="025" borderColor="border-subdued" paddingBlockStart="400">
+                                    <BlockStack gap="300">
+                                        <Text variant="bodySm" as="p" fontWeight="semibold">
+                                            {meta.includesLabel}
+                                        </Text>
+                                        <BlockStack gap="300">
+                                            {features.map((feature) => {
+                                                const isObj = typeof feature === 'object';
+                                                return (
+                                                    <PricingFeature
+                                                        key={isObj ? feature.text : feature}
+                                                        text={isObj ? feature.text : feature}
+                                                        note={isObj ? feature.note : undefined}
+                                                    />
+                                                );
+                                            })}
+                                        </BlockStack>
+                                    </BlockStack>
+                                </Box>
                             </BlockStack>
 
-                            <Box borderBlockStartWidth="025" borderColor="border-subdued" paddingBlockStart="400">
-                                <BlockStack gap="300">
-                                    <Text variant="bodySm" as="p" fontWeight="semibold">
-                                        {meta.includesLabel}
-                                    </Text>
-                                    <BlockStack gap="300">
-                                        {features.map((feature) => {
-                                            const isObj = typeof feature === 'object';
-                                            return (
-                                                <PricingFeature
-                                                    key={isObj ? feature.text : feature}
-                                                    text={isObj ? feature.text : feature}
-                                                    note={isObj ? feature.note : undefined}
-                                                />
-                                            );
-                                        })}
-                                    </BlockStack>
-                                </BlockStack>
+
+                            <Box paddingBlockStart="400">
+                                <Button
+                                    fullWidth
+                                    size="large"
+                                    variant={isActiveCard ? undefined : 'primary'}
+                                    disabled={isActiveCard || !!upgradingPlan}
+                                    loading={upgradingPlan === planKey}
+                                    onClick={() => initiateBilling(planKey)}
+                                >
+                                    {planActionLabel(planKey)}
+                                </Button>
                             </Box>
                         </BlockStack>
                     </div>
-
-                    <div style={{ paddingTop: '8px' }}>
-                        <Button
-                            fullWidth
-                            size="large"
-                            variant={isActiveCard ? undefined : 'primary'}
-                            disabled={isActiveCard || !!upgradingPlan}
-                            loading={upgradingPlan === planKey}
-                            onClick={() => initiateBilling(planKey)}
-                        >
-                            {planActionLabel(planKey)}
-                        </Button>
-                    </div>
-                </div>
+                </Box>
             </Card>
         );
     };
@@ -686,50 +692,51 @@ const PlansPage = () => {
     const PricingSection = () => (
         <div ref={pricingSectionRef}>
             <BlockStack gap="400">
-            <InlineStack align="space-between" blockAlign="start">
-                <BlockStack gap="050">
-                    <Text variant="headingLg" as="h2" fontWeight={600}>
-                        {t('plans_page.choose_right_plan')}
-                    </Text>
-                    <Text variant="bodyMd" as="p" tone="subdued">
-                        {t('plans_page.all_plans_include')}
-                    </Text>
-                </BlockStack>
-                <BillingCycleToggle value={cycle} onChange={setCycle} />
-            </InlineStack>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px', alignItems: 'stretch' }}>
-                {PLAN_RANK.map((planKey) => (
-                    <div
-                        key={planKey}
-                        style={getCardWrapperStyle(planKey)}
-                        onClick={() => setSelectedPlan(planKey)}
-                    >
-                        <PricingCard planKey={planKey} />
-                    </div>
-                ))}
-            </div>
-
-            <InlineStack align="space-between" blockAlign="center">
-                <InlineStack gap="100" blockAlign="center">
-                    <Icon source={InfoIcon} tone="subdued" />
-                    <Text variant="bodySm" as="p" tone="subdued">
-                        {t('plans_page.unused_sessions_note')}
-                    </Text>
+                <InlineStack align="space-between" blockAlign="start">
+                    <BlockStack gap="050">
+                        <Text variant="headingLg" as="h2" fontWeight={600}>
+                            {t('plans_page.choose_right_plan')}
+                        </Text>
+                        <Text variant="bodyMd" as="p" tone="subdued">
+                            {t('plans_page.all_plans_include')}
+                        </Text>
+                    </BlockStack>
+                    <BillingCycleToggle value={cycle} onChange={setCycle} />
                 </InlineStack>
-                <InlineStack gap="100" blockAlign="center">
-                    <Text variant="bodySm" as="p" tone="subdued">
-                        {t('plans_page.need_help')}
-                    </Text>
-                    <Button variant="plain">
-                        <InlineStack gap="050" blockAlign="center" wrap={false}>
-                            <Text as="span">{t('plans_page.contact_support')}</Text>
-                            <Icon source={ExternalIcon} />
-                        </InlineStack>
-                    </Button>
+
+                <InlineGrid columns={3} gap="400">
+                    {PLAN_RANK.map((planKey) => (
+                        <div
+                            key={planKey}
+                            className="pricing-card-wrapper"
+                            style={getCardWrapperStyle(planKey)}
+                            onClick={() => setSelectedPlan(planKey)}
+                        >
+                            <PricingCard planKey={planKey} />
+                        </div>
+                    ))}
+                </InlineGrid>
+
+                <InlineStack align="space-between" blockAlign="center">
+                    <InlineStack gap="100" blockAlign="center">
+                        <Icon source={InfoIcon} tone="subdued" />
+                        <Text variant="bodySm" as="p" tone="subdued">
+                            {t('plans_page.unused_sessions_note')}
+                        </Text>
+                    </InlineStack>
+                    <InlineStack gap="100" blockAlign="center">
+                        <Text variant="bodySm" as="p" tone="subdued">
+                            {t('plans_page.need_help')}
+                        </Text>
+                        <Button variant="plain">
+                            <InlineStack gap="050" blockAlign="center" wrap={false}>
+                                <Text as="span">{t('plans_page.contact_support')}</Text>
+                                <Icon source={ExternalIcon} />
+                            </InlineStack>
+                        </Button>
+                    </InlineStack>
                 </InlineStack>
-            </InlineStack>
-        </BlockStack>
+            </BlockStack>
         </div>
     );
 

@@ -78,3 +78,35 @@
     bottom: auto !important;
     top: 20px !important;
 }
+
+/* Scoped fix: makes the pricing card footer button bottom-align
+   regardless of feature count, by bridging the gap Polaris's
+   Box/Card props can't reach (min-height vs height). */
+
+.pricing-card-wrapper .Polaris-ShadowBevel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.pricing-card-wrapper .Polaris-ShadowBevel > .Polaris-Box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.pricing-card-wrapper .Polaris-ShadowBevel > .Polaris-Box > .Polaris-Box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.pricing-card-fill {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.pricing-card-fill > .Polaris-BlockStack {
+    flex: 1;
+}

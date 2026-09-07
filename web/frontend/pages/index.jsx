@@ -1062,7 +1062,7 @@ const IndexPage = () => {
                             { title: t('dashboard.recent_sessions.table_headers.date_time') },
                             { title: t('dashboard.recent_sessions.table_headers.session_length') },
                             { title: t('dashboard.recent_sessions.table_headers.result') },
-                            { title: t('dashboard.recent_sessions.table_headers.action') },
+                            // { title: t('dashboard.recent_sessions.table_headers.action') },
                         ]}
                         selectable={false}
                         emptyState={

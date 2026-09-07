@@ -115,6 +115,15 @@ export default function NewOnboarding() {
     const [isNewUser, setIsNewUser] = useState(false);
     const [isNewUserChecked, setIsNewUserChecked] = useState(false);
 
+    // Onboarding is one-time: once finish_onboarding is set (after successful
+    // billing), send the merchant to the dashboard instead - even when this
+    // page is opened directly via URL.
+    useEffect(() => {
+        if (store?.finish_onboarding) {
+            navigate("/", { replace: true });
+        }
+    }, [store?.finish_onboarding, navigate]);
+
     useEffect(() => {
         const handleResize = () => {
             setIsMobile(window.innerWidth <= 768);

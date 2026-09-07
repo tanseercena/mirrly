@@ -520,7 +520,7 @@ const LivePreviewCard = ({ settings, t }) => {
                 </InlineStack>
 
                 <InlineStack gap="100" blockAlign="start" align="start" wrap={false}>
-                    <Text>  <Icon source={InfoIcon} tone="subdued" /> </Text>
+                    <Text>  <Icon source={InfoIcon} align='start' tone="subdued" /> </Text>
                     <Text variant="bodySm" as="p" tone="subdued">
                         {t('mirrly_settings.live_preview_card.preview_note')}
                     </Text>
