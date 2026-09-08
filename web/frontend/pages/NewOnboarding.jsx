@@ -215,6 +215,73 @@ export default function NewOnboarding() {
         return plan ? plan.id : null;
     };
 
+    // Plan-card helpers - mirror the Plans page so both read from the seeded plans
+    const findPlanByKey = (key) => {
+        const planMap = {
+            "starter": "Free",
+            "growth": "Growth",
+            "scale": "Scale"
+        };
+        const name = planMap[key];
+        return plans.find((p) => String(p.name ?? "").trim().toLowerCase() === name.toLowerCase()) ?? null;
+    };
+    const planLimitRaw = (p) => p?.limits?.sessions ?? p?.limits?.session ?? null;
+    const isUnlimitedPlan = (p) => planLimitRaw(p) === "unlimited";
+    const planLimitOf = (p) => {
+        const raw = planLimitRaw(p);
+        return typeof raw === "number" ? raw : null;
+    };
+    const planRateOf = (p) => Number(p?.limits?.session_rate ?? 0);
+    const planPriceOf = (p) => Number((billingPeriod === "yearly" ? p?.yearly_charge : p?.monthly_charge) ?? 0);
+    const formatNumber = (n) => Number(n || 0).toLocaleString();
+    const formatMoney = (n) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+    /* Static, translated fallbacks per plan - shown until the plans load or if the API fails */
+    const PLAN_CARDS = [
+        {
+            key: "starter",
+            badge: null,
+            name: t("onboarding.starter_plan"),
+            priceFallback: billingPeriod === "yearly" ? t("onboarding.starter_yearly_price") : t("onboarding.starter_price"),
+            subtitleFallback: t("onboarding.starter_sessions"),
+            featuresFallback: [
+                t("onboarding.all_core_features"),
+                t("onboarding.up_to_50_sessions"),
+                t("onboarding.standard_quality"),
+                t("onboarding.email_support"),
+            ],
+        },
+        {
+            key: "growth",
+            badge: { className: "popular", label: t("onboarding.popular") },
+            name: t("onboarding.growth_plan"),
+            priceFallback: billingPeriod === "yearly" ? t("onboarding.growth_yearly_price") : t("onboarding.growth_price"),
+            subtitleFallback: t("onboarding.growth_sessions"),
+            featuresFallback: [
+                t("onboarding.all_core_features"),
+                t("onboarding.up_to_500_sessions"),
+                t("onboarding.high_quality"),
+                t("onboarding.priority_support"),
+                t("onboarding.usage_analytics"),
+            ],
+        },
+        {
+            key: "scale",
+            badge: { className: "recommended", label: t("onboarding.recommended") },
+            name: t("onboarding.scale_plan"),
+            priceFallback: billingPeriod === "yearly" ? t("onboarding.scale_yearly_price") : t("onboarding.scale_price"),
+            subtitleFallback: t("onboarding.unlimited_sessions"),
+            featuresFallback: [
+                t("onboarding.all_core_features"),
+                t("onboarding.unlimited_sessions_short"),
+                t("onboarding.highest_quality"),
+                t("onboarding.priority_support"),
+                t("onboarding.usage_analytics"),
+                t("onboarding.early_access_features"),
+            ],
+        },
+    ];
+
     // Function to initiate billing process
     const initiateBilling = async () => {
         const planId = getPlanId(selectedPlan);
@@ -5619,171 +5686,87 @@ export default function NewOnboarding() {
                                                         >
                                                             {t("onboarding.monthly_title")}
                                                         </button>
-                                                        <button
+                                                        {/* <button
                                                             className={`step5-toggle-option ${billingPeriod === 'yearly' ? 'active' : ''}`}
                                                             onClick={() => setBillingPeriod('yearly')}
                                                         >
                                                             {t("onboarding.yearly_title")}
                                                             <span className="step5-toggle-discount">{t("onboarding.save_20_percent")}</span>
-                                                        </button>
+                                                        </button> */}
                                                     </div>
 
-                                                    {/* Plan Cards */}
+                                                    {/* Plan Cards - rendered from the seeded plans, same as the Plans page */}
                                                     <div className="step5-plan-cards">
+                                                        {PLAN_CARDS.map((meta) => {
+                                                            const plan = findPlanByKey(meta.key);
+                                                            const unlimited = !!plan && isUnlimitedPlan(plan);
+                                                            const limit = plan ? planLimitOf(plan) : null;
+                                                            const rate = plan ? planRateOf(plan) : 0;
+                                                            // Features come from the seeded plans; translated descriptors only as fallback
+                                                            const features = plan?.features?.length ? plan.features : meta.featuresFallback;
 
-                                                        {/* Starter Plan */}
-                                                        <div
-                                                            className={`step5-plan-card ${selectedPlan === "starter" ? "selected" : ""}`}
-                                                            onClick={() => setSelectedPlan("starter")}
-                                                        >
-                                                            <div className="step5-plan-name">{t("onboarding.starter_plan")}</div>
-                                                            <div className="step5-plan-price">{billingPeriod === 'yearly' ? t("onboarding.starter_yearly_price") : t("onboarding.starter_price")}</div>
-                                                            <div className="step5-plan-subtitle">{t("onboarding.starter_sessions")}</div>
-                                                            <div className="step5-plan-features">
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.all_core_features")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.up_to_50_sessions")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.standard_quality")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.email_support")}
-                                                                </div>
-                                                            </div>
-                                                            <div className="step5-plan-bottom">
-                                                                {selectedPlan === "starter" ? (
-                                                                    <div className="step5-plan-selected">
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                                                                            <polyline points="22 4 12 14.01 9 11.01" />
-                                                                        </svg>
-                                                                        {t("onboarding.selected")}
+                                                            // Sessions line - starter is pay-as-you-go, unlimited plans use their own label
+                                                            const subtitle = !plan
+                                                                ? meta.subtitleFallback
+                                                                : meta.key === "starter"
+                                                                    ? t("plans_page.pay_as_you_go")
+                                                                    : unlimited
+                                                                        ? t("plans_page.scale_included")
+                                                                        : limit !== null
+                                                                            ? t("plans_page.sessions_included", { count: formatNumber(limit) })
+                                                                            : meta.subtitleFallback;
+
+                                                            return (
+                                                                <div
+                                                                    key={meta.key}
+                                                                    className={`step5-plan-card ${selectedPlan === meta.key ? "selected" : ""}`}
+                                                                    onClick={() => setSelectedPlan(meta.key)}
+                                                                >
+                                                                    {meta.badge && (
+                                                                        <div className={`step5-plan-badge ${meta.badge.className}`}>{meta.badge.label}</div>
+                                                                    )}
+                                                                    <div className="step5-plan-name">{meta.name}</div>
+                                                                    <div className="step5-plan-price">
+                                                                        {plan ? `$${formatMoney(planPriceOf(plan))}/month` : meta.priceFallback}
                                                                     </div>
-                                                                ) : (
-                                                                    <div className="step5-plan-radio">
-                                                                        <div className="step5-radio-circle">
-                                                                            <div className="step5-radio-inner"></div>
+                                                                    <div className="step5-plan-subtitle">{subtitle}</div>
+                                                                    {rate > 0 && (
+                                                                        <div className="step5-plan-subtitle" style={{ marginTop: "-8px" }}>
+                                                                            {t("plans_page.per_extra_session", { price: rate.toFixed(2) })}
                                                                         </div>
-                                                                        {t("onboarding.choose_plan_btn")}
+                                                                    )}
+                                                                    <div className="step5-plan-features">
+                                                                        {features.map((feature, index) => {
+                                                                            const isObj = typeof feature === "object";
+                                                                            return (
+                                                                                <div className="step5-plan-feature" key={isObj ? feature.text : index}>
+                                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                                                    {isObj ? feature.text : feature}
+                                                                                </div>
+                                                                            );
+                                                                        })}
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Growth Plan */}
-                                                        <div
-                                                            className={`step5-plan-card ${selectedPlan === "growth" ? "selected" : ""}`}
-                                                            onClick={() => setSelectedPlan("growth")}
-                                                        >
-                                                            <div className="step5-plan-badge popular">{t("onboarding.popular")}</div>
-                                                            <div className="step5-plan-name">{t("onboarding.growth_plan")}</div>
-                                                            <div className="step5-plan-price">{billingPeriod === 'yearly' ? t("onboarding.growth_yearly_price") : t("onboarding.growth_price")}</div>
-                                                            <div className="step5-plan-subtitle">{t("onboarding.growth_sessions")}</div>
-                                                            <div className="step5-plan-features">
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.all_core_features")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.up_to_500_sessions")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.high_quality")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.priority_support")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.usage_analytics")}
-                                                                </div>
-                                                            </div>
-                                                            <div className="step5-plan-bottom">
-                                                                {selectedPlan === "growth" ? (
-                                                                    <div className="step5-plan-selected">
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                                                                            <polyline points="22 4 12 14.01 9 11.01" />
-                                                                        </svg>
-                                                                        {t("onboarding.selected")}
+                                                                    <div className="step5-plan-bottom">
+                                                                        {selectedPlan === meta.key ? (
+                                                                            <div className="step5-plan-selected">
+                                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                                                    <polyline points="22 4 12 14.01 9 11.01" />
+                                                                                </svg>
+                                                                                {t("onboarding.selected")}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="step5-plan-radio">
+                                                                                <div className="step5-radio-circle">
+                                                                                    <div className="step5-radio-inner"></div>
+                                                                                </div>
+                                                                                {t("onboarding.choose_plan_btn")}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                ) : (
-                                                                    <div className="step5-plan-radio">
-                                                                        <div className="step5-radio-circle">
-                                                                            <div className="step5-radio-inner"></div>
-                                                                        </div>
-                                                                        {t("onboarding.choose_plan_btn")}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Scale Plan */}
-
-                                                        <div
-                                                            className={`step5-plan-card ${selectedPlan === "scale" ? "selected" : ""}`}
-                                                            onClick={() => setSelectedPlan("scale")}
-                                                        >
-                                                            <div className="step5-plan-badge recommended">{t("onboarding.recommended")}</div>
-                                                            <div className="step5-plan-name">{t("onboarding.scale_plan")}</div>
-                                                            <div className="step5-plan-price">{billingPeriod === 'yearly' ? t("onboarding.scale_yearly_price") : t("onboarding.scale_price")}</div>
-                                                            <div className="step5-plan-subtitle">{t("onboarding.unlimited_sessions")}</div>
-                                                            <div className="step5-plan-features">
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.all_core_features")}
                                                                 </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.unlimited_sessions_short")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.highest_quality")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.priority_support")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.usage_analytics")}
-                                                                </div>
-                                                                <div className="step5-plan-feature">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                                    {t("onboarding.early_access_features")}
-                                                                </div>
-                                                            </div>
-                                                            <div className="step5-plan-bottom">
-                                                                {selectedPlan === "scale" ? (
-                                                                    <div className="step5-plan-selected">
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                                                                            <polyline points="22 4 12 14.01 9 11.01" />
-                                                                        </svg>
-                                                                        {t("onboarding.selected")}
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="step5-plan-radio">
-                                                                        <div className="step5-radio-circle">
-                                                                            <div className="step5-radio-inner"></div>
-                                                                        </div>
-                                                                        {t("onboarding.choose_plan_btn")}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
+                                                            );
+                                                        })}
                                                     </div>
 
                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '24x' }}>

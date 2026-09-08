@@ -21,15 +21,16 @@ class PlansSeeder extends Seeder
             'monthly_charge' => 0.00,
             'yearly_charge' => 0.00,
             'features' => [
-                'All core features',
-                'Up to 50 sessions / month',
-                'Standard quality',
-                'Email support',
+                'Unlimited try-on sessions',
+                '7-day analytics history',
+                '30 seconds session ',
+                'Standard try-on button',
+                'Chat Support',
                 
             ],
             'limits' => [
-                'sessions' => 50,
-                'session_rate' => 0.05,
+                'sessions' => '',
+                'session_rate' => 0.90,
             ],
             'can' => [
                
@@ -41,16 +42,17 @@ class PlansSeeder extends Seeder
             'monthly_charge' => 79.00,
             'yearly_charge' => 63.00,
             'features' => [
-                'All core features',
-                'Up to 500 sessions / month',
+                '90-day analytics history',
+                '30 seconds session',
                 'High quality',
-                'Priority support',
-                'Usage analytics',
+                'Custom try-on button',
+                'Chat Support',
+                'Email notifications',
                 
             ],
             'limits' => [
-                'sessions' => 500,
-                'session_rate' => 0.04,
+                'sessions' => 90,
+                'session_rate' => 0.80,
             ],
             'can' => [
                 
@@ -62,17 +64,17 @@ class PlansSeeder extends Seeder
             'monthly_charge' => 199.00,
             'yearly_charge' => 159.00,
             'features' => [
-                'All core features',
-                'Unlimited sessions',
-                'Highest quality',
-                'Priority support',
-                'Usage analytics',
-                'Early access to new features',
+                'Unlimited analytics history',
+                '30 seconds session ',
+                'Custom try-on button',
+                'Chat Support (Priority)',
+                'Email notifications',
+                
                 
             ],
             'limits' => [
-                'sessions' => 'unlimited',
-                'session_rate' => 0.03,
+                'sessions' => 250,
+                'session_rate' => 0.75,
             ],
             'can' => [
                 

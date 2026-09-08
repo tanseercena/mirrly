@@ -309,6 +309,7 @@ const PlansPage = () => {
             title: t('plans_page.growth'),
             note: t('plans_page.for_growing_stores'),
             popular: true,
+            badgeLabel: t('plans_page.most_popular'),
             includesLabel: t('plans_page.everything_in_free_plus'),
             features: [
                 t('plans_page.90_day_analytics'),
@@ -320,6 +321,7 @@ const PlansPage = () => {
             title: t('plans_page.scale'),
             note: t('plans_page.for_high_volume_stores'),
             popular: false,
+            badgeLabel: t('plans_page.recommended'),
             includesLabel: t('plans_page.everything_in_growth_plus'),
             features: [
                 t('plans_page.unlimited_analytics'),
@@ -379,7 +381,7 @@ const PlansPage = () => {
                                         </Text>
                                     </BlockStack>
 
-                                    {meta.popular && (
+                                    {meta.badgeLabel && (
                                         <div
                                             style={{
                                                 background: '#0F6E5C',
@@ -392,7 +394,7 @@ const PlansPage = () => {
                                                 flexShrink: 0,
                                             }}
                                         >
-                                            {t('plans_page.most_popular')}
+                                            {meta.badgeLabel}
                                         </div>
                                     )}
                                 </InlineStack>
@@ -407,10 +409,14 @@ const PlansPage = () => {
                                         </Text>
                                     </InlineStack>
 
-                                    {/* Included sessions line - unlimited plans use their own label */}
+                                    {/* Included sessions line - unlimited plans use their own label, free plan shows pay-as-you-go */}
                                     {unlimited ? (
                                         <Text variant="bodySm" as="p" fontWeight="medium">
                                             {t('plans_page.scale_included')}
+                                        </Text>
+                                    ) : planKey === 'free' ? (
+                                        <Text variant="bodySm" as="p" fontWeight="medium">
+                                            {t('plans_page.pay_as_you_go')}
                                         </Text>
                                     ) : (
                                         <Text variant="bodySm" as="p" fontWeight="medium">
