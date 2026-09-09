@@ -3,16 +3,192 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\Shopify;
+use App\Lib\ConfigToken;
 use App\Models\Product;
 use App\Models\Store;
 use App\Models\TrySession;
+use App\Services\DecartService;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use RuntimeException;
 
 class TrySessionsController extends Controller
 {
+    // Client-reported funnel events → try_sessions columns. camera_opened is
+    // deliberately absent (written at session creation); purchased/abandoned
+    // are server-side only (orders webhook / completion logic).
+    private const EVENT_COLUMNS = [
+        'tryon_started' => 'tryon_started_at',
+        'tryon_completed' => 'tryon_completed_at',
+        'added_to_cart' => 'added_to_cart_at',
+    ];
+
+    private const STAGE_RANK = [
+        'opened' => 0,
+        'started' => 1,
+        'completed' => 2,
+        'added_to_cart' => 3,
+        'purchased' => 4,
+        'abandoned' => 5,
+    ];
+
+    /**
+     * Storefront POST /api/{shop}/event — funnel milestones sent fire-and-forget
+     * (sendBeacon). Milestone timestamps are only set once and funnel_stage
+     * only moves forward, so beacon retries can never regress a session.
+     */
+    public function event(Request $request, $shop)
+    {
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+        if (!$store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        $event = $request->input('event');
+        if (!isset(self::EVENT_COLUMNS[$event])) {
+            return response()->json(['error' => 'Unknown event'], 400);
+        }
+
+        $session = TrySession::where('store_id', $store->id)
+            ->where('session_token', $request->input('session_token'))
+            ->first();
+        if (!$session) {
+            return response()->json(['error' => 'Session not found'], 404);
+        }
+
+        $update = [];
+        $column = self::EVENT_COLUMNS[$event];
+        if (!$session->{$column}) {
+            $update[$column] = now();
+        }
+
+        if ($event === 'tryon_completed' && $request->filled('duration_seconds')) {
+            $update['duration_seconds'] = max(0, (int) $request->input('duration_seconds'));
+        }
+
+        if ($event === 'added_to_cart' && $request->filled('cart_token')) {
+            $update['cart_token'] = (string) $request->input('cart_token');
+        }
+
+        $newStage = match ($event) {
+            'tryon_started' => 'started',
+            'tryon_completed' => 'completed',
+            'added_to_cart' => 'added_to_cart',
+        };
+        if (self::STAGE_RANK[$newStage] > (self::STAGE_RANK[$session->funnel_stage] ?? 0)) {
+            $update['funnel_stage'] = $newStage;
+        }
+
+        if ($update) {
+            $session->update($update);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Storefront POST /api/{shop}/session. The moment this call lands is the
+     * camera_opened funnel event (the session row's camera_opened_at write).
+     * Verifies the /config-issued token, checks the product is try-on able,
+     * mints a scoped Decart client token and returns everything the browser
+     * needs to open the camera and connect.
+     */
+    public function start(Request $request, $shop)
+    {
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+        if (!$store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        // Integrity check: ties this call back to the exact /config response
+        // the shopper was shown — /session can't be reached with an arbitrary
+        // product_id without going through /config first.
+        $claims = ConfigToken::verify($request->input('config_token'));
+        $productId = (string) ($claims['product_id'] ?? '');
+        if (!$claims || ($claims['shop'] ?? null) !== $shop || $productId === '') {
+            return response()->json(['error' => 'Invalid or expired config token'], 401);
+        }
+
+        $variantId = (string) ($request->input('variant_id') ?: $claims['variant_id']);
+
+        // A product without try_on enabled can't be tried on, even if someone
+        // crafts the request directly.
+        $product = Product::where('store_id', $store->id)
+            ->where('shopify_product_id', $productId)
+            ->where('try_on', true)
+            ->first();
+        if (!$product) {
+            return response()->json(['error' => 'Try-on is not available for this product'], 404);
+        }
+
+        $modelName = (string) config('services.decart.model', 'lucy-vton-3.5');
+        $maxDuration = max(30, (int) config('services.decart.max_session_duration', 30));
+
+        try {
+            $clientToken = app(DecartService::class)->createClientToken(
+                $modelName,
+                $this->storeOrigins($store),
+                300,
+                $maxDuration
+            );
+        } catch (RuntimeException) {
+            return response()->json(['error' => 'Failed to prepare try-on session'], 502);
+        }
+
+        if (empty($clientToken['apiKey'])) {
+            return response()->json(['error' => 'Failed to prepare try-on session'], 502);
+        }
+
+        // Create the row only after the token mint succeeded, so a Decart
+        // failure can't leave an orphaned session behind.
+        $session = TrySession::create([
+            'store_id' => $store->id,
+            'product_id' => $product->id,
+            'shopify_variant_id' => ctype_digit($variantId) ? (int) $variantId : null,
+            'session_token' => (string) Str::uuid(),
+            'funnel_stage' => 'opened',
+            'camera_opened_at' => now(),
+            'device_type' => in_array($request->input('device_type'), ['mobile', 'desktop', 'tablet'], true)
+                ? $request->input('device_type')
+                : 'unknown',
+        ]);
+
+        return response()->json([
+            'session_token' => $session->session_token,
+            'client_token' => $clientToken['apiKey'],
+            'model_name' => $modelName,
+            'prompt' => $this->buildPrompt($product, $variantId),
+            'max_duration_seconds' => $maxDuration,
+        ]);
+    }
+
+    /**
+     * The browser connects to Decart from the storefront, so the client token
+     * must be scoped to the store's own web origins.
+     */
+    private function storeOrigins(Store $store): array
+    {
+        return array_map(
+            fn ($domain) => 'https://' . $domain,
+            array_filter([$store->shopify_domain, $store->domain])
+        );
+    }
+
+    private function buildPrompt(Product $product, string $variantId): string
+    {
+        $variantTitle = $this->variantTitle($product->shopify_product, $variantId);
+
+        $item = trim(
+            ($variantTitle && $variantTitle !== 'Default Title' ? $variantTitle . ' ' : '')
+            . $product->title
+        );
+
+        return collect([$product->style_hint, $item])->filter()->implode(', ');
+    }
+
     /**
      * Latest try-on sessions with their product — feeds the dashboard's
      * "Recent sessions" table.

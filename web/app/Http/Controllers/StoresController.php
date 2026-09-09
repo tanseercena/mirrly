@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Lib\ConfigToken;
 use App\Lib\TopLevelRedirection;
 use App\Mail\SendFeedback;
 use App\Models\Plan;
@@ -61,37 +62,12 @@ class StoresController extends Controller
                 'border_radius' => $radiusMap[$style['borderRadius']] ?? 'rounded',
                 'show_icon' => (bool) ($branding['showIcon'] ?? true),
             ],
-            'config_token' => $this->createConfigToken(
+            'config_token' => ConfigToken::mint(
                 $shop,
                 $request->input('product_id'),
                 $request->input('variant_id')
             ),
         ]);
-    }
-
-    // Short-lived (~5 min) signed JWT tying a /session call back to the exact
-    // product/variant the shopper was shown. Signed with the app key so it can
-    // only be minted server-side; verified when /session is implemented.
-    private function createConfigToken(string $shop, ?string $productId, ?string $variantId): string
-    {
-        $segments = [
-            $this->base64UrlEncode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])),
-            $this->base64UrlEncode(json_encode([
-                'shop' => $shop,
-                'product_id' => $productId,
-                'variant_id' => $variantId,
-                'exp' => time() + 300,
-            ])),
-        ];
-        $signature = hash_hmac('sha256', implode('.', $segments), (string) config('app.key'), true);
-        $segments[] = $this->base64UrlEncode($signature);
-
-        return implode('.', $segments);
-    }
-
-    private function base64UrlEncode(string $data): string
-    {
-        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 
 

@@ -67,4 +67,14 @@ return [
       'api_key' => env('HOOKDECK_API_KEY', ''),
     ],
 
+    'decart' => [
+        'api_key' => env('DECART_API_KEY', ''),
+        'base_url' => env('DECART_BASE_URL', 'https://api.decart.ai'),
+        // Realtime virtual try-on model the client tokens are scoped to.
+        'model' => env('DECART_TRYON_MODEL', 'lucy-vton-3.5'),
+        // Client-side session ceiling (seconds) — later mirrored by the
+        // plan's billing unit. Also sent to Decart as maxSessionDuration.
+        'max_session_duration' => env('DECART_MAX_SESSION_DURATION', 30),
+    ],
+
 ];
