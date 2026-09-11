@@ -84,7 +84,8 @@ export async function fetchConfig(productId: string, variantId: string): Promise
 export async function startSession(
   configToken: string, // integrity check tying this call back to /config — see types.ts
   productId: string,
-  variantId: string
+  variantId: string,
+  existingSessionToken?: string // passed on reconnects so the backend reuses the same session row
 ): Promise<SessionStartResponse> {
   const res = await fetch(buildUrl('/session'), {
     method: 'POST',
@@ -94,6 +95,7 @@ export async function startSession(
       product_id: productId,
       variant_id: variantId,
       device_type: guessDeviceType(),
+      ...(existingSessionToken ? { session_token: existingSessionToken } : {}),
     }),
   });
   if (!res.ok) throw new Error(`session start failed: ${res.status}`);

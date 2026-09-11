@@ -61,6 +61,14 @@ const builds = [
     format: 'esm',
     outdir: '../extensions/mirrly/assets',
   },
+  {
+    // Nothing imports styles.css from JS (esbuild wouldn't auto-inject it
+    // anyway), so it ships as its own asset, linked from the liquid block.
+    entryPoints: { 'tryon-styles': 'src/styles.css' },
+    bundle: true,
+    minify: true,
+    outdir: '../extensions/mirrly/assets',
+  },
 ];
 
 async function run() {
