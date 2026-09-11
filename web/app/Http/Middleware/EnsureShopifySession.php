@@ -9,6 +9,7 @@ use App\Lib\TopLevelRedirection;
 use Closure;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Shopify\Clients\Graphql;
 use Shopify\Context;
@@ -26,6 +27,9 @@ class EnsureShopifySession
         }
     }
     QUERY;
+
+    /** How long a successful token validation is reused before re-checking with Shopify. */
+    private const TOKEN_VALIDATION_CACHE_SECONDS = 600;
 
     /**
      * Checks if there is currently an active Shopify session.
@@ -51,7 +55,16 @@ class EnsureShopifySession
         }
 
         $shop = Utils::sanitizeShopDomain($request->query('shop', ''));
-        $session = Utils::loadCurrentSession($request->header(), $request->cookie(), $isOnline);
+
+        try {
+            $session = Utils::loadCurrentSession($request->header(), $request->cookie(), $isOnline);
+        } catch (\Throwable $e) {
+            // A request can arrive without any session token (e.g. a boot
+            // request that fired before App Bridge patched fetch). Treat it as
+            // unauthenticated and let the redirect flow below respond — never
+            // a 500.
+            $session = null;
+        }
 
         if ($session && $shop && $session->getShop() !== $shop) {
             // This request is for a different shop. Go straight to login
@@ -74,10 +87,7 @@ class EnsureShopifySession
                 }
             } else {
                 // Make a request to ensure the access token is still valid. Otherwise, re-authenticate the user.
-                $client = new Graphql($session->getShop(), $session->getAccessToken());
-                $response = $client->query(self::TEST_GRAPHQL_QUERY);
-
-                $proceed = $response->getStatusCode() === 200;
+                $proceed = $this->isTokenStillValid($session);
             }
 
             if ($proceed) {
@@ -109,5 +119,66 @@ class EnsureShopifySession
         }
 
         return TopLevelRedirection::redirect($request, "/api/auth?shop=$shop");
+    }
+
+    /**
+     * Live-validating the token costs a round trip to Shopify on every request.
+     * The dashboard fires several parallel API requests on load and each would
+     * otherwise pay that cost, so a successful validation is cached briefly.
+     * A short lock keeps those parallel requests from pinging Shopify
+     * simultaneously (cache stampede) — the first one validates, the rest
+     * read the cached result.
+     */
+    private function isTokenStillValid($session): bool
+    {
+        $cacheKey = 'shopify_token_valid:' . md5($session->getShop() . '|' . $session->getAccessToken());
+
+        try {
+            if (Cache::get($cacheKey)) {
+                return true;
+            }
+        } catch (\Throwable $e) {
+            // Cache unavailable (e.g. Redis down) — validate live below.
+        }
+
+        $lock = null;
+        try {
+            $lock = Cache::lock($cacheKey . ':lock', 10);
+            $lock->block(5);
+        } catch (\Throwable $e) {
+            // Locks unsupported or timed out — fall back to a plain live validation.
+            return $this->validateTokenLive($session, $cacheKey);
+        }
+
+        try {
+            try {
+                if (Cache::get($cacheKey)) {
+                    return true; // another request finished validating while we waited
+                }
+            } catch (\Throwable $e) {
+            }
+
+            return $this->validateTokenLive($session, $cacheKey);
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable $e) {
+            }
+        }
+    }
+
+    private function validateTokenLive($session, string $cacheKey): bool
+    {
+        $client = new Graphql($session->getShop(), $session->getAccessToken());
+        $valid = $client->query(self::TEST_GRAPHQL_QUERY)->getStatusCode() === 200;
+
+        if ($valid) {
+            try {
+                Cache::put($cacheKey, true, now()->addSeconds(self::TOKEN_VALIDATION_CACHE_SECONDS));
+            } catch (\Throwable $e) {
+            }
+        }
+
+        return $valid;
     }
 }

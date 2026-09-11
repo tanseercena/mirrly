@@ -31,6 +31,7 @@ class PlansSeeder extends Seeder
             'limits' => [
                 'sessions' => '',
                 'session_rate' => 0.90,
+                'analytics_history_days' => 7,
             ],
             'can' => [
                
@@ -53,6 +54,7 @@ class PlansSeeder extends Seeder
             'limits' => [
                 'sessions' => 90,
                 'session_rate' => 0.80,
+                'analytics_history_days' => 90,
             ],
             'can' => [
                 
@@ -75,6 +77,7 @@ class PlansSeeder extends Seeder
             'limits' => [
                 'sessions' => 250,
                 'session_rate' => 0.75,
+                'analytics_history_days' => 'unlimited',
             ],
             'can' => [
                 

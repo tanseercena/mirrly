@@ -494,7 +494,10 @@
             "last_90_days": "Last 90 days",
             "custom": "Custom",
             "cancel": "Cancel",
-            "apply": "Apply"
+            "apply": "Apply",
+            "history_limit": "Your plan includes up to {{days}} days of analytics history.",
+            "upgrade_to_increase_retention": "Upgrade to increase retention",
+            "upgrade": "Upgrade"
         }
     },
     "plans_page": {

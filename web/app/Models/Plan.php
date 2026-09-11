@@ -16,6 +16,21 @@ class Plan extends Model
         'can' => 'array'
     ];
 
+    /**
+     * How far back the plan can report analytics, in days.
+     * Null means unlimited (any date range).
+     */
+    public function analyticsHistoryDays(): ?int
+    {
+        $days = $this->limits['analytics_history_days'] ?? null;
+
+        if ($days === null || $days === '' || $days === 'unlimited') {
+            return null;
+        }
+
+        return is_numeric($days) ? (int) $days : null;
+    }
+
     public function store()
     {
         return $this->belongsTo(Store::class);

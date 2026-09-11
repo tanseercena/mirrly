@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\Shopify;
 use App\Models\Product;
+use App\Models\Plan;
 use App\Models\Store;
 use App\Models\TrySession;
 use Carbon\Carbon;
@@ -67,6 +68,9 @@ class TrySessionsController extends Controller
         $from = $request->filled('from')
             ? Carbon::parse($request->input('from'))->startOfDay()
             : Carbon::today()->subDays(29)->startOfDay();
+
+        // Plan limit: Free/Growth stores only get N days of analytics history
+        $from = $this->clampFromToPlan($store, $from);
 
         $rows = TrySession::where('try_sessions.store_id', $store->id)
             ->whereBetween('try_sessions.created_at', [$from, $to])
@@ -159,6 +163,9 @@ class TrySessionsController extends Controller
         $from = $request->filled('from')
             ? Carbon::parse($request->input('from'))->startOfDay()
             : Carbon::today()->subDays(29)->startOfDay();
+
+        // Plan limit: Free/Growth stores only get N days of analytics history
+        $from = $this->clampFromToPlan($store, $from);
 
         [$prevFrom, $prevTo] = $this->previousWindow($from, $to);
 
@@ -273,6 +280,9 @@ class TrySessionsController extends Controller
             [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
         }
 
+        // Plan limit: Free/Growth stores only get N days of analytics history
+        $from = $this->clampFromToPlan($store, $from);
+
         // Comparison window: same length, immediately before the selected one
         [$prevFrom, $prevTo] = $this->previousWindow($from, $to);
 
@@ -315,6 +325,36 @@ class TrySessionsController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * How far back the store's plan can report analytics, in days
+     * (null = unlimited). Falls back to the Free plan when the store has
+     * no active subscription, mirroring SubscriptionsController@show.
+     */
+    private function analyticsHistoryDays(Store $store): ?int
+    {
+        $plan = $store->subscription?->plan_id
+            ? Plan::find($store->subscription->plan_id)
+            : Plan::whereRaw('LOWER(name) = ?', ['free'])->first();
+
+        return $plan?->analyticsHistoryDays();
+    }
+
+    /**
+     * Pull $from forward to the earliest date the plan's analytics history
+     * allows, so limited plans can never query older than their window.
+     */
+    private function clampFromToPlan(Store $store, Carbon $from): Carbon
+    {
+        $days = $this->analyticsHistoryDays($store);
+        if ($days === null) {
+            return $from;
+        }
+
+        $earliest = Carbon::today()->subDays($days - 1)->startOfDay();
+
+        return $from->lt($earliest) ? $earliest : $from;
     }
 
     /**
