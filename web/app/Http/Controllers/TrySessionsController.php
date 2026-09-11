@@ -124,6 +124,15 @@ class TrySessionsController extends Controller
             return response()->json(['error' => 'Try-on is not available for this product'], 404);
         }
 
+        // Client tokens are single-use and short-lived, so a shopper who steps
+        // out of frame and back in needs a fresh one — but against the SAME
+        // session row (one row per shopper visit, not per connection).
+        // Unknown or mismatched tokens just fall through to a new row.
+        $session = TrySession::where('session_token', (string) $request->input('session_token'))
+            ->where('store_id', $store->id)
+            ->where('product_id', $product->id)
+            ->first();
+
         $modelName = (string) config('services.decart.model', 'lucy-vton-3.5');
         $maxDuration = max(30, (int) config('services.decart.max_session_duration', 30));
 
@@ -142,19 +151,26 @@ class TrySessionsController extends Controller
             return response()->json(['error' => 'Failed to prepare try-on session'], 502);
         }
 
-        // Create the row only after the token mint succeeded, so a Decart
-        // failure can't leave an orphaned session behind.
-        $session = TrySession::create([
-            'store_id' => $store->id,
-            'product_id' => $product->id,
-            'shopify_variant_id' => ctype_digit($variantId) ? (int) $variantId : null,
-            'session_token' => (string) Str::uuid(),
-            'funnel_stage' => 'opened',
-            'camera_opened_at' => now(),
-            'device_type' => in_array($request->input('device_type'), ['mobile', 'desktop', 'tablet'], true)
-                ? $request->input('device_type')
-                : 'unknown',
-        ]);
+        if ($session) {
+            $session->connection_count += 1;
+            $session->last_connected_at = now();
+            $session->save();
+        } else {
+            // Create the row only after the token mint succeeded, so a Decart
+            // failure can't leave an orphaned session behind.
+            $session = TrySession::create([
+                'store_id' => $store->id,
+                'product_id' => $product->id,
+                'shopify_variant_id' => ctype_digit($variantId) ? (int) $variantId : null,
+                'session_token' => (string) Str::uuid(),
+                'funnel_stage' => 'opened',
+                'camera_opened_at' => now(),
+                'last_connected_at' => now(),
+                'device_type' => in_array($request->input('device_type'), ['mobile', 'desktop', 'tablet'], true)
+                    ? $request->input('device_type')
+                    : 'unknown',
+            ]);
+        }
 
         return response()->json([
             'session_token' => $session->session_token,
