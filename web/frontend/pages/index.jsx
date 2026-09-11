@@ -28,6 +28,8 @@ import { useNavigate } from "react-router-dom";
 import { PageLoader } from "../components/PageLoader.jsx";
 import SessionFunnelDateFilter from '../components/SessionFunnelDateFilter';
 import { isCardDismissed, dismissCard } from "../utils/sessionStorage.js";
+import { defaultRange, toISODate } from "../utils/analyticsRange.js";
+import { prefetchJSON } from "../utils/prefetch.js";
 
 
 import useReviewModal from "../hooks/useReviewModal.js";
@@ -62,21 +64,11 @@ const THEME_POLL_MAX_ATTEMPTS = 30; // checks every 1s for up to 30s
 
 /* ============================================
     OVERVIEW ANALYTICS
-    Date-range helpers + dynamic KPI cards — mirrors the Sessions page
+    Dynamic KPI cards — mirrors the Sessions page
     pattern, but keeps the dashboard's own card look (no sparklines).
+    Date-range helpers come from utils/analyticsRange.js (shared with
+    utils/prefetch.js so both request the same URL on boot).
     ============================================ */
-
-/* Default "Last 30 days" window */
-const defaultRange = () => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 29);
-    return { start, end };
-};
-
-/* Local-date YYYY-MM-DD (no UTC shifting) */
-const toISODate = (d) =>
-    d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 
 /* Previous period of equal length, immediately before [start, end].
    Works uniformly for today (-> yesterday), last 7 days (-> prior 7)
@@ -438,8 +430,8 @@ const IndexPage = () => {
 
         const load = async () => {
             try {
-                const response = await fetch('/api/sessions/recent');
-                const payload = response.ok ? await response.json() : null;
+                const response = await prefetchJSON('/api/sessions/recent');
+                const payload = response && response.ok ? response.data : null;
                 if (!cancelled && payload && payload.data) {
                     setRecentSessions(payload.data);
                 }
@@ -474,10 +466,9 @@ const IndexPage = () => {
     useEffect(() => {
         const fetchSubscription = async () => {
             try {
-                const response = await fetch("/api/subscription");
-                if (response.ok) {
-                    const data = await response.json();
-                    setSubscriptionData(data.data);
+                const response = await prefetchJSON("/api/subscription");
+                if (response && response.ok && response.data) {
+                    setSubscriptionData(response.data.data);
                 }
             } catch (error) {
                 console.error("Error fetching subscription:", error);
@@ -504,8 +495,8 @@ const IndexPage = () => {
                     from: toISODate(overviewRange.start),
                     to: toISODate(overviewRange.end),
                 });
-                const response = await fetch('/api/sessions/analytics?' + params.toString());
-                const payload = response.ok ? await response.json() : null;
+                const response = await prefetchJSON('/api/sessions/analytics?' + params.toString());
+                const payload = response && response.ok ? response.data : null;
                 if (!cancelled && payload && payload.data) {
                     setOverviewAnalytics(payload.data);
                 }

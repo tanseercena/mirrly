@@ -7,6 +7,85 @@
     <!-- Ensures that the UI is properly scaled in the Shopify Mobile app -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="shopify-api-key" content="%VITE_SHOPIFY_API_KEY%" />
+    <!-- Start the dashboard's boot requests as soon as App Bridge has loaded
+         and patched fetch (requests authenticate via the Authorization header
+         it injects). utils/prefetch.js reuses these promises; the response
+         shape matches its fetchJSON(). -->
+    <script>
+        (function () {
+            var early = {};
+            var grab = function (url) {
+                early[url] = fetch(url).then(function (response) {
+                    return response.json().catch(function () { return null; }).then(function (data) {
+                        return { ok: response.ok, status: response.status, data: data };
+                    });
+                });
+            };
+            var fire = function () {
+                var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+                var iso = function (d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+                var path = window.location.pathname;
+                var end = new Date();
+                var start = new Date();
+                start.setDate(end.getDate() - 29);
+                var rangeQuery = 'from=' + iso(start) + '&to=' + iso(end);
+
+                // Needed on every route (AppProvider gate)
+                grab('/api/store');
+
+                if (path === '/') {
+                    grab('/api/subscription');
+                    grab('/api/sessions/recent');
+                    grab('/api/sessions/analytics?' + rangeQuery);
+                }
+
+                if (path.indexOf('/products') === 0) {
+                    // Must mirror the products page's first request
+                    // (pages/Products.jsx): page 1, persisted per-page
+                    // preference, no filters.
+                    var perPage = '25';
+                    try {
+                        var stored = window.sessionStorage.getItem('products_per_page');
+                        if (['10', '25', '50', '100'].indexOf(stored) !== -1) perPage = stored;
+                    } catch (e) { /* storage unavailable — default stands */ }
+                    grab('/api/products?page=1&per_page=' + perPage + '&status=all');
+                }
+
+                if (path.indexOf('/sessions') === 0) {
+                    // Must mirror pages/Sessions.jsx's first requests
+                    grab('/api/sessions/analytics?' + rangeQuery);
+                    grab('/api/sessions/product-performance?' + rangeQuery);
+                }
+
+                if (path.indexOf('/plans') === 0) {
+                    // Must mirror pages/Plans.jsx's first requests
+                    grab('/api/plans');
+                    grab('/api/subscription');
+                }
+
+                if (Object.keys(early).length) {
+                    window.__earlyApi = early;
+                }
+            };
+            if (window.shopify) {
+                fire();
+            } else {
+                // App Bridge hasn't run yet — poll briefly for it. If it never
+                // shows up, skip early fetching; the app fetches normally once
+                // rendered.
+                var waited = 0;
+                var timer = setInterval(function () {
+                    waited += 20;
+                    if (window.shopify) {
+                        clearInterval(timer);
+                        setTimeout(fire, 0);
+                    } else if (waited > 4000) {
+                        clearInterval(timer);
+                    }
+                }, 20);
+            }
+        })();
+    </script>
     <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
