@@ -2,29 +2,61 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { startSession, sendEvent, buildUrl } from './session-api';
 import { connectEngine, type EngineConnection } from './realtime-engine';
 import { startPersonDetection, type PersonDetection } from './person-detection';
+import { addVariantToCart } from './cart';
+import type { ProductInfo } from './types';
+import { TryOnIntro } from './components/TryOnIntro';
+import { ErrorScreen, type TryOnError } from './components/ErrorScreen';
+import {
+  CloseButton,
+  CountdownRing,
+  GlassBottomBar,
+  IconButton,
+  ProductSummary,
+  StatusPill,
+} from './components/ui';
+import { BackIcon, BagIcon, CheckIcon, InfoIcon, Silhouette } from './components/icons';
 
 type Status =
-  | 'idle' // modal open, waiting for the shopper to hit Start
+  | 'idle' // intro — modal open, waiting for the shopper to hit Start
   | 'requesting_camera'
   | 'detecting' // camera live, waiting for a person to step into frame
   | 'connecting'
   | 'streaming'
   | 'waiting_person' // was streaming; person left, engine disconnected to stop billing
-  | 'ended'
-  | 'error';
+  | 'ended';
+
+// Design-spec error screens. 'camera_denied' also covers "no camera found"
+// with adjusted copy — same blocked-camera remedy.
+type ErrorKind = 'camera_denied' | 'camera_unsupported' | 'session_failed';
+
+const DEFAULT_COUNTDOWN_SECONDS = 8;
 
 interface Props {
   configToken: string;
   productId: string;
   variantId: string;
+  product: ProductInfo | null;
+  countdownSeconds?: number;
   onClose: () => void;
 }
 
-export function TryOnModal({ configToken, productId, variantId, onClose }: Props) {
+export function TryOnModal({
+  configToken,
+  productId,
+  variantId,
+  product,
+  countdownSeconds = DEFAULT_COUNTDOWN_SECONDS,
+  onClose,
+}: Props) {
   const [status, setStatus] = useState<Status>('idle');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [addedToCart, setAddedToCart] = useState(false);
+  const [error, setError] = useState<ErrorKind | null>(null);
+  const [countdownLeft, setCountdownLeft] = useState(0);
+  const [snapshot, setSnapshot] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
 
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
@@ -48,24 +80,81 @@ export function TryOnModal({ configToken, productId, variantId, onClose }: Props
   const durationTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    document.addEventListener('change', handleVariantChange, true);
+    const overlay = overlayRef.current;
+    const previouslyFocused = openerRef.current;
+
+    // Lock page scroll behind the modal and trap Tab inside it.
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        dismiss();
+        return;
+      }
+      if (e.key !== 'Tab' || !overlay) return;
+      const focusables = overlay.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown, true);
 
     return () => {
       aliveRef.current = false;
-      document.removeEventListener('change', handleVariantChange, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+      document.body.style.overflow = prevOverflow;
+      previouslyFocused?.focus?.();
       cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // "Preparing your look…" ring — restarts on every connection because the
+  // garment re-renders from scratch each time.
+  useEffect(() => {
+    if (status !== 'streaming') {
+      setCountdownLeft(0);
+      return;
+    }
+    setCountdownLeft(countdownSeconds);
+    const interval = window.setInterval(() => {
+      setCountdownLeft((left) => {
+        if (left <= 1) {
+          window.clearInterval(interval);
+          return 0;
+        }
+        return left - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
   // Everything expensive (camera, detection, backend session) starts only
   // after the shopper explicitly hits Start inside the modal.
   async function begin() {
     if (!aliveRef.current) return;
+    setError(null);
     setStatus('requesting_camera');
     try {
       // 1. Camera first — nothing is written server-side or billed before
       //    this succeeds (permission denied / no camera are the common exits).
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setStatus('idle');
+        setError('camera_unsupported');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 1280 } },
         audio: false,
@@ -89,13 +178,22 @@ export function TryOnModal({ configToken, productId, variantId, onClose }: Props
       } catch {
         // Detection couldn't load (CDN blocked, no WebGL). Degrade to the
         // old always-connected behavior rather than blocking the try-on.
-          console.log("Detection error");
         personPresentRef.current = true;
         void ensureConnected();
       }
     } catch (err: any) {
-      if (aliveRef.current) handleFatalError(mapErrorMessage(err));
+      setStatus('idle');
+      setError(mapCameraError(err));
     }
+  }
+
+  function backToIntro() {
+    detectionRef.current?.stop();
+    detectionRef.current = null;
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+    personPresentRef.current = false;
+    setStatus('idle');
   }
 
   function handlePersonPresent() {
@@ -159,7 +257,7 @@ export function TryOnModal({ configToken, productId, variantId, onClose }: Props
         },
         onError: (err) => {
           if (!aliveRef.current || engineRef.current !== connection) return;
-          handleFatalError(err.message || 'Connection lost');
+          failSession(err.message);
         },
         onDisconnect: () => {
           if (!aliveRef.current || engineRef.current !== connection) return;
@@ -173,7 +271,7 @@ export function TryOnModal({ configToken, productId, variantId, onClose }: Props
       }
       engineRef.current = connection;
     } catch (err: any) {
-      if (aliveRef.current) handleFatalError(mapErrorMessage(err));
+      failSession(err?.message);
     } finally {
       connectingRef.current = false;
     }
@@ -209,11 +307,27 @@ export function TryOnModal({ configToken, productId, variantId, onClose }: Props
     }
   }
 
+  // Freezes the current remote frame so the result screen can show it blurred.
+  function captureSnapshot(): string | null {
+    try {
+      const video = remoteVideoRef.current;
+      if (!video || !video.videoWidth) return null;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d')?.drawImage(video, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.85);
+    } catch {
+      return null;
+    }
+  }
+
   function endSession() {
     if (completedSentRef.current) return;
     completedSentRef.current = true;
 
     stopSegment();
+    setSnapshot((current) => current ?? captureSnapshot());
     if (engineRef.current) {
       const engine = engineRef.current;
       engineRef.current = null;
@@ -226,6 +340,84 @@ export function TryOnModal({ configToken, productId, variantId, onClose }: Props
       });
     }
     setStatus('ended');
+  }
+
+  function dismiss() {
+    endSession();
+    onClose();
+  }
+
+  async function handleAddToCart() {
+    setAdding(true);
+    try {
+      await addVariantToCart(currentVariantRef.current, 1, sessionTokenRef.current);
+
+      // Attribution: cart token lets the orders webhook match purchases back
+      // to this session server-side.
+      let cartToken: string | undefined;
+      try {
+        const cart = await fetch('/cart.js').then((r) => r.json());
+        cartToken = cart.token;
+      } catch {
+        /* attribution is best-effort — the add itself already succeeded */
+      }
+      if (sessionTokenRef.current) {
+        sendEvent(sessionTokenRef.current, 'added_to_cart', {
+          ...(cartToken ? { cart_token: cartToken } : {}),
+        });
+      }
+
+      completedSentRef.current = true;
+      stopSegment();
+      setSnapshot((current) => current ?? captureSnapshot());
+      if (engineRef.current) {
+        const engine = engineRef.current;
+        engineRef.current = null;
+        engine.disconnect();
+      }
+      setAdded(true);
+      setStatus('ended');
+    } catch {
+      setError('session_failed');
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  function tryAgain() {
+    setAdded(false);
+    setSnapshot(null);
+    completedSentRef.current = false;
+    setError(null);
+
+    if (!detectionRef.current) {
+      // Degradation mode (no person detection) — just reconnect.
+      void ensureConnected();
+      return;
+    }
+    setStatus('detecting');
+    if (personPresentRef.current) void ensureConnected();
+  }
+
+  function retryFromError() {
+    if (error === 'session_failed') {
+      setError(null);
+      if (localStreamRef.current) {
+        tryAgain();
+      } else {
+        void begin();
+      }
+      return;
+    }
+    // Camera errors: restart the whole camera flow.
+    void begin();
+  }
+
+  function failSession(_message?: string) {
+    engineRef.current = null;
+    stopSegment();
+    setStatus('idle');
+    setError('session_failed');
   }
 
   function handleVariantChange(e: Event) {
@@ -255,30 +447,6 @@ export function TryOnModal({ configToken, productId, variantId, onClose }: Props
       });
   }
 
-  async function handleAddToCart() {
-    try {
-      const form = new FormData();
-      form.set('id', currentVariantRef.current);
-      form.set('quantity', '1');
-
-      await fetch('/cart/add.js', { method: 'POST', body: form });
-      const cart = await fetch('/cart.js').then((r) => r.json());
-
-      if (sessionTokenRef.current) {
-        sendEvent(sessionTokenRef.current, 'added_to_cart', { cart_token: cart.token });
-      }
-      setAddedToCart(true);
-    } catch {
-      setErrorMessage("Couldn't add to cart — please use the product page instead.");
-    }
-  }
-
-  function handleFatalError(message: string) {
-    setErrorMessage(message);
-    setStatus('error');
-    cleanup();
-  }
-
   function cleanup() {
     aliveRef.current = false;
     detectionRef.current?.stop();
@@ -289,110 +457,184 @@ export function TryOnModal({ configToken, productId, variantId, onClose }: Props
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
   }
 
-  const showLocalPreview =
-    status === 'detecting' || status === 'connecting' || status === 'waiting_person';
+  function mapCameraError(err: any): ErrorKind {
+    if (err?.name === 'NotAllowedError' || err?.name === 'SecurityError') return 'camera_denied';
+    if (err?.name === 'NotFoundError') return 'camera_denied';
+    return 'camera_unsupported';
+  }
+
+  // --- derived view state ---
+  const inCameraStep =
+    status === 'requesting_camera' || status === 'detecting' || status === 'connecting' || status === 'waiting_person';
+  const showLocal = inCameraStep;
+  const showRemote = status === 'streaming' || (status === 'ended' && !!snapshot);
+
+  const pill =
+    status === 'requesting_camera'
+      ? { tone: 'loading' as const, text: 'Requesting camera access…' }
+      : status === 'connecting'
+        ? { tone: 'success' as const, text: "You're ready" }
+        : { tone: 'neutral' as const, text: 'Position yourself in frame' };
+
+  const cameraTips = (
+    <ul class="tryon-tips">
+      <li><span class="tryon-tips__icon"><InfoIcon size={16} /></span>Good lighting</li>
+      <li><span class="tryon-tips__icon"><CheckIcon size={16} /></span>Stand facing the camera</li>
+      <li><span class="tryon-tips__icon"><CheckIcon size={16} /></span>Keep your upper body visible</li>
+    </ul>
+  );
 
   return (
-    <div class="tryon-overlay" role="dialog" aria-modal="true" aria-label="Live try-on">
+    <div
+      ref={overlayRef}
+      class="tryon-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tryon-title"
+      data-step={status === 'idle' ? 'intro' : status === 'streaming' ? 'streaming' : status === 'ended' ? 'result' : 'camera'}
+    >
       <div class="tryon-panel">
-        <button
-          class="tryon-close"
-          onClick={() => {
-            endSession();
-            onClose();
-          }}
-          aria-label="Close"
-        >
-          &times;
-        </button>
-
-        {status === 'idle' && (
-          <div class="tryon-status">
-            <p>See this on you — live, using your camera.</p>
-            <button class="tryon-cta" onClick={begin}>Start try-on</button>
-          </div>
-        )}
-
-        {status === 'requesting_camera' && (
-          <div class="tryon-status"><p>Requesting camera access&hellip;</p></div>
-        )}
-
-        {/* Both videos stay mounted from the first render so refs exist before
-            any async stream/callback lands; visibility is style-driven. */}
-        <div
-          class="tryon-stage"
-          style={{ display: showLocalPreview || status === 'streaming' ? '' : 'none' }}
-        >
-          <video
-            class="tryon-video tryon-video-local"
-            style={{ display: showLocalPreview ? '' : 'none' }}
-            autoPlay
-            playsInline
-            muted
-            ref={(el) => {
-              localVideoRef.current = el;
-              if (el && localStreamRef.current) el.srcObject = localStreamRef.current;
-            }}
-          />
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video
-            class="tryon-video tryon-video-remote"
-            style={{ display: status === 'streaming' ? '' : 'none' }}
-            autoPlay
-            playsInline
-            muted
-            ref={(el) => {
-              remoteVideoRef.current = el;
-              if (el && remoteStreamRef.current) el.srcObject = remoteStreamRef.current;
-            }}
-          />
-          {showLocalPreview && (
-            <div class="tryon-stage-hint">
-              <p>
-                {status === 'connecting'
-                  ? 'Starting your live try-on…'
-                  : status === 'waiting_person'
-                    ? 'Step back into the frame to continue'
-                    : 'Step into the frame to start your try-on'}
-              </p>
-            </div>
+        <div class="tryon-topbar">
+          {inCameraStep && status !== 'requesting_camera' && (
+            <IconButton label="Back" onClick={backToIntro} class="tryon-topbar__back">
+              <BackIcon size={18} />
+            </IconButton>
           )}
+          <CloseButton onClick={dismiss} />
         </div>
 
-        {status === 'streaming' && !addedToCart && (
-          <div class="tryon-actions">
-            <button class="tryon-cta" onClick={handleAddToCart}>Add to cart</button>
-          </div>
-        )}
+        {error ? (
+          <ErrorScreen kind={error} onRetry={retryFromError} onClose={onClose} />
+        ) : status === 'idle' ? (
+          <TryOnIntro product={product} onStart={begin} onCancel={onClose} />
+        ) : (
+          <div class="tryon-split">
+            <aside class="tryon-side">
+              {inCameraStep && (
+                <>
+                  <ProductSummary product={product} compact />
+                  <h2 class="tryon-headline tryon-camera-headline" id="tryon-title">
+                    Position yourself in frame
+                  </h2>
+                  <p class="tryon-body">
+                    Make sure your whole upper body is visible for the best results.
+                  </p>
+                  {cameraTips}
+                </>
+              )}
+              {status === 'streaming' && (
+                <>
+                  <ProductSummary product={product} compact />
+                  <h2 class="tryon-headline" id="tryon-title">
+                    Try-on in progress&hellip;
+                  </h2>
+                  <p class="tryon-body">
+                    Your live try-on is running with AI. This usually takes just a few seconds.
+                  </p>
+                  {countdownLeft > 0 && (
+                    <div class="tryon-preparing">
+                      <CountdownRing remaining={countdownLeft} total={countdownSeconds} />
+                      <span class="tryon-preparing__label">Preparing your look&hellip;</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </aside>
 
-        {addedToCart && (
-          <div class="tryon-confirmation">
-            <p>Added to your cart.</p>
-            <button onClick={() => { endSession(); onClose(); }}>Done</button>
-          </div>
-        )}
+            <div class="tryon-media">
+              <video
+                class="tryon-video tryon-video--local"
+                style={{ display: showLocal ? '' : 'none' }}
+                autoPlay
+                playsInline
+                muted
+                ref={(el) => {
+                  localVideoRef.current = el;
+                  if (el && localStreamRef.current) el.srcObject = localStreamRef.current;
+                }}
+              />
+              <video
+                class="tryon-video tryon-video--remote"
+                style={{ display: showRemote ? '' : 'none' }}
+                autoPlay
+                playsInline
+                muted
+                ref={(el) => {
+                  remoteVideoRef.current = el;
+                  if (el && remoteStreamRef.current) el.srcObject = remoteStreamRef.current;
+                }}
+              />
+              {status === 'ended' && snapshot && (
+                <img class="tryon-snapshot" src={snapshot} alt="Your try-on result" />
+              )}
 
-        {status === 'ended' && !addedToCart && (
-          <div class="tryon-confirmation">
-            <p>How did that look?</p>
-            <button class="tryon-cta" onClick={handleAddToCart}>Add to cart</button>
-            <button onClick={onClose}>Close</button>
-          </div>
-        )}
+              {inCameraStep && (
+                <>
+                  <Silhouette class="tryon-silhouette" />
+                  <div class="tryon-pill-anchor">
+                    <StatusPill tone={pill.tone} text={pill.text} />
+                  </div>
+                  {(status === 'detecting' || status === 'waiting_person') && (
+                    <div class="tryon-guidance">
+                      <InfoIcon size={16} />
+                      <span>Make sure your whole upper body is visible</span>
+                    </div>
+                  )}
+                </>
+              )}
 
-        {status === 'error' && (
-          <div class="tryon-status tryon-error">
-            <p>{errorMessage ?? 'Something went wrong.'}</p>
-            <button onClick={onClose}>Close</button>
+              {status === 'streaming' && (
+                <>
+                  <span class="tryon-live" aria-hidden="true">LIVE</span>
+                  {countdownLeft > 0 && (
+                    <div class="tryon-preparing tryon-preparing--overlay">
+                      <CountdownRing remaining={countdownLeft} total={countdownSeconds} size={52} />
+                    </div>
+                  )}
+                  <GlassBottomBar product={product} onAddToCart={handleAddToCart} adding={adding} />
+                </>
+              )}
+
+              {status === 'ended' && (
+                <div class="tryon-result">
+                  <span class="tryon-result__check">
+                    <CheckIcon size={26} />
+                  </span>
+                  <h2 class="tryon-headline" id="tryon-title">
+                    {added ? 'Added to your cart.' : 'How did that look?'}
+                  </h2>
+                  <p class="tryon-body">
+                    {added
+                      ? 'Ready for checkout whenever you are.'
+                      : 'Add it to your cart or try again with a different look.'}
+                  </p>
+                  <div class="tryon-result__actions">
+                    {added ? (
+                      <button type="button" class="tryon-btn tryon-btn--accent" onClick={dismiss}>
+                        <BagIcon size={17} />
+                        <span>Done</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        class="tryon-btn tryon-btn--accent"
+                        onClick={handleAddToCart}
+                        disabled={adding}
+                      >
+                        <BagIcon size={17} />
+                        <span>{adding ? 'Adding…' : 'Add to cart'}</span>
+                      </button>
+                    )}
+                    <button type="button" class="tryon-btn tryon-btn--outline" onClick={tryAgain}>
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
     </div>
   );
-}
-
-function mapErrorMessage(err: any): string {
-  if (err?.name === 'NotAllowedError') return 'Camera access was denied. Enable it in your browser settings to try this on.';
-  if (err?.name === 'NotFoundError') return 'No camera was found on this device.';
-  return 'Live try-on is unavailable right now — please try again in a moment.';
 }

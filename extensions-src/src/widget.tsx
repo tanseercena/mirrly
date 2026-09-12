@@ -1,10 +1,12 @@
 import { render } from 'preact';
 import { TryOnModal } from './TryOnModal';
+import type { ProductInfo } from './types';
 
 interface MountOptions {
   configToken: string;
   productId: string;
   variantId: string;
+  product: ProductInfo | null;
 }
 
 export function mountWidget(root: HTMLElement, opts: MountOptions) {
@@ -22,6 +24,7 @@ export function mountWidget(root: HTMLElement, opts: MountOptions) {
       configToken={opts.configToken}
       productId={opts.productId}
       variantId={opts.variantId}
+      product={opts.product}
       onClose={close}
     />,
     modalHost

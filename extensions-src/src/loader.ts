@@ -1,4 +1,4 @@
-import type { ButtonSettings, RootDataset } from './types';
+import type { ButtonSettings, ProductInfo, RootDataset } from './types';
 import { fetchApiToken, fetchConfig } from './session-api';
 import { insertButton } from './insertion';
 
@@ -40,7 +40,7 @@ async function setUpRoot(root: HTMLElement) {
 
   button.addEventListener(
     'click',
-    () => launchWidget(root, data, config.config_token),
+    () => launchWidget(root, data, config.config_token, config.product),
     { once: true } // prevent double-mount on rapid double-click
   );
 }
@@ -62,7 +62,12 @@ function buildButton(settings: ButtonSettings): HTMLButtonElement {
   return button;
 }
 
-async function launchWidget(root: HTMLElement, data: RootDataset, configToken: string) {
+async function launchWidget(
+  root: HTMLElement,
+  data: RootDataset,
+  configToken: string,
+  product: ProductInfo | null
+) {
   const loadingButton = root.querySelector('.tryon-button') as HTMLButtonElement | null;
   if (loadingButton) {
     loadingButton.disabled = true;
@@ -77,6 +82,7 @@ async function launchWidget(root: HTMLElement, data: RootDataset, configToken: s
       configToken,
       productId: data.productId,
       variantId: data.variantId,
+      product,
     });
   } catch (err) {
     console.error('[tryon] widget failed to load', err);

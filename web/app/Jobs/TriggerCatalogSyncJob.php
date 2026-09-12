@@ -161,7 +161,7 @@ class TriggerCatalogSyncJob implements ShouldQueue
             id title handle status productType
             featuredImage { url }
             updatedAt
-            variants { edges { node { id title image { url } } } }
+            variants { edges { node { id title price image { url } } } }
             collections { edges { node { id title } } }
         } } } }";
     }

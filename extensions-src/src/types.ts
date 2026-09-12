@@ -12,9 +12,21 @@ export interface ButtonSettings {
   show_icon: boolean;
 }
 
+// Display-only product info for the try-on modal UI (intro screen, bottom bar).
+// price is the raw numeric string ("89.00") — render it through money_format
+// (the shop's own Shopify format string, e.g. "${{amount}}") for the
+// locale-correct symbol. All fields may be null on older syncs.
+export interface ProductInfo {
+  title: string;
+  image: string | null;
+  price: string | null;
+  money_format: string;
+}
+
 export interface ConfigResponse {
   enabled: boolean;
   button: ButtonSettings;
+  product: ProductInfo | null;
   // Short-lived (~5 min) signed JWT (product_id, variant_id, shop, exp).
   // NOT an auth token — App Proxy's HMAC signature (verified server-side on
   // every /apps/tryon/* request) already proves the request came through

@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Lib\ConfigToken;
 use App\Lib\TopLevelRedirection;
 use App\Mail\SendFeedback;
+use App\Helpers\Shopify;
 use App\Models\Plan;
+use App\Models\Product;
 use App\Models\Setting;
 use App\Models\Session;
 use App\Models\Store;
@@ -52,6 +54,10 @@ class StoresController extends Controller
         $radiusMap = ['full' => 'pill'];
         $style = $branding['buttonStyle'] ?? [];
 
+        $product = Product::where('store_id', $store->id)
+            ->where('shopify_product_id', (string) $request->input('product_id'))
+            ->first();
+
         return response()->json([
             'enabled' => true, // later changed based on products try on enable or disabled from products table
             'button' => [
@@ -62,12 +68,45 @@ class StoresController extends Controller
                 'border_radius' => $radiusMap[$style['borderRadius']] ?? 'rounded',
                 'show_icon' => (bool) ($branding['showIcon'] ?? true),
             ],
+            // Display-only product data for the try-on modal UI
+            'product' => $product ? $this->productPayload($product, (string) $request->input('variant_id'), $store) : null,
             'config_token' => ConfigToken::mint(
                 $shop,
                 $request->input('product_id'),
                 $request->input('variant_id')
             ),
         ]);
+    }
+
+    private function productPayload(Product $product, string $variantId, Store $store): array
+    {
+        // Per-variant image, else the product's featured image
+        $image = null;
+        foreach ($product->variant_images ?? [] as $img) {
+            if ((string) ($img['variant_id'] ?? '') === $variantId && !empty($img['url'])) {
+                $image = $img['url'];
+                break;
+            }
+        }
+        $image ??= $product->shopify_product['featuredImage']['url'] ?? null;
+
+        // price only exists in rows synced after it was added to the sync query
+        $price = null;
+        foreach ($product->shopify_product['variants'] ?? [] as $variant) {
+            if (Shopify::numericId($variant['id'] ?? '') === (int) $variantId) {
+                $price = $variant['price'] ?? null;
+                break;
+            }
+        }
+
+        return [
+            'title' => $product->title,
+            'image' => $image,
+            'price' => $price !== null ? (string) $price : null,
+            // Shopify money format string, e.g. "${{amount}}" — the widget
+            // substitutes the price into it for locale-correct rendering.
+            'money_format' => $store->money_format ?? '${{amount}}',
+        ];
     }
 
 
