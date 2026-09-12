@@ -2,6 +2,10 @@ import { render } from 'preact';
 import { TryOnModal } from './TryOnModal';
 import type { ProductInfo } from './types';
 
+// Build marker — bump whenever debugging whether the storefront is running
+// a stale cached copy of this bundle.
+console.log('[tryon] widget bundle 2026-09-12-r6 (blob setImage flow)');
+
 interface MountOptions {
   configToken: string;
   productId: string;

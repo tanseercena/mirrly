@@ -133,8 +133,17 @@ class TrySessionsController extends Controller
             ->where('product_id', $product->id)
             ->first();
 
-        $modelName = (string) config('services.decart.model', 'lucy-vton-3.5');
+        $modelName = (string) config('services.decart.model', 'lucy-vton-latest');
         $maxDuration = max(30, (int) config('services.decart.max_session_duration', 30));
+
+        // Garment reference image for the try-on model — the storefront URL
+        // the browser converts to a Blob and applies post-connect via
+        // setImage (realtime sessions don't accept files-API ids). Non-fatal:
+        // without it the session runs prompt-only.
+        $referenceImageUrl = app(DecartService::class)->resolveReferenceImageUrl(
+            $product,
+            ctype_digit($variantId) ? (int) $variantId : null
+        );
 
         try {
             $clientToken = app(DecartService::class)->createClientToken(
@@ -177,6 +186,7 @@ class TrySessionsController extends Controller
             'client_token' => $clientToken['apiKey'],
             'model_name' => $modelName,
             'prompt' => $this->buildPrompt($product, $variantId),
+            'reference_image_url' => $referenceImageUrl,
             'max_duration_seconds' => $maxDuration,
         ]);
     }
@@ -202,7 +212,11 @@ class TrySessionsController extends Controller
             . $product->title
         );
 
-        return collect([$product->style_hint, $item])->filter()->implode(', ');
+        // Decart's VTON prompting guide: realtime sessions respond best to
+        // explicit "substitute" instructions that reference the garment image.
+        $description = collect([$product->style_hint, $item])->filter()->implode(' ');
+
+        return trim("Substitute the person's current outfit with the {$description} from the reference garment image.");
     }
 
     /**

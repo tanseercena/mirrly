@@ -13,23 +13,29 @@
 // strings, not out of the raw network traffic.
 
 import { createDecartClient, models } from '@decartai/sdk';
+import { garmentBlobFromUrl } from './garment-image';
 
 export interface EngineConnectOptions {
   // Short-lived, scoped client token minted server-side via
-  // client.tokens.create({ expiresIn, allowedModels, allowedOrigins }).
-  // NEVER the permanent account API key — that stays on the backend only.
+  // client.tokens.create(). NEVER the permanent account API key — that stays
+  // on the backend only.
   clientToken: string;
-  // e.g. "lucy-vton-3.5" — Decart's purpose-built realtime virtual try-on
-  // model, not the general-purpose editing model. Passed from the backend
-  // so the model choice can change without a frontend redeploy.
+  // e.g. "lucy-vton-latest" — Decart's purpose-built realtime virtual try-on
+  // model. Passed from the backend so the model choice can change without a
+  // frontend redeploy.
   modelName: string;
   prompt: string;
-  // A file_… id from client.files.upload(), NOT a raw image URL. Uploading
-  // requires the real API key, so this must be done server-side during the
-  // /session call and handed to the browser as an id, already resolved.
-  referenceImageFileId?: string;
+  // Storefront URL of the garment photo. Realtime sessions take reference
+  // images as Blob/URL — a files-API id in initialState KILLS the agent
+  // (room joins, then insta-disconnects). So the image is fetched client
+  // -side and applied post-connect via setImage, per Decart's docs.
+  referenceImageUrl?: string;
   stream: MediaStream;
   onRemoteStream: (stream: MediaStream) => void;
+  // Decart connection states: connecting | connected | generating |
+  // reconnecting | disconnected. 'generating' means the model is actively
+  // producing frames.
+  onStateChange?: (state: string) => void;
   onError: (err: Error) => void;
   onDisconnect?: (reason: string) => void;
 }
@@ -40,24 +46,88 @@ export interface EngineConnection {
   sessionId: string;
 }
 
+const SET_IMAGE_TIMEOUT_MS = 15_000;
+
 export async function connectEngine(opts: EngineConnectOptions): Promise<EngineConnection> {
   const client = createDecartClient({ apiKey: opts.clientToken }); // scoped token, not the account key
   const model = models.realtime(opts.modelName as any);
 
+  // Once the caller calls disconnect(), every forwarded event stops — so the
+  // modal never needs `is this still the current connection?` identity
+  // checks (which raced: callbacks can fire before connect() resolves and
+  // engineRef is assigned, and events fired then were silently dropped).
+  let disposed = false;
+
+  // Prompt-only initial state — the garment is attached atomically right
+  // after connect via setImage (prompt + image together, per the docs'
+  // anti-flicker guidance). Every reconnect runs this same path, so the
+  // garment is re-applied on each fresh connection.
   const realtimeClient = await client.realtime.connect(opts.stream, {
     model,
-    onRemoteStream: opts.onRemoteStream,
-    onError: opts.onError,
-    onDisconnect: opts.onDisconnect,
+    onRemoteStream: (stream) => {
+      if (!disposed) opts.onRemoteStream(stream);
+    },
     initialState: {
-      prompt: { text: opts.prompt, enhance: true },
-      ...(opts.referenceImageFileId ? { image: opts.referenceImageFileId } : {}),
+      prompt: { text: opts.prompt, enhance: false },
     },
   });
 
+  // The SDK's connect options are zod-validated and STRIP unknown keys —
+  // error/disconnect callbacks passed above would be silently dropped.
+  // Events only arrive through the client's emitter, so they're wired here.
+  realtimeClient.on('error', (err: any) => {
+    if (disposed) return;
+    console.error(
+      '[tryon] realtime error:',
+      err?.message ?? err,
+      err?.code ?? '',
+      err?.details ?? ''
+    );
+    opts.onError(err instanceof Error ? err : new Error(String(err?.message ?? 'Realtime error')));
+  });
+
+  realtimeClient.on('connectionChange', (state: string) => {
+    if (disposed) return;
+    opts.onStateChange?.(state);
+    if (state === 'disconnected') {
+      opts.onDisconnect?.('connection closed');
+    }
+  });
+
+  if (opts.referenceImageUrl) {
+    const garment = await garmentBlobFromUrl(opts.referenceImageUrl);
+    console.log('[tryon] applying garment image', garment ? `${garment.size} bytes` : '(failed to load)');
+    if (garment) {
+      try {
+        await withTimeout(
+          realtimeClient.setImage(garment, { prompt: opts.prompt, enhance: false }),
+          SET_IMAGE_TIMEOUT_MS,
+          'setImage timed out'
+        );
+        console.log('[tryon] garment applied');
+      } catch (err) {
+        // Garment rejected/timed out — degrade to prompt-only rather than
+        // failing a session that already has a live camera feed.
+        console.warn('[tryon] setImage failed — continuing prompt-only', err);
+      }
+    } else {
+      console.warn('[tryon] garment image failed to load — running prompt-only');
+    }
+  }
+
   return {
     setPrompt: (prompt, options) => realtimeClient.setPrompt(prompt, options),
-    disconnect: () => realtimeClient.disconnect(),
-    sessionId: realtimeClient.sessionId,
+    disconnect: () => {
+      disposed = true;
+      realtimeClient.disconnect();
+    },
+    sessionId: realtimeClient.sessionId ?? '',
   };
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
 }

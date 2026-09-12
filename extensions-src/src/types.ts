@@ -46,10 +46,11 @@ export interface SessionStartResponse {
   // so this can change without a frontend redeploy.
   model_name: string;
   prompt: string;
-  // A file_… id, already uploaded to Decart's file storage server-side via
-  // client.files.upload() using the real API key. The browser only ever
-  // receives the resulting id, never a raw image URL passed to the SDK.
-  reference_image_file_id?: string;
+  // Storefront URL of the best garment photo. Realtime sessions take the
+  // reference image as a Blob/URL — NOT a files-API id — so the browser
+  // converts this to a flat-background JPEG blob and applies it post-connect
+  // via setImage (see garment-image.ts / realtime-engine.ts).
+  reference_image_url?: string;
   // Hard ceiling in seconds enforced client-side (mirrors backend billing unit).
   max_duration_seconds: number;
 }

@@ -78,6 +78,7 @@ export function TryOnModal({
   const segmentStartRef = useRef<number | null>(null);
   const completedSentRef = useRef(false);
   const durationTimerRef = useRef<number | null>(null);
+  const maxDurationRef = useRef(30);
 
   useEffect(() => {
     const overlay = overlayRef.current;
@@ -109,10 +110,12 @@ export function TryOnModal({
       }
     };
     document.addEventListener('keydown', onKeyDown, true);
+    document.addEventListener('change', handleVariantChange);
 
     return () => {
       aliveRef.current = false;
       document.removeEventListener('keydown', onKeyDown, true);
+      document.removeEventListener('change', handleVariantChange);
       document.body.style.overflow = prevOverflow;
       previouslyFocused?.focus?.();
       cleanup();
@@ -156,7 +159,7 @@ export function TryOnModal({
         return;
       }
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 1280 } },
+        video: { facingMode: "user" },
         audio: false,
       });
       if (!aliveRef.current) {
@@ -231,36 +234,37 @@ export function TryOnModal({
       );
       if (!aliveRef.current) return;
       sessionTokenRef.current = session.session_token;
+      maxDurationRef.current = session.max_duration_seconds;
 
+      // No "is this still the current connection?" identity checks in these
+      // callbacks: the engine suppresses events after disconnect(), and
+      // early callbacks (the remote track can arrive BEFORE connectEngine
+      // resolves) must never be dropped — that stranded the modal in
+      // 'connecting'.
       const connection = await connectEngine({
         clientToken: session.client_token,
         modelName: session.model_name,
         prompt: session.prompt,
-        referenceImageFileId: session.reference_image_file_id,
+        referenceImageUrl: session.reference_image_url ?? undefined,
         stream: localStreamRef.current!,
         onRemoteStream: (remoteStream) => {
-          if (!aliveRef.current || engineRef.current !== connection) return;
+          if (!aliveRef.current) return;
           remoteStreamRef.current = remoteStream;
           if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
-
-          // Person left while we were still connecting — drop the connection
-          // immediately instead of streaming (and billing) to an empty room.
-          if (!personPresentRef.current) {
-            handlePersonAbsent();
-            return;
-          }
-
-          segmentStartRef.current = Date.now();
-          setStatus('streaming');
-          sendEvent(session.session_token, 'tryon_started');
-          armDurationCap(session.max_duration_seconds);
+          markStreaming();
+        },
+        onStateChange: (state) => {
+          if (!aliveRef.current) return;
+          // 'generating' = the model is actively producing frames — the
+          // authoritative "try-on is live" signal.
+          if (state === 'generating') markStreaming();
         },
         onError: (err) => {
-          if (!aliveRef.current || engineRef.current !== connection) return;
+          if (!aliveRef.current) return;
           failSession(err.message);
         },
         onDisconnect: () => {
-          if (!aliveRef.current || engineRef.current !== connection) return;
+          if (!aliveRef.current) return;
           handleUnexpectedDisconnect();
         },
       });
@@ -270,11 +274,36 @@ export function TryOnModal({
         return;
       }
       engineRef.current = connection;
+
+      // Person left while we were still connecting — markStreaming never ran,
+      // so nothing else would tear this fresh connection down.
+      if (!personPresentRef.current) handlePersonAbsent();
     } catch (err: any) {
       failSession(err?.message);
     } finally {
       connectingRef.current = false;
     }
+  }
+
+  // Idempotent "try-on is live" transition. Both the remote track arrival
+  // and the 'generating' connection state funnel into this — whichever comes
+  // first wins, so ordering races can't strand the modal in 'connecting'.
+  function markStreaming() {
+    if (!aliveRef.current || segmentStartRef.current !== null) return;
+
+    // Person left while we were still connecting — drop the connection
+    // immediately instead of streaming (and billing) to an empty room.
+    if (!personPresentRef.current) {
+      handlePersonAbsent();
+      return;
+    }
+
+    segmentStartRef.current = Date.now();
+    setStatus('streaming');
+    if (sessionTokenRef.current) {
+      sendEvent(sessionTokenRef.current, 'tryon_started');
+    }
+    armDurationCap(maxDurationRef.current);
   }
 
   // The engine died on its own (network drop, server-side close). If the
