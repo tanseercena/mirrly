@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { startSession, sendEvent, buildUrl } from './session-api';
+import { startSession, sendEvent } from './session-api';
 import { connectEngine, type EngineConnection } from './realtime-engine';
 import { startPersonDetection, type PersonDetection } from './person-detection';
 import { addVariantToCart } from './cart';
@@ -110,12 +110,10 @@ export function TryOnModal({
       }
     };
     document.addEventListener('keydown', onKeyDown, true);
-    document.addEventListener('change', handleVariantChange);
 
     return () => {
       aliveRef.current = false;
       document.removeEventListener('keydown', onKeyDown, true);
-      document.removeEventListener('change', handleVariantChange);
       document.body.style.overflow = prevOverflow;
       previouslyFocused?.focus?.();
       cleanup();
@@ -447,33 +445,6 @@ export function TryOnModal({
     stopSegment();
     setStatus('idle');
     setError('session_failed');
-  }
-
-  function handleVariantChange(e: Event) {
-    const target = e.target as HTMLElement;
-    const isVariantControl =
-      target.matches('select[name="id"], input[name="id"]') ||
-      target.closest('[data-variant-input]');
-    if (!isVariantControl) return;
-
-    const newVariantId = (target as HTMLInputElement | HTMLSelectElement).value;
-    if (!newVariantId || newVariantId === currentVariantRef.current) return;
-    currentVariantRef.current = newVariantId;
-
-    // Not connected (detecting/waiting)? Nothing to do — the next connection
-    // already picks up this variant because startSession sends currentVariant.
-    if (!engineRef.current) return;
-
-    // Lightweight lookup, not a session restart — swapping the prompt is what
-    // makes variant switching instant on an already-open connection.
-    fetch(buildUrl('/variant-prompt', { product_id: productId, variant_id: newVariantId }))
-      .then((r) => r.json())
-      .then((data: { prompt: string }) => {
-        engineRef.current?.setPrompt(data.prompt);
-      })
-      .catch(() => {
-        /* non-fatal — stream continues showing the previous variant's look */
-      });
   }
 
   function cleanup() {

@@ -108,6 +108,7 @@
 
 /* --- Typography --- */
 .tryon-headline {
+  color: var(--tryon-text);
   font-size: clamp(24px, 3.2vw, 32px);
   font-weight: 650;
   letter-spacing: -0.4px;
@@ -202,6 +203,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.tryon-product__variant {
+  font-size: 13px;
+  color: var(--tryon-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .tryon-product__price {
   font-size: 14px;
   color: var(--tryon-text-muted);
@@ -211,8 +219,12 @@
 .tryon-intro {
   display: grid;
   grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
-  min-height: 520px;
-  max-height: 86vh;
+  grid-template-rows: minmax(0, 1fr);
+  /* Definite height: the visual's img uses max-height:100%, which cannot
+     resolve against a content-sized track — without this, large images
+     render at natural size and push the actions row down. */
+  height: min(78vh, 640px);
+  min-height: 480px;
 }
 .tryon-intro__content {
   padding: 40px 44px;

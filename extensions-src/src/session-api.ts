@@ -67,7 +67,10 @@ export async function fetchApiToken(shop: string): Promise<string> {
 }
 
 export async function fetchConfig(productId: string, variantId: string): Promise<ConfigResponse> {
-  const cacheKey = `tryon:config:${productId}`;
+  // Keyed by variant too: a shopper who switches variants before opening
+  // the modal must not be served a config (price/image/token) for the
+  // boot-time variant.
+  const cacheKey = `tryon:config:${productId}:${variantId}`;
   const cached = readCache<ConfigResponse>(cacheKey);
   if (cached) return cached;
 

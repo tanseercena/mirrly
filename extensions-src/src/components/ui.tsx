@@ -62,6 +62,9 @@ export function ProductSummary(props: { product: ProductInfo | null; compact?: b
       )}
       <div class="tryon-product__meta">
         <span class="tryon-product__title">{product.title}</span>
+        {product.variant_title && (
+          <span class="tryon-product__variant">{product.variant_title}</span>
+        )}
         {price && <span class="tryon-product__price">{price}</span>}
       </div>
     </div>

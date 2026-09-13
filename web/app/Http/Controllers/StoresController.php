@@ -92,9 +92,11 @@ class StoresController extends Controller
 
         // price only exists in rows synced after it was added to the sync query
         $price = null;
+        $variantTitle = null;
         foreach ($product->shopify_product['variants'] ?? [] as $variant) {
             if (Shopify::numericId($variant['id'] ?? '') === (int) $variantId) {
                 $price = $variant['price'] ?? null;
+                $variantTitle = $variant['title'] ?? null;
                 break;
             }
         }
@@ -102,6 +104,9 @@ class StoresController extends Controller
         return [
             'title' => $product->title,
             'image' => $image,
+            // Shopify's "Default Title" placeholder for single-variant
+            // products reads as noise in the UI — hide it.
+            'variant_title' => $variantTitle && $variantTitle !== 'Default Title' ? $variantTitle : null,
             'price' => $price !== null ? (string) $price : null,
             // Shopify money format string, e.g. "${{amount}}" — the widget
             // substitutes the price into it for locale-correct rendering.

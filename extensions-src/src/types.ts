@@ -18,6 +18,9 @@ export interface ButtonSettings {
 // locale-correct symbol. All fields may be null on older syncs.
 export interface ProductInfo {
   title: string;
+  // Selected variant's title (e.g. "M / Blue") — null for single-variant
+  // products ("Default Title" is stripped server-side).
+  variant_title?: string | null;
   image: string | null;
   price: string | null;
   money_format: string;

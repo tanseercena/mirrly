@@ -1,4 +1,4 @@
-import type { ButtonSettings, ProductInfo, RootDataset } from './types';
+import type { ButtonSettings, ConfigResponse, RootDataset } from './types';
 import { fetchApiToken, fetchConfig } from './session-api';
 import { insertButton } from './insertion';
 
@@ -40,7 +40,9 @@ async function setUpRoot(root: HTMLElement) {
 
   button.addEventListener(
     'click',
-    () => launchWidget(root, data, config.config_token, config.product),
+    () => {
+      void launchWidget(root, data, config);
+    },
     { once: true } // prevent double-mount on rapid double-click
   );
 }
@@ -65,8 +67,7 @@ function buildButton(settings: ButtonSettings): HTMLButtonElement {
 async function launchWidget(
   root: HTMLElement,
   data: RootDataset,
-  configToken: string,
-  product: ProductInfo | null
+  bootConfig: ConfigResponse
 ) {
   const loadingButton = root.querySelector('.tryon-button') as HTMLButtonElement | null;
   if (loadingButton) {
@@ -75,14 +76,17 @@ async function launchWidget(
   }
 
   try {
-    // Dynamic import: the Preact widget, camera handling, and realtime engine
-    // SDK only download from this point on — never on page load.
-    const mod = await import(/* @vite-ignore */ data.widgetUrl);
+    // Variant resolution and widget download in parallel — neither blocks
+    // on the other.
+    const [mod, resolved] = await Promise.all([
+      import(/* @vite-ignore */ data.widgetUrl),
+      resolveCurrentVariantConfig(data, bootConfig),
+    ]);
     mod.mountWidget(root, {
-      configToken,
+      configToken: resolved.config.config_token,
       productId: data.productId,
-      variantId: data.variantId,
-      product,
+      variantId: resolved.variantId,
+      product: resolved.config.product,
     });
   } catch (err) {
     console.error('[tryon] widget failed to load', err);
@@ -90,6 +94,37 @@ async function launchWidget(
       loadingButton.disabled = false;
       loadingButton.removeAttribute('aria-busy');
     }
+  }
+}
+
+/**
+ * The liquid-stamped variant id is whatever was selected at page load. If
+ * the shopper switches variants before clicking the button, themes keep the
+ * cart form's variant input in sync (it's what Add to cart submits), so read
+ * the live value there; the URL ?variant= param is the secondary signal. A
+ * changed variant needs a fresh /config — the config_token encodes the
+ * variant, and the product payload (price/image/variant title) is per-variant.
+ */
+async function resolveCurrentVariantConfig(
+  data: RootDataset,
+  bootConfig: ConfigResponse
+): Promise<{ variantId: string; config: ConfigResponse }> {
+  const live =
+    document.querySelector<HTMLInputElement | HTMLSelectElement>(
+      'form[action*="/cart/add"] [name="id"]'
+    )?.value.trim() ||
+    new URLSearchParams(window.location.search).get('variant') ||
+    '';
+
+  if (!live || !/^\d+$/.test(live) || live === data.variantId) {
+    return { variantId: data.variantId, config: bootConfig };
+  }
+
+  try {
+    return { variantId: live, config: await fetchConfig(data.productId, live) };
+  } catch {
+    // Refetch failed — keep the boot-time config/variant pair consistent.
+    return { variantId: data.variantId, config: bootConfig };
   }
 }
 
