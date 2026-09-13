@@ -18,6 +18,9 @@ export function TryOnIntro(props: {
   return (
     <div class="tryon-intro">
       <div class="tryon-intro__content">
+        <span class="tryon-brand">
+          Powered by <b>Mirrly</b>
+        </span>
         <ProductSummary product={product} />
 
         <h2 class="tryon-headline" id="tryon-title">

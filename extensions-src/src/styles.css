@@ -21,8 +21,21 @@
   cursor: pointer;
   width: 100%;
   justify-content: center;
+  position: relative;
 }
 .tryon-button:disabled { opacity: 0.6; cursor: default; }
+.tryon-button--loading { pointer-events: none; }
+.tryon-button--loading > * { visibility: hidden; }
+.tryon-button--loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: tryon-spin 800ms linear infinite;
+}
 
 /* --- Tokens --- */
 .tryon-overlay {
@@ -89,6 +102,16 @@
 }
 .tryon-topbar > * { pointer-events: auto; }
 .tryon-topbar__back { margin-right: auto; }
+.tryon-brand {
+  align-self: flex-end; /* top-right corner of the sidebar column */
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+  color: var(--tryon-text-muted);
+  pointer-events: none;
+  user-select: none;
+}
+.tryon-brand b { font-weight: 600; color: var(--tryon-text); }
 
 .tryon-iconbtn {
   width: 44px;
@@ -604,6 +627,7 @@
   .tryon-intro__content {
     display: contents;
   }
+  .tryon-intro__content > .tryon-brand { order: 0; margin: 16px 16px 0; }
   .tryon-intro__content > .tryon-product { order: 0; margin: 16px 16px 0; }
   .tryon-intro__visual {
     order: 1;
@@ -636,6 +660,7 @@
     padding: 8px 16px;
     gap: 4px;
   }
+  .tryon-brand { align-self: flex-start; }
   .tryon-side .tryon-product,
   .tryon-side .tryon-body,
   .tryon-side .tryon-tips,

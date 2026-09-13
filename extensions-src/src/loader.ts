@@ -38,13 +38,14 @@ async function setUpRoot(root: HTMLElement) {
   const button = buildButton(config.button);
   insertButton(button, config.button.position);
 
-  button.addEventListener(
-    'click',
-    () => {
-      void launchWidget(root, data, config);
-    },
-    { once: true } // prevent double-mount on rapid double-click
-  );
+  let launching = false; // guards double-mount on rapid double-click
+  button.addEventListener('click', () => {
+    if (launching) return;
+    launching = true;
+    void launchWidget(button, root, data, config).finally(() => {
+      launching = false;
+    });
+  });
 }
 
 function buildButton(settings: ButtonSettings): HTMLButtonElement {
@@ -65,15 +66,12 @@ function buildButton(settings: ButtonSettings): HTMLButtonElement {
 }
 
 async function launchWidget(
+  button: HTMLButtonElement,
   root: HTMLElement,
   data: RootDataset,
   bootConfig: ConfigResponse
 ) {
-  const loadingButton = root.querySelector('.tryon-button') as HTMLButtonElement | null;
-  if (loadingButton) {
-    loadingButton.disabled = true;
-    loadingButton.setAttribute('aria-busy', 'true');
-  }
+  setButtonLoading(button, true);
 
   try {
     // Variant resolution and widget download in parallel — neither blocks
@@ -90,11 +88,17 @@ async function launchWidget(
     });
   } catch (err) {
     console.error('[tryon] widget failed to load', err);
-    if (loadingButton) {
-      loadingButton.disabled = false;
-      loadingButton.removeAttribute('aria-busy');
-    }
+  } finally {
+    // The modal is up (or loading failed) — restore the button so the
+    // shopper can close the modal and launch again without a page refresh.
+    setButtonLoading(button, false);
   }
+}
+
+function setButtonLoading(button: HTMLButtonElement, loading: boolean) {
+  button.disabled = loading;
+  button.setAttribute('aria-busy', String(loading));
+  button.classList.toggle('tryon-button--loading', loading);
 }
 
 /**

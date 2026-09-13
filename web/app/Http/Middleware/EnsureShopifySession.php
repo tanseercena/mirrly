@@ -4,12 +4,15 @@ namespace App\Http\Middleware;
 
 use App\Exceptions\ShopifyBillingException;
 use App\Lib\AuthRedirection;
+use App\Lib\DbSessionStorage;
 use App\Lib\EnsureBilling;
 use App\Lib\TopLevelRedirection;
+use Carbon\Carbon;
 use Closure;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
+use Shopify\Auth\OAuth;
 use Shopify\Clients\Graphql;
 use Shopify\Context;
 use Shopify\Utils;
@@ -86,6 +89,41 @@ class EnsureShopifySession
             }
         }
 
+        // Check if access token is expired or will expire soon (within 5 minutes)
+        $sessionStorage = new DbSessionStorage();
+        if ($this->isAccessTokenExpired($session)) {
+            \Log::info("Access token expired for {$shop}, attempting refresh...");
+
+            // Check if we have a refresh token available
+            if ($session->getRefreshToken()) {
+                // Check if refresh token is still valid
+                if (!$this->isRefreshTokenExpired($session)) {
+                    try {
+                        // Refresh the access token
+                        $newSession = OAuth::refreshAccessToken($session);
+                        \Log::info("Successfully refreshed access token for {$shop}");
+
+                        // Save the refreshed session to database
+                        $sessionStorage->storeSession($newSession);
+                        \Log::info("Saved refreshed session for {$shop}");
+
+                        // Continue with the refreshed session
+                        return $next($request);
+
+                    } catch (\Exception $e) {
+                        \Log::error("Failed to refresh access token for {$shop}: " . $e->getMessage());
+                        // Fall through to re-auth
+                    }
+                } else {
+                    \Log::warning("Refresh token expired for {$shop}");
+                }
+            }
+
+            // No refresh token available or refresh failed - need to re-authenticate
+            \Log::info("Session expired for {$shop}, redirecting to re-authenticate");
+            return AuthRedirection::redirect($request);
+        }
+
         $bearerPresent = preg_match("/Bearer (.*)/", $request->header('Authorization', ''), $bearerMatches);
         if (!$shop) {
             if ($session) {
@@ -109,5 +147,33 @@ class EnsureShopifySession
         }
 
         return TopLevelRedirection::redirect($request, "/api/auth?shop=$shop");
+    }
+
+    /**
+     * Check if access token is expired or will expire soon
+     */
+    protected function isAccessTokenExpired(\Shopify\Auth\Session $session): bool
+    {
+        $expires = $session->getExpires();
+        if (!$expires) {
+            return false; // Non-expiring offline token
+        }
+
+        // Consider expired if within 5 minutes of expiry
+        $expiryBuffer = Carbon::now()->addMinutes(5);
+        return Carbon::now()->isAfter($expires) || $expiryBuffer->isAfter($expires);
+    }
+
+    /**
+     * Check if refresh token is expired
+     */
+    protected function isRefreshTokenExpired(\Shopify\Auth\Session $session): bool
+    {
+        $expiresAt = $session->getRefreshTokenExpiresAt();
+        if (!$expiresAt) {
+            return false; // Shouldn't happen if we have a refresh token
+        }
+
+        return Carbon::now()->isAfter($expiresAt);
     }
 }

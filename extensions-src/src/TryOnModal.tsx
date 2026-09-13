@@ -510,6 +510,9 @@ export function TryOnModal({
         ) : (
           <div class="tryon-split">
             <aside class="tryon-side">
+              <span class="tryon-brand">
+                Powered by <b>Mirrly</b>
+              </span>
               {inCameraStep && (
                 <>
                   <ProductSummary product={product} compact />
