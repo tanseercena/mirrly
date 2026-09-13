@@ -295,6 +295,10 @@
   grid-template-columns: minmax(0, 34fr) minmax(0, 66fr);
   height: min(70vh, 660px);
 }
+/* Result step takes over the whole panel — the side column is empty then,
+   but its grid track still reserves 34% of the width, so collapse it. */
+.tryon-overlay[data-step='result'] .tryon-split { grid-template-columns: minmax(0, 1fr); }
+.tryon-overlay[data-step='result'] .tryon-side { display: none; }
 .tryon-side {
   padding: 28px;
   display: flex;
@@ -327,7 +331,7 @@
   left: 50%;
   top: 54%;
   transform: translate(-50%, -50%);
-  height: 74%;
+  height: 90%;
   max-width: 80%;
   pointer-events: none;
   animation: tryon-breathe 3.2s ease-in-out infinite;
@@ -444,16 +448,16 @@
 }
 .tryon-ring__num {
   position: absolute;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 650;
 }
 
 .tryon-preparing {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 .tryon-preparing__label { font-size: 14px; color: var(--tryon-text-muted); }
 .tryon-preparing--overlay {
@@ -521,7 +525,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(14px) brightness(0.55);
+  filter: blur(5px) brightness(0.88);
   transform: scale(1.1);
 }
 .tryon-result {

@@ -533,7 +533,7 @@ export function TryOnModal({
                   </p>
                   {countdownLeft > 0 && (
                     <div class="tryon-preparing">
-                      <CountdownRing remaining={countdownLeft} total={countdownSeconds} />
+                      <CountdownRing remaining={countdownLeft} total={countdownSeconds} size={88} />
                       <span class="tryon-preparing__label">Preparing your look&hellip;</span>
                     </div>
                   )}
