@@ -187,7 +187,7 @@ class EnsureShopifySession
         return Carbon::now()->isAfter($expiresAt);
     }
 
-     * Live-validating the token costs a round trip to Shopify on every request.
+     /* Live-validating the token costs a round trip to Shopify on every request.
      * The dashboard fires several parallel API requests on load and each would
      * otherwise pay that cost, so a successful validation is cached briefly.
      * A short lock keeps those parallel requests from pinging Shopify
