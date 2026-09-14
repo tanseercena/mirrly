@@ -2,6 +2,7 @@ import { useState, useEffect, createContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { Crisp } from "crisp-sdk-web";
 import { PageLoader } from "../PageLoader.jsx";
+import { fetchJSON, prefetchJSON } from "../../utils/prefetch.js";
 
 export const AppContext = createContext();
 
@@ -31,11 +32,22 @@ export function AppProvider({ children }) {
     };
 
 useEffect(() => {
-    Crisp.configure("a272e134-5dc6-4e68-8c3c-4205ade6a98d");
+    const configureCrisp = () => {
+        Crisp.configure("a272e134-5dc6-4e68-8c3c-4205ade6a98d");
 
-    // Make $crisp available globally for the chat button
-    window.$crisp = window.$crisp || [];
-    window.$crisp.push(["set", "container:id", "a272e134-5dc6-4e68-8c3c-4205ade6a98d"]);
+        // Make $crisp available globally for the chat button
+        window.$crisp = window.$crisp || [];
+        window.$crisp.push(["set", "container:id", "a272e134-5dc6-4e68-8c3c-4205ade6a98d"]);
+    };
+
+    // Defer the chat widget so its script download doesn't compete with the
+    // app's own requests during first load. Later Crisp calls are queued in
+    // window.$crisp, so they're safe whenever this runs.
+    if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(configureCrisp, { timeout: 3000 });
+    } else {
+        setTimeout(configureCrisp, 2000);
+    }
 
     // Crisp renders as an <iframe> — CSS in your app can't reach inside it.
     // We must directly style the iframe element itself via MutationObserver.
@@ -174,18 +186,20 @@ useEffect(() => {
     //     },
     // });
 
-    const refetchStore = async () => {
+    const loadStore = async ({ usePrefetch = false } = {}) => {
         try {
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => reject(new Error('API timeout after 30 seconds')), 30000);
             });
 
-            const fetchPromise = fetch("/api/store");
+            // The first load reuses the request kicked off at script-eval time
+            // (utils/prefetch.js); manual refetches always hit the network.
+            const storePromise = usePrefetch ? prefetchJSON("/api/store") : fetchJSON("/api/store");
 
-            const response = await Promise.race([fetchPromise, timeoutPromise]);
+            const response = await Promise.race([storePromise, timeoutPromise]);
 
             if (!response.ok) {
-                const responseData = await response.json();
+                const responseData = response.data ?? {};
                 // Check if this is an error response from the middleware
                 if (responseData.error === 'authentication_required' && responseData.redirect) {
                     console.log("Authentication required, redirecting...");
@@ -226,7 +240,7 @@ useEffect(() => {
                 }
             }
 
-            const responseData = await response.json();
+            const responseData = response.data ?? {};
 
             // Check if this is an error response from the middleware
             if (responseData.error === 'authentication_required' && responseData.redirect) {
@@ -324,8 +338,11 @@ useEffect(() => {
         }
     };
 
+    // Exposed for manual refreshes (e.g. after a plan change) — always fresh.
+    const refetchStore = () => loadStore();
+
     useEffect(() => {
-        refetchStore();
+        loadStore({ usePrefetch: true });
     }, []);
 
     return (

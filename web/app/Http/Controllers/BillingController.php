@@ -167,6 +167,17 @@ QUERY;
                 'usageCappedAmount' => $plan->name == 'unlimited' ? 500 : 200,
             ];
 
+            // Free plan: show the $0.00 price on Shopify's approval page and
+            // describe usage in sessions (pay-as-you-go), matching the plan.
+            if ($plan->id == 1) {
+                $billing['chargeName'] = 'Free ($0.00/month)';
+
+                $sessionRate = (float) ($plan->limits['session_rate'] ?? 0);
+                if ($sessionRate > 0) {
+                    $billing['usageTerms'] = '$' . number_format($sessionRate, 2) . ' per try-on session (pay as you go)';
+                }
+            }
+
     //        Log::debug("Initiated billing for $shop");
     //        Log::debug($billing);
 
@@ -330,28 +341,32 @@ QUERY;
         $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
 
         if ($store->subscription) {
-            try {
-                $session2 = Session::query()->where('shop', $store->shopify_domain)->first();
-                $response = Shopify::queryOrException($shop, $session2->access_token, [
-                    "query" => BillingController::CANCEL_SUBSCRIPTION_MUTATION,
-                    "variables" => [
-                        "id" => $store->subscription->admin_graphql_api_id,
-                    ]
-                ]);
-
-                if (empty($response['data']['appSubscriptionCancel']['userErrors'])) {
-                    $store->subscription->update([
-                        'status' => 'cancelled',
-                        'updated_at' => now()
+            // Only a real Shopify charge needs an API cancel; the default
+            // Free subscription carries no admin_graphql_api_id.
+            if ($store->subscription->admin_graphql_api_id) {
+                try {
+                    $session2 = Session::query()->where('shop', $store->shopify_domain)->first();
+                    $response = Shopify::queryOrException($shop, $session2->access_token, [
+                        "query" => BillingController::CANCEL_SUBSCRIPTION_MUTATION,
+                        "variables" => [
+                            "id" => $store->subscription->admin_graphql_api_id,
+                        ]
                     ]);
-                } else {
-                    Log::error('Error cancelling subscription for ' . $shop);
-                    return response()->json(['error' => 'Failed to cancel the subscription'], 500);
+
+                    if (!empty($response['data']['appSubscriptionCancel']['userErrors'])) {
+                        Log::error('Error cancelling subscription for ' . $shop);
+                        return response()->json(['error' => 'Failed to cancel the subscription'], 500);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Error cancelling subscription: ' . $e->getMessage());
+                    return response()->json(['error' => 'An error occurred while cancelling the subscription'], 500);
                 }
-            } catch (\Exception $e) {
-                Log::error('Error cancelling subscription: ' . $e->getMessage());
-                return response()->json(['error' => 'An error occurred while cancelling the subscription'], 500);
             }
+
+            $store->subscription->update([
+                'status' => 'cancelled',
+                'updated_at' => now()
+            ]);
         }
 
         // Cancel other subscriptions
@@ -368,29 +383,6 @@ QUERY;
             'admin_graphql_api_id' => null,
             'next_reset_date' => now()->addMonth(),
         ]);
-
-//        $store->intended_plan_interval = 'monthly';
-//        $store->per_file_limit = 104857600;
-//        $store->digital_products_limit = 20;
-//        $store->digital_lotteries_limit = 1;
-//        $store->orders_per_month = 30;
-//        $store->file_storage_limit = 5368709120;
-//        $store->save();
-
-        $currentDigitalProducts = $store->digitalProducts()->where("deleted", false)->count();
-        $currentDigitalLotteries = $store->digitalLotteries()->count();
-        $startOfMonth = Carbon::now()->startOfMonth();
-        $currentOrders = $store->orders()
-            ->where('created_at', '>=', $startOfMonth)
-            ->count();
-        $currentFileStorageUsage = $store->files()->sum('byteSize');
-        $plan = $freePlan;
-        $store->per_file_limit = $plan->limits['max_file_size'];
-        $store->digital_products_limit = $this->getLimitValue($plan->limits['digital_products'], $currentDigitalProducts);
-        // $store->digital_lotteries_limit = $this->getLimitValue($plan->limits['digital_lotteries'], $currentDigitalLotteries);
-        $store->orders_per_month = $this->getLimitValue($plan->limits['orders'], $currentOrders);
-        $store->file_storage_limit = $this->getLimitValue($plan->limits['file_storage'], $currentFileStorageUsage);
-        $store->save();
 
         return response()->json(['message' => 'Successfully downgraded to free plan'], 200);
     }

@@ -22,6 +22,7 @@ import {
 } from '@shopify/polaris-icons';
 import { AppContext } from '../components/providers/AppProvider.jsx';
 import { PageLoader } from '../components/PageLoader.jsx';
+import { prefetchJSON } from '../utils/prefetch.js';
 import '../App.css'
 /* Plan hierarchy - lowest to highest rank */
 const PLAN_RANK = ['free', 'growth', 'scale'];
@@ -47,13 +48,15 @@ const PlansPage = () => {
 
         const loadData = async () => {
             try {
+                // Initial load resolves instantly from the requests index.html
+                // warmed at parse time; plan changes refetch below.
                 const [plansRes, subRes] = await Promise.all([
-                    fetch('/api/plans'),
-                    fetch('/api/subscription'),
+                    prefetchJSON('/api/plans'),
+                    prefetchJSON('/api/subscription'),
                 ]);
 
-                const plansData = plansRes.ok ? await plansRes.json() : { data: [] };
-                const subData = subRes.ok ? await subRes.json() : null;
+                const plansData = plansRes && plansRes.ok ? plansRes.data : { data: [] };
+                const subData = subRes && subRes.ok ? subRes.data : null;
 
                 if (cancelled) return;
                 setPlans(plansData.data ?? []);
@@ -150,17 +153,9 @@ const PlansPage = () => {
         setUpgradingPlan(planKey);
 
         try {
-            // $0 plan - no Shopify checkout needed, cancel & create local free subscription
-            if (planKey === 'free') {
-                const res = await fetch('/api/billing/free', { method: 'POST' });
-                if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    throw new Error(err.error || 'Failed to switch to the Free plan');
-                }
-                window.location.reload(); // refresh all state with the new subscription
-                return;
-            }
-
+            // Free goes through the same flow as paid plans: the backend
+            // creates a $0 app subscription and Shopify shows its own
+            // approval page before the downgrade is applied.
             const plan = findPlanByKey(planKey);
             if (!plan) throw new Error(t('onboarding.invalid_plan_error') || 'Invalid plan selected');
 
@@ -309,6 +304,7 @@ const PlansPage = () => {
             title: t('plans_page.growth'),
             note: t('plans_page.for_growing_stores'),
             popular: true,
+            badgeLabel: t('plans_page.most_popular'),
             includesLabel: t('plans_page.everything_in_free_plus'),
             features: [
                 t('plans_page.90_day_analytics'),
@@ -320,6 +316,7 @@ const PlansPage = () => {
             title: t('plans_page.scale'),
             note: t('plans_page.for_high_volume_stores'),
             popular: false,
+            badgeLabel: t('plans_page.recommended'),
             includesLabel: t('plans_page.everything_in_growth_plus'),
             features: [
                 t('plans_page.unlimited_analytics'),
@@ -379,7 +376,7 @@ const PlansPage = () => {
                                         </Text>
                                     </BlockStack>
 
-                                    {meta.popular && (
+                                    {meta.badgeLabel && (
                                         <div
                                             style={{
                                                 background: '#0F6E5C',
@@ -392,7 +389,7 @@ const PlansPage = () => {
                                                 flexShrink: 0,
                                             }}
                                         >
-                                            {t('plans_page.most_popular')}
+                                            {meta.badgeLabel}
                                         </div>
                                     )}
                                 </InlineStack>
@@ -407,10 +404,14 @@ const PlansPage = () => {
                                         </Text>
                                     </InlineStack>
 
-                                    {/* Included sessions line - unlimited plans use their own label */}
+                                    {/* Included sessions line - unlimited plans use their own label, free plan shows pay-as-you-go */}
                                     {unlimited ? (
                                         <Text variant="bodySm" as="p" fontWeight="medium">
                                             {t('plans_page.scale_included')}
+                                        </Text>
+                                    ) : planKey === 'free' ? (
+                                        <Text variant="bodySm" as="p" fontWeight="medium">
+                                            {t('plans_page.pay_as_you_go')}
                                         </Text>
                                     ) : (
                                         <Text variant="bodySm" as="p" fontWeight="medium">

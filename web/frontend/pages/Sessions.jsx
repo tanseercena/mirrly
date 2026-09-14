@@ -34,6 +34,7 @@ import { SparkLineChart, LineChart } from '@shopify/polaris-viz';
 import '@shopify/polaris-viz/build/esm/styles.css';
 import SessionFunnelDateFilter from '../components/SessionFunnelDateFilter';
 import { PageLoader } from '../components/PageLoader.jsx';
+import { prefetchJSON } from '../utils/prefetch.js';
 
 /* ============================================
     SHARED HELPERS
@@ -633,8 +634,10 @@ const SessionsProductTables = ({ range }) => {
                     from: toISODate(range.start),
                     to: toISODate(range.end),
                 });
-                const response = await fetch('/api/sessions/product-performance?' + params.toString());
-                const payload = response.ok ? await response.json() : null;
+                // Initial load resolves instantly from the request index.html
+                // warmed at parse time; range changes fetch fresh.
+                const response = await prefetchJSON('/api/sessions/product-performance?' + params.toString());
+                const payload = response && response.ok ? response.data : null;
                 if (!cancelled && payload && payload.data) {
                     setPerformance(payload.data);
                 }
@@ -693,8 +696,10 @@ const SessionsPage = () => {
                     from: toISODate(range.start),
                     to: toISODate(range.end),
                 });
-                const response = await fetch('/api/sessions/analytics?' + params.toString());
-                const payload = response.ok ? await response.json() : null;
+                // Initial load resolves instantly from the request index.html
+                // warmed at parse time; range changes fetch fresh.
+                const response = await prefetchJSON('/api/sessions/analytics?' + params.toString());
+                const payload = response && response.ok ? response.data : null;
                 if (!cancelled && payload && payload.data) {
                     setAnalytics(payload.data);
                 }

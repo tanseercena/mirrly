@@ -10,6 +10,7 @@ import {
   DEFAULT_LOCALE as DEFAULT_POLARIS_LOCALE,
   SUPPORTED_LOCALES as SUPPORTED_POLARIS_LOCALES,
 } from "@shopify/polaris";
+import enTranslations from "../locales/en.json";
 
 
 /**
@@ -46,9 +47,15 @@ export function getUserLocale() {
   if (_userLocale) {
     return _userLocale;
   }
-  const url = new URL(window.location.href);
-  const locale = url.searchParams.get("locale") || DEFAULT_APP_LOCALE;
-  _userLocale = match([locale], SUPPORTED_APP_LOCALES, DEFAULT_APP_LOCALE);
+  try {
+    const url = new URL(window.location.href);
+    const locale = url.searchParams.get("locale") || DEFAULT_APP_LOCALE;
+    _userLocale = match([locale], SUPPORTED_APP_LOCALES, DEFAULT_APP_LOCALE);
+  } catch (error) {
+    // Intl.Locale can be missing on pre-2020 browsers before the polyfills
+    // load — fall back to English instead of blocking the boot.
+    _userLocale = DEFAULT_APP_LOCALE;
+  }
   return _userLocale;
 }
 
@@ -70,10 +77,16 @@ export function getPolarisTranslations() {
  * Asynchronously initializes i18next and loads Polaris translations.
  *
  * Intended to be called before rendering the app to ensure translations are present.
+ *
+ * English ships inside the main bundle, so the default-locale boot resolves
+ * without any extra chunk fetches. Non-English locales still await their
+ * JSON chunk here, matching the old no-flash behaviour.
  */
 export async function initI18n() {
-  await loadIntlPolyfills();
-  await Promise.all([initI18next(), fetchPolarisTranslations()]);
+  // Best-effort: the polyfills only matter for pre-2020 browsers, and
+  // blocking every boot on them costs more than they save.
+  loadIntlPolyfills().catch(() => {});
+  await initI18next();
 }
 
 /**
@@ -150,6 +163,12 @@ async function initI18next() {
       // lng: getUserLocale(),
       fallbackLng: DEFAULT_APP_LOCALE,
       supportedLngs: SUPPORTED_APP_LOCALES,
+      // English is bundled (see import above) so the default locale needs
+      // no backend chunk fetch before first render; the async backend
+      // below only fires for the other supported locales.
+      resources: { en: { translation: enTranslations } },
+      // Resolve inline resources synchronously instead of on a timer.
+      initImmediate: false,
       interpolation: {
         // React escapes values by default
         escapeValue: false,

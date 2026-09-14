@@ -10,7 +10,8 @@ import { Routes as ReactRouterRoutes, Route } from "react-router-dom";
  * * `/pages/blog/[id].jsx` matches `/blog/123`
  * * `/pages/[...catchAll].jsx` matches any URL not explicitly matched
  *
- * @param {object} pages value of import.meta.globEager(). See https://vitejs.dev/guide/features.html#glob-import
+ * @param {object} pages map of page paths to components (eager or React.lazy —
+ *   see App.jsx, built from import.meta.glob). See https://vitejs.dev/guide/features.html#glob-import
  *
  * @return {Routes} `<Routes/>` from React Router, with a `<Route/>` for each file in `pages`
  */
@@ -54,13 +55,13 @@ function useRoutes(pages) {
                 path = path.substring(0, path.length - 1);
             }
 
-            if (!pages[key].default) {
+            if (!pages[key]) {
                 console.warn(`${key} doesn't export a default React component`);
             }
 
             return {
                 path,
-                component: pages[key].default,
+                component: pages[key],
             };
         })
         .filter((route) => route.component);
@@ -91,10 +92,10 @@ function useRoutes(pages) {
         const fullPath = `./pages/${fileName}`;
         const page = pages[fullPath];
 
-        if (page && page.default) {
+        if (page) {
             routes.push({
                 path: manualDynamicRoutes[fileName],
-                component: page.default,
+                component: page,
             });
         }
     });
@@ -105,10 +106,10 @@ function useRoutes(pages) {
 
         autoDynamicPatterns.forEach(({ pattern, route }) => {
             const match = fileName.match(pattern);
-            if (match && pages[key].default) {
+            if (match && pages[key]) {
                 routes.push({
                     path: route(match),
-                    component: pages[key].default,
+                    component: pages[key],
                 });
             }
         });

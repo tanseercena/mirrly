@@ -30,6 +30,7 @@ import {
 } from '@shopify/polaris-icons';
 
 import ProductSettingsDrawer from '../components/ProductSettingsDrawer';
+import { prefetchJSON } from '../utils/prefetch.js';
 
 /* ============================================
     CUSTOM TOGGLE SWITCH
@@ -136,8 +137,10 @@ const ProductsPage = () => {
                 params.set('collection_id', collectionFilter);
             }
 
-            const response = await fetch(`/api/products?${params.toString()}`);
-            const data = await response.json();
+            // The initial load resolves instantly from the request that
+            // index.html warmed at parse time; filter/page changes fetch fresh.
+            const response = await prefetchJSON(`/api/products?${params.toString()}`);
+            const data = response?.data ?? {};
 
             setProducts(data.products ?? []);
             setPagination(data.pagination ?? null);
