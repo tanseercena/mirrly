@@ -40,6 +40,7 @@ class Setting extends Model
         'restricted_products' => 'array',
         'collections' => 'array',
         'button_branding' => 'array',
+        'theme_extension_enabled' => 'boolean',
         'camera_fallback' => 'array',
         'privacy_recording' => 'array',
         'notification' => 'array',

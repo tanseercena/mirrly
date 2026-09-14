@@ -21,13 +21,13 @@ class EnsureApiTokenIsValid
             $request->input('shop'))->first();
 
         if (!$store) {
-            return redirect()->route('api.invalid-token');
+            return response()->json(['error' => 'Store not found'], 404);
         }
 
         if (($referrer === $store->shopify_domain || $referrer === $store->domain || $referrer === '127.0.0.1') && $request->input('api-token') === $store->api_token) {
             return $next($request);
         }
 
-        return redirect()->away('https://pushy.conversionproplus.com/api/invalid');
+        return response()->json(['error' => 'Invalid API token'], 401);
     }
 }
