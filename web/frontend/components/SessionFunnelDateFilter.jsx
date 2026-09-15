@@ -262,7 +262,7 @@ const SessionFunnelDateFilter = ({ onChange }) => {
                                     text-align: left;
                                     color: var(--p-color-text);
                                     font-family: inherit;
-                                }
+                                }git c
                                 .sfd-option:hover, .sfd-option:focus-visible {
                                     background: var(--p-color-bg-hover);
                                     outline: none;

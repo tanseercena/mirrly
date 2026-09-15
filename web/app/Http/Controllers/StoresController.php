@@ -498,6 +498,39 @@ class StoresController extends Controller
         return response()->json(['success' => true, 'message' => 'Privacy recording settings saved successfully']);
     }
 
+    public function saveCustomerSession(Request $request)
+    {
+        $session = $request->get('shopifySession');
+        $shop = $session->getShop();
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+
+        if (!$store) {
+            return response()->json([
+                'message' => 'Store not found',
+            ], 404);
+        }
+
+        // Get or create the store's setting
+        $setting = $store->setting;
+
+        if (!$setting) {
+            $setting = $store->setting()->create([]);
+        }
+
+        // Build customer session data structure
+        $customerSession = [
+            'try_sessions_per_product' => max(1, (int) $request->input('try_sessions_per_product', 1)),
+            'allow_try_on_for' => in_array($request->input('allow_try_on_for'), ['all', 'logged_in'], true)
+                ? $request->input('allow_try_on_for')
+                : 'all',
+        ];
+
+        $setting->customer_session = $customerSession;
+        $setting->save();
+
+        return response()->json(['success' => true, 'message' => 'Customer session settings saved successfully']);
+    }
+
     public function saveNotification(Request $request)
     {
         $session = $request->get('shopifySession');

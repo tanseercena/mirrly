@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Page,
@@ -17,6 +17,8 @@ import {
     Popover,
     ColorPicker,
     Thumbnail,
+    RadioButton,
+    Divider,
 } from '@shopify/polaris';
 import { useAppBridge } from '@shopify/app-bridge-react';
 import {
@@ -33,7 +35,8 @@ import {
     CashDollarIcon,
     ChartLineIcon,
     ImageIcon,
-    ArrowDiagonalIcon
+    ArrowDiagonalIcon,
+    PersonIcon,
 } from '@shopify/polaris-icons';
 import { showErrorToast } from '../helpers/functions';
 
@@ -337,7 +340,7 @@ const BrandingCard = ({ settings, onChange, t }) => {
             </BlockStack>
         </Card>
     );
-    
+
 };
 
 const LivePreviewCard = ({ settings, t }) => {
@@ -533,123 +536,125 @@ const LivePreviewCard = ({ settings, t }) => {
 /* ============================================
     SECTION: CAMERA FALLBACK BEHAVIOR
     ============================================ */
-const CameraFallbackCard = ({ settings, onChange, t }) => {
-    const [unsupported, setUnsupported] = useState(settings?.unsupported || 'ai_preview');
-    const [permissionDenied, setPermissionDenied] = useState(settings?.permission_denied || 'guidance');
+// const CameraFallbackCard = ({ settings, onChange, t }) => {
+//     const [unsupported, setUnsupported] = useState(settings?.unsupported || 'ai_preview');
+//     const [permissionDenied, setPermissionDenied] = useState(settings?.permission_denied || 'guidance');
 
-    // Update local state when settings prop changes
-    useEffect(() => {
-        if (settings) {
-            setUnsupported(settings.unsupported || 'ai_preview');
-            setPermissionDenied(settings.permission_denied || 'guidance');
-        }
-    }, [settings]);
+//     // Update local state when settings prop changes
+//     useEffect(() => {
+//         if (settings) {
+//             setUnsupported(settings.unsupported || 'ai_preview');
+//             setPermissionDenied(settings.permission_denied || 'guidance');
+//         }
+//     }, [settings]);
 
-    return (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
-            <Card padding="400">
-                <BlockStack gap="400">
-                    <BlockStack gap="050">
-                        <Text variant="headingMd" as="h3" fontWeight={600}>
-                            {t('mirrly_settings.camera_fallback_card.title')}
-                        </Text>
-                        <Text variant="bodySm" as="p" tone="subdued">
-                            {t('mirrly_settings.camera_fallback_card.description')}
-                        </Text>
-                    </BlockStack>
+//     return (
+//         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px', alignItems: 'start' }}>
+//             <Card padding="400">
+//                 <BlockStack gap="400">
+//                     <BlockStack gap="050">
+//                         <Text variant="headingMd" as="h3" fontWeight={600}>
+//                             {t('mirrly_settings.camera_fallback_card.title')}
+//                         </Text>
+//                         <Text variant="bodySm" as="p" tone="subdued">
+//                             {t('mirrly_settings.camera_fallback_card.description')}
+//                         </Text>
+//                     </BlockStack>
 
-                    <InlineStack align="space-between" blockAlign="start" wrap={false} gap="400">
-                        <SettingsRow
-                            icon={MobileIcon}
-                            iconBg="bg-fill-info-secondary"
-                            iconTone="info"
-                            title={t('mirrly_settings.camera_fallback_card.unsupported_browser')}
-                            description={t('mirrly_settings.camera_fallback_card.unsupported_browser_description')}
-                        />
-                        <div style={{ width: '260px', flexShrink: 0 }}>
-                            <BlockStack gap="100">
-                                <Select
-                                    label={t('mirrly_settings.camera_fallback_card.unsupported_browser_fallback')}
-                                    labelHidden
-                                    options={[
-                                        { label: t('mirrly_settings.camera_fallback_card.show_ai_preview'), value: 'ai_preview' },
-                                        { label: t('mirrly_settings.camera_fallback_card.hide_try_on_button'), value: 'hide' },
-                                    ]}
-                                    value={unsupported}
-                                    onChange={(value) => {
-                                        setUnsupported(value);
-                                        onChange('unsupported', value);
-                                    }}
-                                />
-                                <Text variant="bodySm" as="p" tone="subdued">
-                                    {t('mirrly_settings.camera_fallback_card.ai_preview_description')}
-                                </Text>
-                            </BlockStack>
-                        </div>
-                    </InlineStack>
+//                     <InlineStack align="space-between" blockAlign="start" wrap={false} gap="400">
+//                         <SettingsRow
+//                             icon={MobileIcon}
+//                             iconBg="bg-fill-info-secondary"
+//                             iconTone="info"
+//                             title={t('mirrly_settings.camera_fallback_card.unsupported_browser')}
+//                             description={t('mirrly_settings.camera_fallback_card.unsupported_browser_description')}
+//                         />
+//                         <div style={{ width: '260px', flexShrink: 0 }}>
+//                             <BlockStack gap="100">
+//                                 <Select
+//                                     label={t('mirrly_settings.camera_fallback_card.unsupported_browser_fallback')}
+//                                     labelHidden
+//                                     options={[
+//                                         { label: t('mirrly_settings.camera_fallback_card.show_ai_preview'), value: 'ai_preview' },
+//                                         { label: t('mirrly_settings.camera_fallback_card.hide_try_on_button'), value: 'hide' },
+//                                     ]}
+//                                     value={unsupported}
+//                                     onChange={(value) => {
+//                                         setUnsupported(value);
+//                                         onChange('unsupported', value);
+//                                     }}
+//                                 />
+//                                 <Text variant="bodySm" as="p" tone="subdued">
+//                                     {t('mirrly_settings.camera_fallback_card.ai_preview_description')}
+//                                 </Text>
+//                             </BlockStack>
+//                         </div>
+//                     </InlineStack>
 
-                    <InlineStack align="space-between" blockAlign="start" wrap={false} gap="400">
-                        <SettingsRow
-                            icon={CameraIcon}
-                            iconBg="bg-fill-magic-secondary"
-                            iconTone="magic"
-                            title={t('mirrly_settings.camera_fallback_card.permission_denied')}
-                            description={t('mirrly_settings.camera_fallback_card.permission_denied_description')}
-                        />
-                        <div style={{ width: '260px', flexShrink: 0 }}>
-                            <BlockStack gap="100">
-                                <Select
-                                    label={t('mirrly_settings.camera_fallback_card.permission_denied_fallback')}
-                                    labelHidden
-                                    options={[
-                                        { label: t('mirrly_settings.camera_fallback_card.show_guidance'), value: 'guidance' },
-                                        { label: t('mirrly_settings.camera_fallback_card.show_ai_preview'), value: 'ai_preview' },
-                                    ]}
-                                    value={permissionDenied}
-                                    onChange={(value) => {
-                                        setPermissionDenied(value);
-                                        onChange('permission_denied', value);
-                                    }}
-                                />
-                                <Text variant="bodySm" as="p" tone="subdued">
-                                    {t('mirrly_settings.camera_fallback_card.guidance_description')}
-                                </Text>
-                            </BlockStack>
-                        </div>
-                    </InlineStack>
-                </BlockStack>
-            </Card>
+//                     <InlineStack align="space-between" blockAlign="start" wrap={false} gap="400">
+//                         <SettingsRow
+//                             icon={CameraIcon}
+//                             iconBg="bg-fill-magic-secondary"
+//                             iconTone="magic"
+//                             title={t('mirrly_settings.camera_fallback_card.permission_denied')}
+//                             description={t('mirrly_settings.camera_fallback_card.permission_denied_description')}
+//                         />
+//                         <div style={{ width: '260px', flexShrink: 0 }}>
+//                             <BlockStack gap="100">
+//                                 <Select
+//                                     label={t('mirrly_settings.camera_fallback_card.permission_denied_fallback')}
+//                                     labelHidden
+//                                     options={[
+//                                         { label: t('mirrly_settings.camera_fallback_card.show_guidance'), value: 'guidance' },
+//                                         { label: t('mirrly_settings.camera_fallback_card.show_ai_preview'), value: 'ai_preview' },
+//                                     ]}
+//                                     value={permissionDenied}
+//                                     onChange={(value) => {
+//                                         setPermissionDenied(value);
+//                                         onChange('permission_denied', value);
+//                                     }}
+//                                 />
+//                                 <Text variant="bodySm" as="p" tone="subdued">
+//                                     {t('mirrly_settings.camera_fallback_card.guidance_description')}
+//                                 </Text>
+//                             </BlockStack>
+//                         </div>
+//                     </InlineStack>
+//                 </BlockStack>
+//             </Card>
 
-            <Box
-                background="bg-fill-info-secondary"
-                borderWidth="025"
-                borderColor="border-info"
-                borderRadius="200"
-                padding="400"
-            >
-                <BlockStack gap="400">
-                    <InlineStack gap="150" blockAlign="center">
-                        <Text> <Icon source={InfoIcon} tone="info" /> </Text>
-                        <Text variant="bodyMd" as="p" fontWeight="semibold" tone="info">
-                            {t('mirrly_settings.camera_fallback_card.why_fallbacks_matter')}
-                        </Text>
-                    </InlineStack>
-
-                    <div style={{ lineHeight: '2.0', paddingLeft: '16px' }}>
-                        <Text variant="bodyMd" as="p">
-                            {t('mirrly_settings.camera_fallback_card.why_fallbacks_description')}
-                        </Text>
-                    </div>
-
-                    <InlineStack gap="050" blockAlign="center" padding="400">
-                        <Button variant="plain">{t('mirrly_settings.camera_fallback_card.learn_more_about_fallbacks')}</Button>
-                        <Text> <Icon source={ArrowDiagonalIcon} tone="info" /> </Text>
-                    </InlineStack>
-                </BlockStack>
-            </Box>
-        </div>
-    );
-};
+//             <Box background="bg-fill-success-secondary" borderRadius="200" padding="400">
+//                 <BlockStack gap="400">
+//                     <InlineStack gap="150" blockAlign="center">
+//                         <Text> <Icon source={LockIcon} tone="success" /> </Text>
+//                         <Text variant="bodyMd" as="p" fontWeight="semibold" tone="success">
+//                             {t('mirrly_settings.privacy_card.privacy_first')}
+//                         </Text>
+//                     </InlineStack>
+//                     <BlockStack gap="200" >
+//                         {[
+//                             t('mirrly_settings.privacy_card.off_by_default'),
+//                             t('mirrly_settings.privacy_card.no_recordings_saved'),
+//                             t('mirrly_settings.privacy_card.data_only_used'),
+//                             t('mirrly_settings.privacy_card.youre_in_control'),
+//                         ].map((item) => (
+//                             <InlineStack key={item} gap="200" blockAlign="center" wrap={false}>
+//                                 <Text> <Icon source={CheckIcon} tone="success" /> </Text>
+//                                 <Text variant="bodySm" as="span">
+//                                     {item}
+//                                 </Text>
+//                             </InlineStack>
+//                         ))}
+//                     </BlockStack>
+//                     <InlineStack gap="100" blockAlign="center" padding="400">
+//                         <Button variant="plain">{t('mirrly_settings.camera_fallback_card.learn_more_about_fallbacks')}</Button>
+//                         <Text> <Icon source={ArrowDiagonalIcon} tone="info" /> </Text>
+//                     </InlineStack>
+//                 </BlockStack>
+//             </Box>
+//         </div>
+//     );
+// };
 
 /* ============================================
     SECTION: PRIVACY & RECORDING
@@ -667,112 +672,193 @@ const PrivacyCard = ({ settings, onChange, t }) => {
     }, [settings]);
 
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
-            <Card padding="400">
-                <BlockStack gap="400">
+        <Card padding="400">
+            <BlockStack gap="400">
+                <BlockStack gap="050">
+                    <Text variant="headingMd" as="h3" fontWeight={600}>
+                        {t('mirrly_settings.privacy_card.title')}
+                    </Text>
+                    <Text variant="bodySm" as="p" tone="subdued">
+                        {t('mirrly_settings.privacy_card.description')}
+                    </Text>
+                </BlockStack>
+
+                <InlineStack align="space-between" blockAlign="center" wrap={false}>
                     <BlockStack gap="050">
-                        <Text variant="headingMd" as="h3" fontWeight={600}>
-                            {t('mirrly_settings.privacy_card.title')}
+                        <Text variant="bodyMd" as="p" fontWeight="semibold">
+                            {t('mirrly_settings.privacy_card.record_shopper_videos')}
                         </Text>
                         <Text variant="bodySm" as="p" tone="subdued">
-                            {t('mirrly_settings.privacy_card.description')}
+                            {t('mirrly_settings.privacy_card.record_shopper_videos_description')}
                         </Text>
                     </BlockStack>
+                    <Toggle
+                        checked={recording}
+                        onChange={(value) => {
+                            setRecording(value);
+                            onChange('recording', value);
+                        }}
+                    />
+                </InlineStack>
 
+                <Box paddingInlineStart="400">
                     <InlineStack align="space-between" blockAlign="center" wrap={false}>
                         <BlockStack gap="050">
-                            <Text variant="bodyMd" as="p" fontWeight="semibold">
-                                {t('mirrly_settings.privacy_card.record_shopper_videos')}
+                            <Text
+                                variant="bodyMd"
+                                as="p"
+                                fontWeight="medium"
+                                tone={recording ? undefined : 'subdued'}
+                            >
+                                {t('mirrly_settings.privacy_card.retention_period')}
                             </Text>
                             <Text variant="bodySm" as="p" tone="subdued">
-                                {t('mirrly_settings.privacy_card.record_shopper_videos_description')}
+                                {t('mirrly_settings.privacy_card.retention_period_description')}
                             </Text>
                         </BlockStack>
-                        <Toggle
-                            checked={recording}
-                            onChange={(value) => {
-                                setRecording(value);
-                                onChange('recording', value);
-                            }}
-                        />
+                        <div style={{ width: '160px', flexShrink: 0 }}>
+                            <Select
+                                label={t('mirrly_settings.privacy_card.retention_period')}
+                                labelHidden
+                                disabled={!recording}
+                                options={[
+                                    { label: t('mirrly_settings.privacy_card.7_days'), value: '7' },
+                                    { label: t('mirrly_settings.privacy_card.30_days'), value: '30' },
+                                    { label: t('mirrly_settings.privacy_card.90_days'), value: '90' },
+                                ]}
+                                value={retention}
+                                onChange={(value) => {
+                                    setRetention(value);
+                                    onChange('retention', value);
+                                }}
+                            />
+                        </div>
                     </InlineStack>
+                </Box>
 
-                    <Box paddingInlineStart="400">
-                        <InlineStack align="space-between" blockAlign="center" wrap={false}>
-                            <BlockStack gap="050">
-                                <Text
-                                    variant="bodyMd"
-                                    as="p"
-                                    fontWeight="medium"
-                                    tone={recording ? undefined : 'subdued'}
-                                >
-                                    {t('mirrly_settings.privacy_card.retention_period')}
-                                </Text>
-                                <Text variant="bodySm" as="p" tone="subdued">
-                                    {t('mirrly_settings.privacy_card.retention_period_description')}
-                                </Text>
-                            </BlockStack>
-                            <div style={{ width: '160px', flexShrink: 0 }}>
-                                <Select
-                                    label={t('mirrly_settings.privacy_card.retention_period')}
-                                    labelHidden
-                                    disabled={!recording}
-                                    options={[
-                                        { label: t('mirrly_settings.privacy_card.7_days'), value: '7' },
-                                        { label: t('mirrly_settings.privacy_card.30_days'), value: '30' },
-                                        { label: t('mirrly_settings.privacy_card.90_days'), value: '90' },
-                                    ]}
-                                    value={retention}
-                                    onChange={(value) => {
-                                        setRetention(value);
-                                        onChange('retention', value);
-                                    }}
-                                />
-                            </div>
-                        </InlineStack>
-                    </Box>
-
-                    <Box background="bg-fill-info-secondary" padding="300" borderRadius="200">
-                        <InlineStack gap="200" blockAlign="start" wrap={false}>
-                            <Text> <Icon source={InfoIcon} tone="info" /> </Text>
-                            <Text variant="bodySm" as="p">
-                                {t('mirrly_settings.privacy_card.privacy_info')}
-                            </Text>
-                        </InlineStack>
-                    </Box>
-                </BlockStack>
-            </Card>
-
-            <Box background="bg-fill-success-secondary" borderRadius="200" padding="400">
-                <BlockStack gap="400">
-                    <InlineStack gap="150" blockAlign="center">
-                        <Text> <Icon source={LockIcon} tone="success" /> </Text>
-                        <Text variant="bodyMd" as="p" fontWeight="semibold" tone="success">
-                            {t('mirrly_settings.privacy_card.privacy_first')}
+                <Box background="bg-fill-info-secondary" padding="300" borderRadius="200">
+                    <InlineStack gap="200" blockAlign="start" wrap={false}>
+                        <Text> <Icon source={InfoIcon} tone="info" /> </Text>
+                        <Text variant="bodySm" as="p">
+                            {t('mirrly_settings.privacy_card.privacy_info')}
                         </Text>
                     </InlineStack>
-                    <BlockStack gap="200" >
-                        {[
-                            t('mirrly_settings.privacy_card.off_by_default'),
-                            t('mirrly_settings.privacy_card.no_recordings_saved'),
-                            t('mirrly_settings.privacy_card.data_only_used'),
-                            t('mirrly_settings.privacy_card.youre_in_control'),
-                        ].map((item) => (
-                            <InlineStack key={item} gap="200" blockAlign="center" wrap={false}>
-                                <Text> <Icon source={CheckIcon} tone="success" /> </Text>
-                                <Text variant="bodySm" as="span">
-                                    {item}
-                                </Text>
-                            </InlineStack>
-                        ))}
+                </Box>
+            </BlockStack>
+        </Card>
+    );
+};
+
+/* ============================================
+    SECTION: CUSTOMER SESSION SETTINGS
+    ============================================ */
+const CustomerSessionCard = ({ settings, onChange, t }) => {
+    const [trySessions, setTrySessions] = useState(String(settings?.try_sessions_per_product ?? '1'));
+    const [allowTryOnFor, setAllowTryOnFor] = useState(settings?.allow_try_on_for || 'all');
+    const saveTimeoutRef = useRef(null);
+    const pendingValueRef = useRef(null);
+
+    // Update local state when settings prop changes
+    useEffect(() => {
+        if (settings) {
+            // Don't clobber the field while a debounced save is still pending
+            if (pendingValueRef.current === null) {
+                setTrySessions(String(settings.try_sessions_per_product ?? '1'));
+            }
+            setAllowTryOnFor(settings.allow_try_on_for || 'all');
+        }
+    }, [settings]);
+
+    // Clear any pending save on unmount
+    useEffect(() => () => {
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    }, []);
+
+    // The number field fires onChange on every keystroke/spinner click.
+    // Debounce so rapid changes POST once with the final value instead of
+    // racing each other and saving out of order.
+    const handleTrySessionsChange = (value) => {
+        setTrySessions(value);
+        pendingValueRef.current = value;
+
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(() => {
+            pendingValueRef.current = null;
+            onChange('try_sessions_per_product', value === '' ? '1' : value);
+        }, 600);
+    };
+
+    return (
+        <Card padding="400">
+            <BlockStack gap="400">
+                <InlineStack gap="150" blockAlign="start" wrap={false}>
+                    <Text><Icon source={PersonIcon} /> </Text>
+                    <BlockStack gap="050">
+                        <Text variant="bodyMd" as="p" fontWeight="semibold">
+                            {t('mirrly_settings.customer_session_card.title')}
+                        </Text>
                     </BlockStack>
-                    <InlineStack gap="100" blockAlign="center" padding="400">
-                        <Button variant="plain">{t('mirrly_settings.camera_fallback_card.learn_more_about_fallbacks')}</Button>
-                        <Text> <Icon source={ArrowDiagonalIcon} tone="info" /> </Text>
-                    </InlineStack>
+                </InlineStack>
+
+                <BlockStack gap="100">
+                    <Text variant="bodyMd" as="p" fontWeight="semibold">
+                        {t('mirrly_settings.customer_session_card.try_sessions_title')}
+                    </Text>
+                    <Text variant="bodySm" as="p" tone="subdued">
+                        {t('mirrly_settings.customer_session_card.try_sessions_description')}
+                    </Text>
+                    <TextField
+                        label={t('mirrly_settings.customer_session_card.try_sessions_label')}
+                        labelHidden
+                        type="number"
+                        min={1}
+                        // step={0} hides Polaris' built-in spinner, which double-increments
+                        // (its press-and-hold timer fires +1 and the click adds +1 again),
+                        // so every slightly-slow click jumps by 2. Native arrow keys still
+                        // step by 1, and typing works as usual.
+                        step={0}
+                        value={trySessions}
+                        autoComplete="off"
+                        onChange={handleTrySessionsChange}
+                    />
+                    <Text variant="bodySm" as="p" tone="subdued">
+                        {t('mirrly_settings.customer_session_card.try_sessions_hint')}
+                    </Text>
                 </BlockStack>
-            </Box>
-        </div>
+
+                <Divider />
+
+                <BlockStack gap="200">
+                    <BlockStack gap="050">
+                        <Text variant="bodyMd" as="p" fontWeight="semibold">
+                            {t('mirrly_settings.customer_session_card.allow_try_on_title')}
+                        </Text>
+                        <Text variant="bodySm" as="p" tone="subdued">
+                            {t('mirrly_settings.customer_session_card.allow_try_on_description')}
+                        </Text>
+                    </BlockStack>
+
+                    <BlockStack gap="150">
+                        <RadioButton
+                            label={t('mirrly_settings.customer_session_card.all_customers')}
+                            checked={allowTryOnFor === 'all'}
+                            name="allowTryOnFor"
+                            onChange={() => onChange('allow_try_on_for', 'all')}
+                        />
+                        <RadioButton
+                            label={t('mirrly_settings.customer_session_card.logged_in_customers_only')}
+                            checked={allowTryOnFor === 'logged_in'}
+                            name="allowTryOnFor"
+                            onChange={() => onChange('allow_try_on_for', 'logged_in')}
+                        />
+                    </BlockStack>
+
+                    <Text variant="bodySm" as="p" tone="subdued">
+                        {t('mirrly_settings.customer_session_card.allow_try_on_hint')}
+                    </Text>
+                </BlockStack>
+            </BlockStack>
+        </Card>
     );
 };
 
@@ -1042,6 +1128,12 @@ const SettingsPage = () => {
         retention: '7',
     });
 
+    // Customer session state
+    const [customerSession, setCustomerSession] = useState({
+        try_sessions_per_product: '1',
+        allow_try_on_for: 'all',
+    });
+
     // Notification state
     const [notification, setNotification] = useState({
         weekly_summary: true,
@@ -1075,6 +1167,9 @@ const SettingsPage = () => {
                 }
                 if (data.data?.privacy_recording) {
                     setPrivacyRecording(data.data.privacy_recording);
+                }
+                if (data.data?.customer_session) {
+                    setCustomerSession(data.data.customer_session);
                 }
                 if (data.data?.notification) {
                     setNotification(data.data.notification);
@@ -1125,7 +1220,7 @@ const SettingsPage = () => {
             }
         } catch (error) {
             console.error('Failed to save button branding:', error);
-            shopify.toast.show(t('error_occur'), { isError: true , duration:999999} );
+            shopify.toast.show(t('error_occur'), { isError: true, duration: 999999 });
         }
     }, [branding, shopify, t]);
 
@@ -1150,7 +1245,7 @@ const SettingsPage = () => {
             }
         } catch (error) {
             console.error('Failed to save camera fallback settings:', error);
-            shopify.toast.show(t('error_occur'), { isError: true , duration: 999999});
+            shopify.toast.show(t('error_occur'), { isError: true, duration: 999999 });
         }
     }, [cameraFallback, shopify, t]);
 
@@ -1175,9 +1270,34 @@ const SettingsPage = () => {
             }
         } catch (error) {
             console.error('Failed to save privacy recording settings:', error);
-            shopify.toast.show(t('error_occur'), { isError: true , duration:999999 });
+            shopify.toast.show(t('error_occur'), { isError: true, duration: 999999 });
         }
     }, [privacyRecording, shopify, t]);
+
+    const handleCustomerSessionChange = useCallback(async (field, value) => {
+        // Update local state immediately
+        setCustomerSession((prev) => ({ ...prev, [field]: value }));
+
+        try {
+            const response = await fetch('/api/customer-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...customerSession,
+                    [field]: value,
+                }),
+            });
+
+            if (response.ok) {
+                shopify.toast.show(t('changes_saved'));
+            } else {
+                showErrorToast(shopify, t('error_occur'));
+            }
+        } catch (error) {
+            console.error('Failed to save customer session settings:', error);
+            shopify.toast.show(t('error_occur'), { isError: true, duration: 999999 });
+        }
+    }, [customerSession, shopify, t]);
 
     const handleNotificationChange = useCallback(async (field, value) => {
         // Update local state immediately
@@ -1200,7 +1320,7 @@ const SettingsPage = () => {
             }
         } catch (error) {
             console.error('Failed to save notification settings:', error);
-            shopify.toast.show(t('error_occur'), { isError: true , duration: 999999 });
+            shopify.toast.show(t('error_occur'), { isError: true, duration: 999999 });
         }
     }, [notification, shopify, t]);
 
@@ -1221,8 +1341,11 @@ const SettingsPage = () => {
                     <LivePreviewCard settings={branding} t={t} />
                 </div>
 
-                <CameraFallbackCard settings={cameraFallback} onChange={handleCameraFallbackChange} t={t} />
-                <PrivacyCard settings={privacyRecording} onChange={handlePrivacyRecordingChange} t={t} />
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                    <PrivacyCard settings={privacyRecording} onChange={handlePrivacyRecordingChange} t={t} />
+                    <CustomerSessionCard settings={customerSession} onChange={handleCustomerSessionChange} t={t} />
+                </div>
+                {/* <CameraFallbackCard settings={cameraFallback} onChange={handleCameraFallbackChange} t={t} /> */}
                 <NotificationsCard settings={notification} onChange={handleNotificationChange} t={t} />
                 <AdvancedCard t={t} />
             </BlockStack>
