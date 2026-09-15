@@ -1865,6 +1865,18 @@
             "data_only_used": "Data only used to deliver the try-on experience",
             "youre_in_control": "You're in control"
         },
+        "customer_session_card": {
+            "title": "Customer session settings",
+            "try_sessions_title": "Try sessions per customer (per product)",
+            "try_sessions_description": "Set how many times a customer can try the same product.",
+            "try_sessions_label": "Try sessions per customer",
+            "try_sessions_hint": "Default is 1. You can increase this to allow more tries.",
+            "allow_try_on_title": "Allow try-on for",
+            "allow_try_on_description": "Choose whether customers need to be logged in to use try-on.",
+            "all_customers": "All customers",
+            "logged_in_customers_only": "Logged in customers only",
+            "allow_try_on_hint": "Default allows not logged in customers."
+        },
         "notifications_card": {
             "title": "Notifications",
             "description": "Stay informed about your store's try-on performance and usage",

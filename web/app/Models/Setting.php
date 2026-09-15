@@ -44,6 +44,7 @@ class Setting extends Model
         'camera_fallback' => 'array',
         'privacy_recording' => 'array',
         'notification' => 'array',
+        'customer_session' => 'array',
     ];
 
     public function store()

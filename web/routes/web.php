@@ -57,6 +57,7 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
         Route::post("button-branding", "saveButtonBranding");
         Route::post("camera-fallback", "saveCameraFallback");
         Route::post("privacy-recording", "savePrivacyRecording");
+        Route::post("customer-session", "saveCustomerSession");
         Route::post("notification", "saveNotification");
         Route::post("toggle-setup-step", "toggleSetupStep");
         Route::get("check-theme-extension", "checkThemeExtension");
