@@ -28,6 +28,16 @@ export interface ProductInfo {
 
 export interface ConfigResponse {
   enabled: boolean;
+  // Shopper eligibility for the contract gates (login requirement +
+  // per-product try limit), evaluated server-side per request. The loader
+  // uses this to pass a "blocked" reason into the widget so the shopper sees
+  // a friendly message before the camera is ever requested. Optional so a
+  // stale cached config (60s sessionStorage cache) treats a missing shopper
+  // as allowed — /session is the enforcement point either way.
+  shopper?: {
+    allowed: boolean;
+    reason: ShopperBlockReason | null;
+  };
   button: ButtonSettings;
   product: ProductInfo | null;
   // Short-lived (~5 min) signed JWT (product_id, variant_id, shop, exp).
@@ -38,6 +48,10 @@ export interface ConfigResponse {
   // directly with an arbitrary product_id without going through /config first.
   config_token: string;
 }
+
+// Why the shopper is blocked from starting a try-on. Surfaced by /config
+// (pre-camera) and enforced again by /session (authoritative).
+export type ShopperBlockReason = 'login_required' | 'try_limit_reached';
 
 export interface SessionStartResponse {
   session_token: string;
@@ -77,4 +91,7 @@ export interface RootDataset {
   variantId: string;
   shop: string;
   widgetUrl: string;
+  // Logged-in Shopify customer id, stamped by Liquid ("{{ customer.id }}").
+  // Empty string for guests — the widget then falls back to its anonymous id.
+  customerId: string;
 }

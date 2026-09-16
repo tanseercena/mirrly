@@ -12,6 +12,7 @@ use App\Models\Setting;
 use App\Models\Session;
 use App\Models\Store;
 use App\Models\SyncJob;
+use App\Models\TrySession;
 use App\Jobs\TriggerCatalogSyncJob;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,16 +51,24 @@ class StoresController extends Controller
         $branding = $store->setting->button_branding ?? [];
 
         // Map admin-saved vocabulary to the storefront widget's contract
-        $positionMap = ['below_cart' => 'below_add_to_cart', 'above_cart' => 'above_add_to_cart'];
-        $radiusMap = ['full' => 'pill'];
+        $positionMap = ['below_cart' => 'below_add_to_cart', "above_cart" => "above_add_to_cart"];
+        $radiusMap = ['full' => "pill"];
         $style = $branding['buttonStyle'] ?? [];
 
         $product = Product::where('store_id', $store->id)
             ->where('shopify_product_id', (string) $request->input('product_id'))
             ->first();
 
+        // Shopper eligibility for the customer-session gates (login requirement
+        // + per-product try limit). The widget shows a friendly message before
+        // ever requesting the camera; /session re-checks both authoritatively.
+        $customerSession = $store->setting?->customer_session ?? [];
+        [$customerId, $anonymousId] = $this->shopperIdentity($request);
+        $shopper = $this->shopperEligibility($store, $product, $customerSession, $customerId, $anonymousId);
+
         return response()->json([
             'enabled' => true, // later changed based on products try on enable or disabled from products table
+            'shopper' => $shopper,
             'button' => [
                 'text' => $branding['buttonText'] ?? 'Try it on live',
                 'position' => $positionMap[$branding['position']] ?? 'below_add_to_cart',
@@ -76,6 +85,48 @@ class StoresController extends Controller
                 $request->input('variant_id')
             ),
         ]);
+    }
+
+    /**
+     * Widget-sent shopper identity: the logged-in Shopify customer id
+     * (stamped into the page by Liquid), else a browser-persisted anonymous
+     * id. Null when absent or malformed.
+     */
+    private function shopperIdentity(Request $request): array
+    {
+        $customerId = ctype_digit((string) $request->input('customer_id'))
+            ? (int) $request->input('customer_id')
+            : null;
+        $anonymousId = $customerId
+            ? null
+            : (substr(preg_replace('/[^a-zA-Z0-9\-]/', '', (string) $request->input('anonymous_id')), 0, 64) ?: null);
+
+        return [$customerId, $anonymousId];
+    }
+
+    /**
+     * Customer-session gates evaluated for /config, so the widget can explain
+     * a block before ever asking for the camera. start() re-checks both
+     * authoritatively.
+     */
+    private function shopperEligibility(Store $store, ?Product $product, array $customerSession, ?int $customerId, ?string $anonymousId): array
+    {
+        $allowTryOnFor = $customerSession['allow_try_on_for'] ?? 'all';
+        $gate = ($allowTryOnFor === 'logged_in' && !$customerId) ? 'login_required' : null;
+
+        if (!$gate && $product && ($customerId || $anonymousId)) {
+            $tryLimit = max(1, (int) ($customerSession['try_sessions_per_product'] ?? 1));
+            $tries = TrySession::where('store_id', $store->id)
+                ->where('product_id', $product->id)
+                ->where($customerId ? 'shopify_customer_id' : 'anonymous_id', $customerId ?? $anonymousId)
+                ->count();
+
+            if ($tries >= $tryLimit) {
+                $gate = 'try_limit_reached';
+            }
+        }
+
+        return ['allowed' => $gate === null, 'reason' => $gate];
     }
 
     private function productPayload(Product $product, string $variantId, Store $store): array

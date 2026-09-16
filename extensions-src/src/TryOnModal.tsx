@@ -3,7 +3,7 @@ import { startSession, sendEvent } from './session-api';
 import { connectEngine, type EngineConnection } from './realtime-engine';
 import { startPersonDetection, type PersonDetection } from './person-detection';
 import { addVariantToCart } from './cart';
-import type { ProductInfo } from './types';
+import type { ProductInfo, ShopperBlockReason } from './types';
 import { TryOnIntro } from './components/TryOnIntro';
 import { ErrorScreen, type TryOnError } from './components/ErrorScreen';
 import {
@@ -29,13 +29,24 @@ type Status =
 // with adjusted copy — same blocked-camera remedy.
 type ErrorKind = 'camera_denied' | 'camera_unsupported' | 'session_failed';
 
+// Everything ErrorScreen can render: camera/session failures plus the
+// shopper gates (login requirement / try limit), which arrive either from
+// /config (via the `blocked` prop, before any camera work) or as the
+// backend's error_code when /session rejects mid-flow.
+type ModalError = ErrorKind | ShopperBlockReason;
+
 const DEFAULT_COUNTDOWN_SECONDS = 8;
 
 interface Props {
   configToken: string;
   productId: string;
   variantId: string;
+  // Liquid-stamped customer id ("" for guests) — sent with every /session
+  // call so the per-product try limit and login gate key off THIS shopper.
+  customerId: string;
   product: ProductInfo | null;
+  // Pre-camera block from /config — see widget.tsx MountOptions
+  blocked?: ShopperBlockReason;
   countdownSeconds?: number;
   onClose: () => void;
 }
@@ -44,12 +55,16 @@ export function TryOnModal({
   configToken,
   productId,
   variantId,
+  customerId,
   product,
+  blocked,
   countdownSeconds = DEFAULT_COUNTDOWN_SECONDS,
   onClose,
 }: Props) {
   const [status, setStatus] = useState<Status>('idle');
-  const [error, setError] = useState<ErrorKind | null>(null);
+  // A /config block renders immediately — the shopper never reaches the
+  // intro, let alone the camera.
+  const [error, setError] = useState<ModalError | null>(blocked ?? null);
   const [countdownLeft, setCountdownLeft] = useState(0);
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -147,6 +162,16 @@ export function TryOnModal({
   async function begin() {
     if (!aliveRef.current) return;
     setError(null);
+
+    // Restart-safe: a previous run's detector and camera may still be alive
+    // (Try again from the result screen re-enters here) — stop them first
+    // so two pollers never fight over person-present state.
+    detectionRef.current?.stop();
+    detectionRef.current = null;
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+    personPresentRef.current = false;
+
     setStatus('requesting_camera');
     try {
       // 1. Camera first — nothing is written server-side or billed before
@@ -228,6 +253,7 @@ export function TryOnModal({
         configToken,
         productId,
         currentVariantRef.current,
+        customerId,
         sessionTokenRef.current ?? undefined
       );
       if (!aliveRef.current) return;
@@ -277,7 +303,7 @@ export function TryOnModal({
       // so nothing else would tear this fresh connection down.
       if (!personPresentRef.current) handlePersonAbsent();
     } catch (err: any) {
-      failSession(err?.message);
+      failSession(err?.message, err?.errorCode);
     } finally {
       connectingRef.current = false;
     }
@@ -411,11 +437,26 @@ export function TryOnModal({
     }
   }
 
+  function cameraLive(): boolean {
+    return !!localStreamRef.current?.getVideoTracks().some((t) => t.readyState === 'live');
+  }
+
   function tryAgain() {
     setAdded(false);
     setSnapshot(null);
     completedSentRef.current = false;
     setError(null);
+
+    // From the result screen the previous run is fully torn down — its
+    // camera feed went with the engine disconnect, so the mid-session fast
+    // path below would sit on a dead preview waiting for detection that can
+    // never fire. Restart the whole flow; the fresh /session call re-checks
+    // the shopper gates, so an exhausted limit lands on the limit screen
+    // instead of silently reconnecting.
+    if (status === 'ended' || !cameraLive()) {
+      void begin();
+      return;
+    }
 
     if (!detectionRef.current) {
       // Degradation mode (no person detection) — just reconnect.
@@ -440,11 +481,16 @@ export function TryOnModal({
     void begin();
   }
 
-  function failSession(_message?: string) {
+  function failSession(_message?: string, errorCode?: string) {
     engineRef.current = null;
     stopSegment();
     setStatus('idle');
-    setError('session_failed');
+    // /session can reject with a shopper-gate code even when /config said
+    // allowed (limit hit between calls, tampered identity) — show the
+    // matching screen instead of a generic failure.
+    setError(
+      errorCode === 'login_required' || errorCode === 'try_limit_reached' ? errorCode : 'session_failed'
+    );
   }
 
   function cleanup() {

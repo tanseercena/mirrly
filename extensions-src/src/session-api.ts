@@ -66,17 +66,58 @@ export async function fetchApiToken(shop: string): Promise<string> {
   return data;
 }
 
-export async function fetchConfig(productId: string, variantId: string): Promise<ConfigResponse> {
+// Stable per-browser id for guests — the per-product try limit keys off this
+// when the shopper isn't logged in (customer id wins when present). Survives
+// page views and visits; clearing site data resets it, which is acceptable
+// for a storefront limit.
+export function getAnonymousId(): string {
+  const KEY = 'tryon:anon-id';
+  const fallback = `anon-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  try {
+    let id = localStorage.getItem(KEY);
+    if (!id) {
+      id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : fallback;
+      localStorage.setItem(KEY, id);
+      return id;
+    }
+    return id;
+  } catch {
+    // Storage blocked — per-visit id; the limit just can't track this browser
+    return fallback;
+  }
+}
+
+// Shopper identity sent with /config and /session for the customer-session
+// gates (login requirement + per-product try limit). The anonymous id rides
+// along even for logged-in shoppers so a request can never end up with no
+// usable identity — the backend prefers the customer id when it's present.
+export function getShopperParams(customerId: string): Record<string, string> {
+  return customerId
+    ? { customer_id: customerId, anonymous_id: getAnonymousId() }
+    : { anonymous_id: getAnonymousId() };
+}
+
+export async function fetchConfig(
+  productId: string,
+  variantId: string,
+  customerId: string
+): Promise<ConfigResponse> {
   // Keyed by variant too: a shopper who switches variants before opening
   // the modal must not be served a config (price/image/token) for the
-  // boot-time variant.
-  const cacheKey = `tryon:config:${productId}:${variantId}`;
+  // boot-time variant. Customer id is in the key so a logged-in shopper's
+  // eligibility never leaks into the guest view (and vice versa).
+  const cacheKey = `tryon:config:${productId}:${variantId}:${customerId || 'guest'}`;
   const cached = readCache<ConfigResponse>(cacheKey);
   if (cached) return cached;
 
-  const res = await fetch(buildUrl('/config', { product_id: productId, variant_id: variantId }), {
-    headers: { Accept: 'application/json' },
-  });
+  const res = await fetch(
+    buildUrl('/config', { product_id: productId, variant_id: variantId, ...getShopperParams(customerId) }),
+    {
+      headers: { Accept: 'application/json' },
+    }
+  );
   if (!res.ok) throw new Error(`config fetch failed: ${res.status}`);
 
   const data: ConfigResponse = await res.json();
@@ -88,6 +129,7 @@ export async function startSession(
   configToken: string, // integrity check tying this call back to /config — see types.ts
   productId: string,
   variantId: string,
+  customerId: string,
   existingSessionToken?: string // passed on reconnects so the backend reuses the same session row
 ): Promise<SessionStartResponse> {
   const res = await fetch(buildUrl('/session'), {
@@ -98,10 +140,23 @@ export async function startSession(
       product_id: productId,
       variant_id: variantId,
       device_type: guessDeviceType(),
+      ...getShopperParams(customerId),
       ...(existingSessionToken ? { session_token: existingSessionToken } : {}),
     }),
   });
-  if (!res.ok) throw new Error(`session start failed: ${res.status}`);
+  if (!res.ok) {
+    // Surface the backend's error_code (login_required / try_limit_reached)
+    // so the modal can show the matching message instead of a generic failure.
+    let errorCode: string | undefined;
+    try {
+      errorCode = (await res.json())?.error_code;
+    } catch {
+      /* non-JSON body — generic failure */
+    }
+    const err = new Error(`session start failed: ${res.status}`) as Error & { errorCode?: string };
+    err.errorCode = errorCode;
+    throw err;
+  }
   return res.json();
 }
 
