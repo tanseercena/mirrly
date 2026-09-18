@@ -26,6 +26,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         $schedule->command('app:reset-monthly-limits-for-stores')->daily();
+        $schedule->command('app:prune-expired-recordings')->daily();
         $schedule->command('app:send-inventory-threshold-email')->daily();
         $schedule->command('app:process-pending-order-resends')->everyTwoMinutes()->withoutOverlapping();
         $schedule->command('webhook:process-pending-orders')->everyFiveMinutes()->withoutOverlapping();

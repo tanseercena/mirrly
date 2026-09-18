@@ -70,6 +70,10 @@ export interface SessionStartResponse {
   reference_image_url?: string;
   // Hard ceiling in seconds enforced client-side (mirrors backend billing unit).
   max_duration_seconds: number;
+  // True only when the merchant enabled recording in Settings → Privacy &
+  // recording. The client records the try-on output stream ONLY when this is
+  // set; the upload endpoint re-checks the setting server-side.
+  recording?: boolean;
 }
 // Note: a successful call to this endpoint is itself the `camera_opened`
 // event — the backend writes camera_opened_at when this session row is

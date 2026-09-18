@@ -160,6 +160,29 @@ export async function startSession(
   return res.json();
 }
 
+// Uploads the try-on recording (and optional result snapshot) after a
+// session ends. Only called when the backend flagged the session as
+// recorded — the endpoint re-checks the setting server-side. Multipart
+// fetch rather than sendBeacon: recordings are megabytes, beacons aren't.
+export function uploadRecording(
+  customerId: string,
+  sessionToken: string,
+  video: Blob | null,
+  image: Blob | null
+): Promise<void> {
+  const form = new FormData();
+  form.append('session_token', sessionToken);
+  for (const [key, value] of Object.entries(getShopperParams(customerId))) {
+    form.append(key, value);
+  }
+  if (video) form.append('video', video, 'tryon.webm');
+  if (image) form.append('image', image, 'snapshot.jpg');
+
+  return fetch(buildUrl('/recording'), { method: 'POST', body: form }).then((res) => {
+    if (!res.ok) throw new Error(`recording upload failed: ${res.status}`);
+  });
+}
+
 // Fire-and-forget funnel events. sendBeacon is preferred because it survives
 // the tab closing or navigating away mid-event, which fetch() would not.
 export function sendEvent(sessionToken: string, event: FunnelEvent, extra: Record<string, unknown> = {}) {

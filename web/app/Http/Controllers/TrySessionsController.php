@@ -236,7 +236,71 @@ class TrySessionsController extends Controller
             'prompt' => $this->buildPrompt($product, $variantId),
             'reference_image_url' => $referenceImageUrl,
             'max_duration_seconds' => $maxDuration,
+            // Client records the try-on output stream ONLY when this is true —
+            // otherwise nothing is ever captured or uploaded.
+            'recording' => (bool) ($store->setting?->privacy_recording['recording'] ?? false),
         ]);
+    }
+
+    /**
+     * Storefront POST /api/{shop}/recording — the widget uploads the try-on
+     * recording (and result snapshot) here after a session ends, but only
+     * when the merchant enabled recording: the gate below re-checks the
+     * setting server-side, so a tampered client can't store anything while
+     * recording is off. Files live on the private 'local' disk under
+     * recordings/{store}/{session_token}/ and are pruned after the
+     * configured retention period by app:prune-expired-recordings.
+     */
+    public function storeRecording(Request $request, $shop)
+    {
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+        if (!$store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        $session = TrySession::where('store_id', $store->id)
+            ->where('session_token', (string) $request->input('session_token'))
+            ->first();
+        if (!$session) {
+            return response()->json(['error' => 'Session not found'], 404);
+        }
+
+        $privacy = $store->setting?->privacy_recording ?? [];
+        if (empty($privacy['recording'])) {
+            return response()->json(['error' => 'Recording is disabled'], 403);
+        }
+
+        $request->validate([
+            'video' => ['nullable', 'file', 'max:51200'],
+            'image' => ['nullable', 'file', 'image', 'max:5120'],
+        ]);
+
+        if (!$request->hasFile('video') && !$request->hasFile('image')) {
+            return response()->json(['error' => 'Nothing to store'], 400);
+        }
+
+        $dir = "recordings/{$store->id}/{$session->session_token}";
+
+        // One file per connection segment — reconnects within a session
+        // produce additional segments alongside each other.
+        if ($request->hasFile('video')) {
+            $request->file('video')->storeAs(
+                $dir,
+                now()->format('His') . '-segment.' . ($request->file('video')->extension() ?: 'webm'),
+                'local'
+            );
+        }
+
+        if ($request->hasFile('image')) {
+            $request->file('image')->storeAs($dir, now()->format('His') . '-snapshot.jpg', 'local');
+        }
+
+        $retention = max(1, (int) ($privacy['retention'] ?? 7));
+        $session->recording_path = $dir;
+        $session->recording_expires_at = now()->addDays($retention);
+        $session->save();
+
+        return response()->json(['success' => true]);
     }
 
     /**
