@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { startSession, sendEvent } from './session-api';
+import { startSession, sendEvent, uploadRecording } from './session-api';
 import { connectEngine, type EngineConnection } from './realtime-engine';
 import { startPersonDetection, type PersonDetection } from './person-detection';
 import { addVariantToCart } from './cart';
-import type { ProductInfo } from './types';
+import type { ProductInfo, ShopperBlockReason } from './types';
 import { TryOnIntro } from './components/TryOnIntro';
 import { ErrorScreen, type TryOnError } from './components/ErrorScreen';
 import {
@@ -29,13 +29,24 @@ type Status =
 // with adjusted copy — same blocked-camera remedy.
 type ErrorKind = 'camera_denied' | 'camera_unsupported' | 'session_failed';
 
+// Everything ErrorScreen can render: camera/session failures plus the
+// shopper gates (login requirement / try limit), which arrive either from
+// /config (via the `blocked` prop, before any camera work) or as the
+// backend's error_code when /session rejects mid-flow.
+type ModalError = ErrorKind | ShopperBlockReason;
+
 const DEFAULT_COUNTDOWN_SECONDS = 8;
 
 interface Props {
   configToken: string;
   productId: string;
   variantId: string;
+  // Liquid-stamped customer id ("" for guests) — sent with every /session
+  // call so the per-product try limit and login gate key off THIS shopper.
+  customerId: string;
   product: ProductInfo | null;
+  // Pre-camera block from /config — see widget.tsx MountOptions
+  blocked?: ShopperBlockReason;
   countdownSeconds?: number;
   onClose: () => void;
 }
@@ -44,12 +55,16 @@ export function TryOnModal({
   configToken,
   productId,
   variantId,
+  customerId,
   product,
+  blocked,
   countdownSeconds = DEFAULT_COUNTDOWN_SECONDS,
   onClose,
 }: Props) {
   const [status, setStatus] = useState<Status>('idle');
-  const [error, setError] = useState<ErrorKind | null>(null);
+  // A /config block renders immediately — the shopper never reaches the
+  // intro, let alone the camera.
+  const [error, setError] = useState<ModalError | null>(blocked ?? null);
   const [countdownLeft, setCountdownLeft] = useState(0);
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -65,6 +80,14 @@ export function TryOnModal({
   const detectionRef = useRef<PersonDetection | null>(null);
   const sessionTokenRef = useRef<string | null>(null);
   const currentVariantRef = useRef(variantId);
+
+  // Try-on recording (Settings → Privacy & recording). The merchant's flag
+  // arrives on every /session response; recording stays OFF unless it's
+  // true, in which case the raw camera feed is never captured at all.
+  const recordingEnabledRef = useRef(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingDrawTimerRef = useRef<number | null>(null);
 
   // Detection callbacks fire long after the mount effect's closure is gone,
   // so liveness lives in a ref rather than the effect's `cancelled` variable.
@@ -147,6 +170,16 @@ export function TryOnModal({
   async function begin() {
     if (!aliveRef.current) return;
     setError(null);
+
+    // Restart-safe: a previous run's detector and camera may still be alive
+    // (Try again from the result screen re-enters here) — stop them first
+    // so two pollers never fight over person-present state.
+    detectionRef.current?.stop();
+    detectionRef.current = null;
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+    personPresentRef.current = false;
+
     setStatus('requesting_camera');
     try {
       // 1. Camera first — nothing is written server-side or billed before
@@ -212,6 +245,7 @@ export function TryOnModal({
     const engine = engineRef.current;
     engineRef.current = null;
     stopSegment();
+    stopSessionRecording();
     engine.disconnect();
     setStatus('waiting_person');
   }
@@ -228,11 +262,13 @@ export function TryOnModal({
         configToken,
         productId,
         currentVariantRef.current,
+        customerId,
         sessionTokenRef.current ?? undefined
       );
       if (!aliveRef.current) return;
       sessionTokenRef.current = session.session_token;
       maxDurationRef.current = session.max_duration_seconds;
+      recordingEnabledRef.current = !!session.recording;
 
       // No "is this still the current connection?" identity checks in these
       // callbacks: the engine suppresses events after disconnect(), and
@@ -248,7 +284,10 @@ export function TryOnModal({
         onRemoteStream: (remoteStream) => {
           if (!aliveRef.current) return;
           remoteStreamRef.current = remoteStream;
-          if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            startSessionRecording(remoteVideoRef.current);
+          }
           markStreaming();
         },
         onStateChange: (state) => {
@@ -277,7 +316,7 @@ export function TryOnModal({
       // so nothing else would tear this fresh connection down.
       if (!personPresentRef.current) handlePersonAbsent();
     } catch (err: any) {
-      failSession(err?.message);
+      failSession(err?.message, err?.errorCode);
     } finally {
       connectingRef.current = false;
     }
@@ -310,6 +349,7 @@ export function TryOnModal({
   function handleUnexpectedDisconnect() {
     engineRef.current = null;
     stopSegment();
+    stopSessionRecording();
     if (personPresentRef.current) {
       void ensureConnected();
     } else {
@@ -349,12 +389,93 @@ export function TryOnModal({
     }
   }
 
+  // Try-on recording. The stream recorded is the try-on OUTPUT (the remote
+  // stream the shopper watches) — the raw camera feed is never captured.
+  //
+  // MediaRecorder pointed straight at a WebRTC remote stream records BLACK
+  // in Chrome even while the same stream plays fine in a <video>. So every
+  // frame is drawn through an off-screen canvas and the recorder captures
+  // canvas.captureStream() instead — identical to what the shopper sees.
+  // One recorder per connection segment: reconnects flush the previous
+  // segment (uploaded immediately) and the next connection records a fresh
+  // one. Everything is gated on the merchant's recording flag, and the
+  // upload endpoint re-checks that flag server-side.
+  function startSessionRecording(video: HTMLVideoElement) {
+    if (!recordingEnabledRef.current || recorderRef.current) return;
+    if (typeof MediaRecorder === 'undefined') return;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 480;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Resize to the incoming video's real dimensions on first frames
+      const draw = () => {
+        if (video.videoWidth) {
+          if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+          }
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+      };
+      draw();
+      const drawTimer = window.setInterval(draw, 40);
+
+      const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'].find(
+        (t) => MediaRecorder.isTypeSupported(t)
+      );
+      const recorder = new MediaRecorder(canvas.captureStream(30), mime ? { mimeType: mime } : undefined);
+      recordingChunksRef.current = [];
+      recorder.ondataavailable = (e: BlobEvent) => {
+        if (e.data.size > 0) recordingChunksRef.current.push(e.data);
+      };
+      recorder.start(1000);
+      recorderRef.current = recorder;
+      recordingDrawTimerRef.current = drawTimer;
+    } catch (err) {
+      // Recording is best-effort — never block the try-on over it
+      console.warn('[tryon] recording could not start', err);
+    }
+  }
+
+  function stopSessionRecording(image?: Blob) {
+    if (recordingDrawTimerRef.current !== null) {
+      window.clearInterval(recordingDrawTimerRef.current);
+      recordingDrawTimerRef.current = null;
+    }
+
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    if (!recorder) return;
+
+    const token = sessionTokenRef.current;
+    recorder.onstop = () => {
+      const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'video/webm' });
+      recordingChunksRef.current = [];
+      if (token && blob.size > 0) {
+        uploadRecording(customerId, token, blob, image ?? null).catch((err) =>
+          console.warn('[tryon] recording upload failed', err)
+        );
+      }
+    };
+    try {
+      if (recorder.state !== 'inactive') {
+        recorder.stop();
+      }
+    } catch (err) {
+      console.warn('[tryon] recording stop failed', err);
+    }
+  }
+
   function endSession() {
     if (completedSentRef.current) return;
     completedSentRef.current = true;
 
     stopSegment();
-    setSnapshot((current) => current ?? captureSnapshot());
+    const captured = captureSnapshot();
+    setSnapshot((current) => current ?? captured);
     if (engineRef.current) {
       const engine = engineRef.current;
       engineRef.current = null;
@@ -366,6 +487,18 @@ export function TryOnModal({
         duration_seconds: Math.round(totalStreamMsRef.current / 1000),
       });
     }
+
+    // Close out the recording segment, attaching the final frame as the
+    // result snapshot when recording is on.
+    if (recordingEnabledRef.current && captured && sessionTokenRef.current) {
+      fetch(captured)
+        .then((r) => r.blob())
+        .then((image) => stopSessionRecording(image))
+        .catch(() => stopSessionRecording());
+    } else {
+      stopSessionRecording();
+    }
+
     setStatus('ended');
   }
 
@@ -396,6 +529,7 @@ export function TryOnModal({
 
       completedSentRef.current = true;
       stopSegment();
+      stopSessionRecording();
       setSnapshot((current) => current ?? captureSnapshot());
       if (engineRef.current) {
         const engine = engineRef.current;
@@ -411,11 +545,26 @@ export function TryOnModal({
     }
   }
 
+  function cameraLive(): boolean {
+    return !!localStreamRef.current?.getVideoTracks().some((t) => t.readyState === 'live');
+  }
+
   function tryAgain() {
     setAdded(false);
     setSnapshot(null);
     completedSentRef.current = false;
     setError(null);
+
+    // From the result screen the previous run is fully torn down — its
+    // camera feed went with the engine disconnect, so the mid-session fast
+    // path below would sit on a dead preview waiting for detection that can
+    // never fire. Restart the whole flow; the fresh /session call re-checks
+    // the shopper gates, so an exhausted limit lands on the limit screen
+    // instead of silently reconnecting.
+    if (status === 'ended' || !cameraLive()) {
+      void begin();
+      return;
+    }
 
     if (!detectionRef.current) {
       // Degradation mode (no person detection) — just reconnect.
@@ -440,11 +589,16 @@ export function TryOnModal({
     void begin();
   }
 
-  function failSession(_message?: string) {
+  function failSession(_message?: string, errorCode?: string) {
     engineRef.current = null;
     stopSegment();
     setStatus('idle');
-    setError('session_failed');
+    // /session can reject with a shopper-gate code even when /config said
+    // allowed (limit hit between calls, tampered identity) — show the
+    // matching screen instead of a generic failure.
+    setError(
+      errorCode === 'login_required' || errorCode === 'try_limit_reached' ? errorCode : 'session_failed'
+    );
   }
 
   function cleanup() {
@@ -452,6 +606,7 @@ export function TryOnModal({
     detectionRef.current?.stop();
     detectionRef.current = null;
     if (durationTimerRef.current) window.clearTimeout(durationTimerRef.current);
+    stopSessionRecording();
     engineRef.current?.disconnect();
     engineRef.current = null;
     localStreamRef.current?.getTracks().forEach((t) => t.stop());

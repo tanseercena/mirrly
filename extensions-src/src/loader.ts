@@ -19,13 +19,14 @@ function init() {
 
 async function setUpRoot(root: HTMLElement) {
   const data = root.dataset as unknown as RootDataset;
+  const { customerId } = data;
 
   let config;
   try {
     // Token first — cached in sessionStorage after the first call, so later
     // pages/calls reuse it instead of hitting the api-token route again.
     await fetchApiToken(data.shop);
-    config = await fetchConfig(data.productId, data.variantId);
+    config = await fetchConfig(data.productId, data.variantId, customerId);
   } catch (err) {
     // Fail silently on the storefront — a broken config fetch should never
     // surface an error to a shopper who wasn't trying to use the feature.
@@ -84,7 +85,12 @@ async function launchWidget(
       configToken: resolved.config.config_token,
       productId: data.productId,
       variantId: resolved.variantId,
+      customerId: data.customerId,
       product: resolved.config.product,
+      // Blocked shoppers get an explanatory screen inside the modal instead
+      // of the intro — the camera is never requested. /session re-checks.
+      blocked:
+        resolved.config.shopper?.allowed === false ? resolved.config.shopper.reason ?? undefined : undefined,
     });
   } catch (err) {
     console.error('[tryon] widget failed to load', err);
@@ -125,7 +131,7 @@ async function resolveCurrentVariantConfig(
   }
 
   try {
-    return { variantId: live, config: await fetchConfig(data.productId, live) };
+    return { variantId: live, config: await fetchConfig(data.productId, live, data.customerId) };
   } catch {
     // Refetch failed — keep the boot-time config/variant pair consistent.
     return { variantId: data.variantId, config: bootConfig };

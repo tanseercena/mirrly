@@ -125,6 +125,28 @@ class TrySessionsController extends Controller
             return response()->json(['error' => 'Try-on is not available for this product'], 404);
         }
 
+        // Customer session gates (Settings → Customer session card): who may
+        // try on, and how many times the same shopper may try ONE product.
+        // The shopper is their logged-in Shopify customer id when available,
+        // otherwise a browser-persisted anonymous id sent by the widget.
+        $customerSession = $store->setting?->customer_session ?? [];
+        $allowTryOnFor = $customerSession['allow_try_on_for'] ?? 'all';
+        $tryLimit = max(1, (int) ($customerSession['try_sessions_per_product'] ?? 1));
+
+        $customerId = ctype_digit((string) $request->input('customer_id'))
+            ? (int) $request->input('customer_id')
+            : null;
+        $anonymousId = $customerId
+            ? null
+            : (substr(preg_replace('/[^a-zA-Z0-9\-]/', '', (string) $request->input('anonymous_id')), 0, 64) ?: null);
+
+        if ($allowTryOnFor === 'logged_in' && !$customerId) {
+            return response()->json([
+                'error' => 'Please log in to try this on',
+                'error_code' => 'login_required',
+            ], 403);
+        }
+
         // Client tokens are single-use and short-lived, so a shopper who steps
         // out of frame and back in needs a fresh one — but against the SAME
         // session row (one row per shopper visit, not per connection).
@@ -133,6 +155,29 @@ class TrySessionsController extends Controller
             ->where('store_id', $store->id)
             ->where('product_id', $product->id)
             ->first();
+
+        // A finished try can't be replayed through its token: once the try-on
+        // has completed, the result screen's "Try again" starts a NEW session
+        // that counts against the per-product limit like any other visit.
+        // Only an in-progress session (person-detection dropout, network
+        // blip) is resumable without consuming another try.
+        $resumable = $session && !$session->tryon_completed_at;
+
+        // Per-product try limit — counts distinct tries (session rows). Only
+        // new sessions are checked; resuming an in-progress one is free.
+        if (!$resumable && ($customerId || $anonymousId)) {
+            $tries = TrySession::where('store_id', $store->id)
+                ->where('product_id', $product->id)
+                ->where($customerId ? 'shopify_customer_id' : 'anonymous_id', $customerId ?? $anonymousId)
+                ->count();
+
+            if ($tries >= $tryLimit) {
+                return response()->json([
+                    'error' => "You've reached the try-on limit for this product",
+                    'error_code' => 'try_limit_reached',
+                ], 403);
+            }
+        }
 
         $modelName = (string) config('services.decart.model', 'lucy-vton-latest');
         $maxDuration = max(30, (int) config('services.decart.max_session_duration', 30));
@@ -161,7 +206,7 @@ class TrySessionsController extends Controller
             return response()->json(['error' => 'Failed to prepare try-on session'], 502);
         }
 
-        if ($session) {
+        if ($resumable) {
             $session->connection_count += 1;
             $session->last_connected_at = now();
             $session->save();
@@ -172,6 +217,8 @@ class TrySessionsController extends Controller
                 'store_id' => $store->id,
                 'product_id' => $product->id,
                 'shopify_variant_id' => ctype_digit($variantId) ? (int) $variantId : null,
+                'shopify_customer_id' => $customerId,
+                'anonymous_id' => $anonymousId,
                 'session_token' => (string) Str::uuid(),
                 'funnel_stage' => 'opened',
                 'camera_opened_at' => now(),
@@ -189,7 +236,71 @@ class TrySessionsController extends Controller
             'prompt' => $this->buildPrompt($product, $variantId),
             'reference_image_url' => $referenceImageUrl,
             'max_duration_seconds' => $maxDuration,
+            // Client records the try-on output stream ONLY when this is true —
+            // otherwise nothing is ever captured or uploaded.
+            'recording' => (bool) ($store->setting?->privacy_recording['recording'] ?? false),
         ]);
+    }
+
+    /**
+     * Storefront POST /api/{shop}/recording — the widget uploads the try-on
+     * recording (and result snapshot) here after a session ends, but only
+     * when the merchant enabled recording: the gate below re-checks the
+     * setting server-side, so a tampered client can't store anything while
+     * recording is off. Files live on the private 'local' disk under
+     * recordings/{store}/{session_token}/ and are pruned after the
+     * configured retention period by app:prune-expired-recordings.
+     */
+    public function storeRecording(Request $request, $shop)
+    {
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+        if (!$store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        $session = TrySession::where('store_id', $store->id)
+            ->where('session_token', (string) $request->input('session_token'))
+            ->first();
+        if (!$session) {
+            return response()->json(['error' => 'Session not found'], 404);
+        }
+
+        $privacy = $store->setting?->privacy_recording ?? [];
+        if (empty($privacy['recording'])) {
+            return response()->json(['error' => 'Recording is disabled'], 403);
+        }
+
+        $request->validate([
+            'video' => ['nullable', 'file', 'max:51200'],
+            'image' => ['nullable', 'file', 'image', 'max:5120'],
+        ]);
+
+        if (!$request->hasFile('video') && !$request->hasFile('image')) {
+            return response()->json(['error' => 'Nothing to store'], 400);
+        }
+
+        $dir = "recordings/{$store->id}/{$session->session_token}";
+
+        // One file per connection segment — reconnects within a session
+        // produce additional segments alongside each other.
+        if ($request->hasFile('video')) {
+            $request->file('video')->storeAs(
+                $dir,
+                now()->format('His') . '-segment.' . ($request->file('video')->extension() ?: 'webm'),
+                'local'
+            );
+        }
+
+        if ($request->hasFile('image')) {
+            $request->file('image')->storeAs($dir, now()->format('His') . '-snapshot.jpg', 'local');
+        }
+
+        $retention = max(1, (int) ($privacy['retention'] ?? 7));
+        $session->recording_path = $dir;
+        $session->recording_expires_at = now()->addDays($retention);
+        $session->save();
+
+        return response()->json(['success' => true]);
     }
 
     /**
