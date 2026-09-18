@@ -28,6 +28,9 @@ class Kernel extends ConsoleKernel
         $schedule->command('app:reset-monthly-limits-for-stores')->daily();
         $schedule->command('app:prune-expired-recordings')->daily();
         $schedule->command('app:send-inventory-threshold-email')->daily();
+        $schedule->command('app:send-weekly-summaries')->hourly()->withoutOverlapping();
+        $schedule->command('app:check-spend-milestones')->everyFifteenMinutes()->withoutOverlapping();
+        $schedule->command('app:check-completion-rates')->daily()->withoutOverlapping();
         $schedule->command('app:process-pending-order-resends')->everyTwoMinutes()->withoutOverlapping();
         $schedule->command('webhook:process-pending-orders')->everyFiveMinutes()->withoutOverlapping();
         $schedule->command('gift:process-scheduled-emails')->everyMinute()->withoutOverlapping();

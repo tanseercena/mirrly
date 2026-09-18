@@ -701,7 +701,10 @@ class StoresController extends Controller
 
         if ($store && $store->setting) {
             return response()->json([
-                'data' => $store->setting
+                'data' => $store->setting,
+                // The notifications card falls back to this when the merchant
+                // never saved a custom "Send notifications to" address.
+                'store_email' => $store->email,
             ]);
         }
 

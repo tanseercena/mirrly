@@ -865,13 +865,13 @@ const CustomerSessionCard = ({ settings, onChange, t }) => {
 /* ============================================
     SECTION: NOTIFICATIONS
     ============================================ */
-const NotificationsCard = ({ settings, onChange, t }) => {
+const NotificationsCard = ({ settings, onChange, storeEmail, t }) => {
     const [weeklySummary, setWeeklySummary] = useState(settings?.weekly_summary ?? true);
     const [spendAlert, setSpendAlert] = useState(settings?.spend_alert ?? true);
     const [completionAlert, setCompletionAlert] = useState(settings?.completion_alert ?? true);
     const [spendThreshold, setSpendThreshold] = useState(settings?.spend_threshold ?? '80');
     const [completionThreshold, setCompletionThreshold] = useState(settings?.completion_threshold ?? '60');
-    const [email, setEmail] = useState(settings?.email ?? 'you@yourstore.com');
+    const [email, setEmail] = useState(settings?.email ?? '');
 
     // Update local state when settings prop changes
     useEffect(() => {
@@ -881,7 +881,7 @@ const NotificationsCard = ({ settings, onChange, t }) => {
             setCompletionAlert(settings.completion_alert ?? true);
             setSpendThreshold(settings.spend_threshold ?? '80');
             setCompletionThreshold(settings.completion_threshold ?? '60');
-            setEmail(settings.email ?? 'you@yourstore.com');
+            setEmail(settings.email ?? '');
         }
     }, [settings]);
 
@@ -996,7 +996,9 @@ const NotificationsCard = ({ settings, onChange, t }) => {
                                 <TextField
                                     label={t('mirrly_settings.notifications_card.send_notifications_to')}
                                     labelHidden
-                                    value={email}
+                                    // Empty = follow the store account email; the
+                                    // backend resolves the same way at send time.
+                                    value={email || storeEmail || ''}
                                     onChange={(value) => {
                                         setEmail(value);
                                         onChange('email', value);
@@ -1134,6 +1136,10 @@ const SettingsPage = () => {
         allow_try_on_for: 'all',
     });
 
+    // Store account email — the notifications card falls back to it when
+    // the merchant never saved a custom "Send notifications to" address.
+    const [storeEmail, setStoreEmail] = useState('');
+
     // Notification state
     const [notification, setNotification] = useState({
         weekly_summary: true,
@@ -1141,7 +1147,7 @@ const SettingsPage = () => {
         completion_alert: true,
         spend_threshold: '80',
         completion_threshold: '60',
-        email: 'you@yourstore.com',
+        email: '',
     });
 
     // Fetch settings on mount
@@ -1170,6 +1176,9 @@ const SettingsPage = () => {
                 }
                 if (data.data?.customer_session) {
                     setCustomerSession(data.data.customer_session);
+                }
+                if (data.store_email) {
+                    setStoreEmail(data.store_email);
                 }
                 if (data.data?.notification) {
                     setNotification(data.data.notification);
@@ -1346,7 +1355,7 @@ const SettingsPage = () => {
                     <CustomerSessionCard settings={customerSession} onChange={handleCustomerSessionChange} t={t} />
                 </div>
                 {/* <CameraFallbackCard settings={cameraFallback} onChange={handleCameraFallbackChange} t={t} /> */}
-                <NotificationsCard settings={notification} onChange={handleNotificationChange} t={t} />
+                <NotificationsCard settings={notification} onChange={handleNotificationChange} storeEmail={storeEmail} t={t} />
                 <AdvancedCard t={t} />
             </BlockStack>
         </Page>
