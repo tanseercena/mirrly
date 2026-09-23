@@ -69,6 +69,10 @@ class StoresController extends Controller
         return response()->json([
             'enabled' => true, // later changed based on products try on enable or disabled from products table
             'shopper' => $shopper,
+            // Master switch for the intro screen's optional "record my
+            // session" checkbox. Only makes the checkbox visible — the
+            // shopper's explicit opt-in is what actually starts the recorder.
+            'recording' => (bool) ($store->setting?->privacy_recording['recording'] ?? false),
             'button' => [
                 'text' => $branding['buttonText'] ?? 'Try it on live',
                 'position' => $positionMap[$branding['position']] ?? 'below_add_to_cart',

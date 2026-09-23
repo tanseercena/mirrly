@@ -38,6 +38,11 @@ export interface ConfigResponse {
     allowed: boolean;
     reason: ShopperBlockReason | null;
   };
+  // Master switch from Settings → Privacy & recording. When true the intro
+  // screen offers the optional "record my session" checkbox; the shopper's
+  // explicit opt-in — not this flag — is what starts the recorder. Optional
+  // so a stale cached config without the flag simply means "no checkbox".
+  recording?: boolean;
   button: ButtonSettings;
   product: ProductInfo | null;
   // Short-lived (~5 min) signed JWT (product_id, variant_id, shop, exp).

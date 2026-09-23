@@ -183,6 +183,32 @@ export function uploadRecording(
   });
 }
 
+// Emails the shopper their own recording from the result screen. The video
+// itself is already on the server (uploadRecording) — this just triggers the
+// send. Resolves once accepted; the thrown Error carries the backend's
+// user-facing message (rate limit, recording gone, ...) when rejected.
+export function emailRecording(
+  customerId: string,
+  sessionToken: string,
+  email: string
+): Promise<void> {
+  return fetch(buildUrl('/recording/email'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_token: sessionToken, email, ...getShopperParams(customerId) }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      let message = `recording email failed: ${res.status}`;
+      try {
+        message = (await res.json())?.error ?? message;
+      } catch {
+        /* non-JSON body — keep the generic message */
+      }
+      throw new Error(message);
+    }
+  });
+}
+
 // Fire-and-forget funnel events. sendBeacon is preferred because it survives
 // the tab closing or navigating away mid-event, which fetch() would not.
 export function sendEvent(sessionToken: string, event: FunnelEvent, extra: Record<string, unknown> = {}) {
