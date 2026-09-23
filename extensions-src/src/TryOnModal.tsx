@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { startSession, sendEvent, uploadRecording } from './session-api';
+import { startSession, sendEvent, uploadRecording, emailRecording } from './session-api';
 import { connectEngine, type EngineConnection } from './realtime-engine';
 import { startPersonDetection, type PersonDetection } from './person-detection';
 import { addVariantToCart } from './cart';
@@ -14,7 +14,7 @@ import {
   ProductSummary,
   StatusPill,
 } from './components/ui';
-import { BackIcon, BagIcon, CheckIcon, InfoIcon, Silhouette } from './components/icons';
+import { BackIcon, BagIcon, CheckIcon, DownloadIcon, InfoIcon, MailIcon, Silhouette } from './components/icons';
 
 type Status =
   | 'idle' // intro — modal open, waiting for the shopper to hit Start
@@ -47,6 +47,10 @@ interface Props {
   product: ProductInfo | null;
   // Pre-camera block from /config — see widget.tsx MountOptions
   blocked?: ShopperBlockReason;
+  // Master switch from /config — when true the intro offers the optional
+  // recording checkbox. The shopper's opt-in, not this flag, starts the
+  // recorder (checked together with the /session response server-side).
+  recording?: boolean;
   countdownSeconds?: number;
   onClose: () => void;
 }
@@ -58,6 +62,7 @@ export function TryOnModal({
   customerId,
   product,
   blocked,
+  recording = false,
   countdownSeconds = DEFAULT_COUNTDOWN_SECONDS,
   onClose,
 }: Props) {
@@ -70,6 +75,30 @@ export function TryOnModal({
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
 
+  // --- optional recording (intro checkbox) + result-screen extras ---
+  // The checkbox state mirrors into a ref because ensureConnected() runs
+  // inside callbacks whose closures predate any re-render.
+  const [recordOptIn, setRecordOptIn] = useState(false);
+  const recordOptInRef = useRef(false);
+  // The recorded Blob stays in the browser so the result screen can offer a
+  // download / email without another server round-trip. Ref + state pair:
+  // recorder callbacks fire outside render closures, the state drives the UI.
+  const recordingBlobRef = useRef<Blob | null>(null);
+  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
+  // Final segment's upload promise — the email action awaits it so a fast
+  // "Send" click can't beat the megabytes still in flight.
+  const recordingUploadRef = useRef<Promise<unknown> | null>(null);
+  const downloadUrlRef = useRef<string | null>(null);
+  const [emailValue, setEmailValue] = useState('');
+  const [emailState, setEmailState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [emailError, setEmailError] = useState('');
+
+  // Checkbox handler — mirrors into the ref for the session-callback closures.
+  const handleRecordChange = (value: boolean) => {
+    recordOptInRef.current = value;
+    setRecordOptIn(value);
+  };
+
   const overlayRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -81,9 +110,9 @@ export function TryOnModal({
   const sessionTokenRef = useRef<string | null>(null);
   const currentVariantRef = useRef(variantId);
 
-  // Try-on recording (Settings → Privacy & recording). The merchant's flag
-  // arrives on every /session response; recording stays OFF unless it's
-  // true, in which case the raw camera feed is never captured at all.
+  // Try-on recording (intro checkbox opt-in). Set per-run in
+  // ensureConnected() from the shopper's checkbox AND the /session
+  // response's merchant master switch — both must be true.
   const recordingEnabledRef = useRef(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
@@ -166,10 +195,23 @@ export function TryOnModal({
   }, [status]);
 
   // Everything expensive (camera, detection, backend session) starts only
-  // after the shopper explicitly hits Start inside the modal.
+  // after the shopper explicitly hit Start inside the modal.
   async function begin() {
     if (!aliveRef.current) return;
     setError(null);
+
+    // Fresh run: drop the previous run's recording artifacts (download blob,
+    // email form) so the next result screen only ever offers THIS run's video.
+    recordingBlobRef.current = null;
+    setRecordingBlob(null);
+    recordingUploadRef.current = null;
+    setEmailValue('');
+    setEmailState('idle');
+    setEmailError('');
+    if (downloadUrlRef.current) {
+      URL.revokeObjectURL(downloadUrlRef.current);
+      downloadUrlRef.current = null;
+    }
 
     // Restart-safe: a previous run's detector and camera may still be alive
     // (Try again from the result screen re-enters here) — stop them first
@@ -268,7 +310,9 @@ export function TryOnModal({
       if (!aliveRef.current) return;
       sessionTokenRef.current = session.session_token;
       maxDurationRef.current = session.max_duration_seconds;
-      recordingEnabledRef.current = !!session.recording;
+      // Recording needs BOTH: the shopper's explicit opt-in (intro checkbox)
+      // and the merchant's master switch echoed by /session.
+      recordingEnabledRef.current = recordOptInRef.current && !!session.recording;
 
       // No "is this still the current connection?" identity checks in these
       // callbacks: the engine suppresses events after disconnect(), and
@@ -404,6 +448,10 @@ export function TryOnModal({
     if (!recordingEnabledRef.current || recorderRef.current) return;
     if (typeof MediaRecorder === 'undefined') return;
     try {
+      // A reconnect supersedes the previous segment — the result screen
+      // should only ever offer the newest recording.
+      recordingBlobRef.current = null;
+      setRecordingBlob(null);
       const canvas = document.createElement('canvas');
       canvas.width = 640;
       canvas.height = 480;
@@ -454,11 +502,18 @@ export function TryOnModal({
     recorder.onstop = () => {
       const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'video/webm' });
       recordingChunksRef.current = [];
-      if (token && blob.size > 0) {
-        uploadRecording(customerId, token, blob, image ?? null).catch((err) =>
-          console.warn('[tryon] recording upload failed', err)
-        );
-      }
+
+      // Keep the video in the browser for the result screen's download /
+      // email options (only reachable when the shopper opted in).
+      recordingBlobRef.current = blob;
+      setRecordingBlob(blob);
+
+      const upload =
+        token && blob.size > 0
+          ? uploadRecording(customerId, token, blob, image ?? null)
+          : null;
+      recordingUploadRef.current = upload;
+      upload?.catch((err) => console.warn('[tryon] recording upload failed', err));
     };
     try {
       if (recorder.state !== 'inactive') {
@@ -466,6 +521,43 @@ export function TryOnModal({
       }
     } catch (err) {
       console.warn('[tryon] recording stop failed', err);
+    }
+  }
+
+  // --- result-screen recording extras (only rendered when a recording exists) ---
+
+  function downloadRecording() {
+    const blob = recordingBlobRef.current;
+    if (!blob) return;
+    if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
+    const url = URL.createObjectURL(blob);
+    downloadUrlRef.current = url;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mirrly-try-on.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  async function handleEmailRecording() {
+    const email = emailValue.trim();
+    if (!email || !sessionTokenRef.current || emailState === 'sending') return;
+    setEmailState('sending');
+    setEmailError('');
+    try {
+      // The server emails the stored file — wait for the upload to land so a
+      // fast "Send" click can't beat the megabytes still in flight.
+      await recordingUploadRef.current;
+    } catch {
+      /* upload failure surfaces below as the server's "not available" reply */
+    }
+    try {
+      await emailRecording(customerId, sessionTokenRef.current, email);
+      setEmailState('sent');
+    } catch (err: any) {
+      setEmailState('error');
+      setEmailError(err?.message || 'Could not send the email');
     }
   }
 
@@ -610,6 +702,10 @@ export function TryOnModal({
     engineRef.current?.disconnect();
     engineRef.current = null;
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    if (downloadUrlRef.current) {
+      URL.revokeObjectURL(downloadUrlRef.current);
+      downloadUrlRef.current = null;
+    }
   }
 
   function mapCameraError(err: any): ErrorKind {
@@ -661,7 +757,14 @@ export function TryOnModal({
         {error ? (
           <ErrorScreen kind={error} onRetry={retryFromError} onClose={onClose} />
         ) : status === 'idle' ? (
-          <TryOnIntro product={product} onStart={begin} onCancel={onClose} />
+          <TryOnIntro
+            product={product}
+            showRecordOption={recording}
+            recordOptIn={recordOptIn}
+            onRecordChange={handleRecordChange}
+            onStart={begin}
+            onCancel={onClose}
+          />
         ) : (
           <div class="tryon-split">
             <aside class="tryon-side">
@@ -787,6 +890,48 @@ export function TryOnModal({
                       Try again
                     </button>
                   </div>
+
+                  {recordingBlob && (
+                    <div class="tryon-share">
+                      <button
+                        type="button"
+                        class="tryon-btn tryon-btn--outline tryon-share__download"
+                        onClick={downloadRecording}
+                      >
+                        <DownloadIcon size={16} />
+                        <span>Download video</span>
+                      </button>
+
+                      <div class="tryon-share__email">
+                        <MailIcon size={16} />
+                        <input
+                          type="email"
+                          class="tryon-share__input"
+                          placeholder="Email me this video"
+                          value={emailValue}
+                          disabled={emailState === 'sent'}
+                          onInput={(e) => setEmailValue((e.target as HTMLInputElement).value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void handleEmailRecording();
+                          }}
+                        />
+                        <button
+                          type="button"
+                          class="tryon-share__send"
+                          onClick={() => void handleEmailRecording()}
+                          disabled={emailState === 'sending' || emailState === 'sent' || !emailValue.trim()}
+                        >
+                          <span>
+                            {emailState === 'sending' ? 'Sending…' : emailState === 'sent' ? 'Sent' : 'Send'}
+                          </span>
+                        </button>
+                      </div>
+                      {emailState === 'sent' && <p class="tryon-share__note">Sent — check your inbox.</p>}
+                      {emailState === 'error' && (
+                        <p class="tryon-share__note tryon-share__note--error">{emailError}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -11,6 +11,12 @@ class TrySession extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        // Emailed download links expire with the recording's retention —
+        // needs to be a Carbon instance for the expiry math in emailRecording().
+        'recording_expires_at' => 'datetime',
+    ];
+
     public function store()
     {
         return $this->belongsTo(Store::class);

@@ -87,6 +87,8 @@ async function launchWidget(
       variantId: resolved.variantId,
       customerId: data.customerId,
       product: resolved.config.product,
+      // Recording offer for the intro screen — /session still re-checks.
+      recording: resolved.config.recording ?? false,
       // Blocked shoppers get an explanatory screen inside the modal instead
       // of the intro — the camera is never requested. /session re-checks.
       blocked:

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\Shopify;
 use App\Lib\ConfigToken;
+use App\Mail\TryOnRecordingMail;
 use App\Models\Product;
 use App\Models\Plan;
 use App\Models\Store;
@@ -13,6 +14,10 @@ use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -301,6 +306,109 @@ class TrySessionsController extends Controller
         $session->save();
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Storefront POST /api/{shop}/recording/email — emails the shopper their
+     * own recording from the result screen. Only reachable when the merchant
+     * enabled recording AND this session actually stored one (the shopper
+     * opted in on the intro screen). Attaches the newest segment; rate-limited
+     * to one send per session so the endpoint can't be turned into a mail
+     * relay.
+     */
+    public function emailRecording(Request $request, $shop)
+    {
+        $store = Store::where('shopify_domain', $shop)->orWhere('domain', $shop)->first();
+        if (!$store) {
+            return response()->json(['error' => 'Store not found'], 404);
+        }
+
+        $session = TrySession::where('store_id', $store->id)
+            ->where('session_token', (string) $request->input('session_token'))
+            ->first();
+        if (!$session) {
+            return response()->json(['error' => 'Session not found'], 404);
+        }
+
+        if (empty($store->setting?->privacy_recording['recording'])) {
+            return response()->json(['error' => 'Recording is disabled'], 403);
+        }
+
+        // Nothing to email unless the shopper opted in and a segment landed.
+        if (!$session->recording_path) {
+            return response()->json(['error' => 'No recording was made for this session'], 404);
+        }
+
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+        ]);
+
+        // Segment filenames are HHMMSS-prefixed, so name order is age order.
+        $video = collect(Storage::disk('local')->files($session->recording_path))
+            ->filter(fn ($file) => str_contains($file, '-segment.'))
+            ->sort()
+            ->last();
+        if (!$video || !Storage::disk('local')->exists($video)) {
+            return response()->json(['error' => 'This recording is no longer available'], 404);
+        }
+
+        // Anti-abuse backstop: one email per session per cooldown, no matter
+        // how often the button is pressed or the endpoint is hit directly.
+        $throttleKey = "tryon-recording-email:{$session->id}";
+        if (RateLimiter::tooManyAttempts($throttleKey, 1)) {
+            return response()->json(['error' => 'This recording was already emailed recently'], 429);
+        }
+
+        // Brevo/Sendinblue's API rejects video attachments outright ("Unsupported
+        // file format: webm"), so the email carries a signed, expiring download
+        // link instead of the file itself. Link lifetime = the recording's
+        // remaining retention, capped at 30 days.
+        $expiresAt = ($session->recording_expires_at ?? now()->addDays(7))->min(now()->addDays(30));
+        $downloadUrl = URL::temporarySignedRoute(
+            'tryon.recording.download',
+            $expiresAt,
+            ['token' => $session->session_token]
+        );
+
+        Mail::to($validated['email'])->send(
+            new TryOnRecordingMail(
+                $store->shopify_domain,
+                $session->product?->title ?? 'your try-on',
+                $downloadUrl,
+                $expiresAt->format('M j, Y')
+            )
+        );
+        RateLimiter::hit($throttleKey, 600);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Public GET /recordings/{token}/download — the target of the signed link
+     * emailed to the shopper. The 'signed' middleware already verified the
+     * HMAC + expiry; this just resolves the session and streams the newest
+     * segment off the private disk. 404s once the recording is pruned.
+     */
+    public function downloadRecording(string $token)
+    {
+        $session = TrySession::where('session_token', $token)->first();
+        if (!$session || !$session->recording_path) {
+            abort(404);
+        }
+
+        // Same newest-segment rule as emailRecording().
+        $video = collect(Storage::disk('local')->files($session->recording_path))
+            ->filter(fn ($file) => str_contains($file, '-segment.'))
+            ->sort()
+            ->last();
+        if (!$video || !Storage::disk('local')->exists($video)) {
+            abort(404);
+        }
+
+        return Storage::disk('local')->download(
+            $video,
+            'mirrly-try-on.' . pathinfo($video, PATHINFO_EXTENSION)
+        );
     }
 
     /**

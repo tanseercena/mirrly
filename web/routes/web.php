@@ -112,6 +112,13 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
 // Billing callback route (outside auth middleware - Shopify redirects here)
 Route::get('billing/callback', [BillingController::class, 'billingCallback'])->name('billing.callback');
 
+// Public, signed download for emailed try-on recordings. The link arrives in
+// the shopper's own email, so there's no session to authenticate — the
+// expiring signature (minted only by the email endpoint) proves it's ours.
+Route::get('recordings/{token}/download', [TrySessionsController::class, 'downloadRecording'])
+    ->name('tryon.recording.download')
+    ->middleware('signed');
+
 Route::post("hd-webhooks", [HookDeckController::class, 'handle']);
 Route::get("prev", function () {
     $html = (new App\Mail\SendOrderEmail([], ['name' => '#1001', 'customer' => ['name' => 'Test Customer']], Store::with('setting')->find(7), true))->render();

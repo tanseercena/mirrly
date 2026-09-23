@@ -4,7 +4,7 @@ import type { ProductInfo, ShopperBlockReason } from './types';
 
 // Build marker — bump whenever debugging whether the storefront is running
 // a stale cached copy of this bundle.
-console.log('[tryon] widget bundle 2026-09-15-r1 (shopper gates)');
+console.log('[tryon] widget bundle 2026-09-22-r1 (recording opt-in)');
 
 interface MountOptions {
   configToken: string;
@@ -18,6 +18,9 @@ interface MountOptions {
   // try limit reached) — the modal opens on the explanation screen instead
   // of the intro, and the camera is never requested.
   blocked?: ShopperBlockReason;
+  // Master switch from /config — when true the intro screen offers the
+  // optional recording checkbox. The shopper's opt-in drives the recorder.
+  recording?: boolean;
 }
 
 export function mountWidget(root: HTMLElement, opts: MountOptions) {
@@ -38,6 +41,7 @@ export function mountWidget(root: HTMLElement, opts: MountOptions) {
       customerId={opts.customerId}
       product={opts.product}
       blocked={opts.blocked}
+      recording={opts.recording ?? false}
       onClose={close}
     />,
     modalHost

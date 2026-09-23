@@ -102,6 +102,21 @@ export const InfoIcon = (props: IconProps) => (
   </svg>
 );
 
+export const DownloadIcon = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
+export const MailIcon = (props: IconProps) => (
+  <svg {...base(props)}>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <polyline points="22,6 12,13 2,6" />
+  </svg>
+);
+
 // Dashed body silhouette shown over the camera preview while detection is
 // waiting for a person. Purely decorative.
 export const Silhouette = (props: { class?: string }) => (

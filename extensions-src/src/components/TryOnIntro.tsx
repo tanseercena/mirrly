@@ -1,5 +1,5 @@
 import type { ProductInfo } from '../types';
-import { BoltIcon, CameraIcon, ShieldIcon } from './icons';
+import { BoltIcon, CameraIcon, CheckIcon, ShieldIcon } from './icons';
 import { CameraCta, ProductSummary } from './ui';
 
 const BENEFITS = [
@@ -10,10 +10,23 @@ const BENEFITS = [
 
 export function TryOnIntro(props: {
   product: ProductInfo | null;
+  // Recording offer (Settings → Privacy & recording). Showing the checkbox
+  // doesn't record anything — the shopper's explicit opt-in below does.
+  showRecordOption?: boolean;
+  recordOptIn?: boolean;
+  onRecordChange?: (value: boolean) => void;
   onStart: () => void;
   onCancel: () => void;
 }) {
   const { product } = props;
+
+  // The blanket "nothing is saved" line is only honest while there is no
+  // recording offer — once the checkbox exists the shopper decides.
+  const benefits = props.showRecordOption
+    ? BENEFITS.map((b) =>
+        b.title === 'Your privacy matters' ? { ...b, copy: 'Saved only if you choose to record' } : b
+      )
+    : BENEFITS;
 
   return (
     <div class="tryon-intro">
@@ -31,7 +44,7 @@ export function TryOnIntro(props: {
         </p>
 
         <ul class="tryon-benefits">
-          {BENEFITS.map(({ icon: Icon, title, copy }) => (
+          {benefits.map(({ icon: Icon, title, copy }) => (
             <li class="tryon-benefit">
               <span class="tryon-benefit__icon">
                 <Icon size={17} />
@@ -43,6 +56,21 @@ export function TryOnIntro(props: {
             </li>
           ))}
         </ul>
+
+        {props.showRecordOption && (
+          <label class="tryon-record">
+            <input
+              type="checkbox"
+              class="tryon-record__input"
+              checked={props.recordOptIn ?? false}
+              onChange={(e) => props.onRecordChange?.((e.target as HTMLInputElement).checked)}
+            />
+            <span class="tryon-record__box" aria-hidden="true">
+              <CheckIcon size={12} />
+            </span>
+            <span class="tryon-record__text">Record my try-on session</span>
+          </label>
+        )}
 
         <div class="tryon-intro__actions">
           <CameraCta onClick={props.onStart} />

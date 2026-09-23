@@ -29,5 +29,6 @@ Route::group(['prefix' => '{shop}', 'middleware' => EnsureApiTokenIsValid::class
     Route::get('config', [StoresController::class, 'config']);
     Route::post('session', [TrySessionsController::class, 'start']);
     Route::post('recording', [TrySessionsController::class, 'storeRecording']);
+    Route::post('recording/email', [TrySessionsController::class, 'emailRecording']);
     Route::post('event', [TrySessionsController::class, 'event']);
 });
