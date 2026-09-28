@@ -1,15 +1,16 @@
 // Error screens for the try-on modal, matching the design spec's failure
-// states. The camera_denied preset also covers "no camera found". The two
-// shopper-gate presets explain a Settings-side block (login requirement /
-// per-product try limit) — they can't be retried from here, so they only
-// offer Close.
-
+// states. The camera_denied preset also covers "no camera found". The
+// shopper-gate presets (login requirement / per-product try limit) explain a
+// Settings-side block — they can't be retried from here, so they only offer
+// Close. billing_failed is the backend refusing the session when a required
+// usage charge couldn't be taken (merchant-side issue, shopper-friendly copy).
 export type TryOnError =
   | 'camera_denied'
   | 'camera_unsupported'
   | 'session_failed'
   | 'login_required'
-  | 'try_limit_reached';
+  | 'try_limit_reached'
+  | 'billing_failed';
 
 const PRESETS: Record<TryOnError, { title: string; copy: string }> = {
   camera_denied: {
@@ -31,6 +32,10 @@ const PRESETS: Record<TryOnError, { title: string; copy: string }> = {
   try_limit_reached: {
     title: "You've reached the try-on limit",
     copy: "You've used all your try-ons for this product. Pick another product and try it on there.",
+  },
+  billing_failed: {
+    title: 'Try-on is unavailable right now',
+    copy: "We couldn't start your session. Please try again in a few minutes.",
   },
 };
 

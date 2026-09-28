@@ -61,6 +61,8 @@ class ResetMonthlyLimitsForStores extends Command
                 if ($plan) {
                     // Reset limits
                     $store->orders_per_month = $plan->limits['orders'] === 'unlimited' ? -1 : $plan->limits['orders'];
+                    // The usage-billing session counter resets with the cycle too.
+                    $store->monthly_sessions = 0;
                     $store->save();
 
                     // Update next_reset_date
