@@ -33,7 +33,7 @@ type ErrorKind = 'camera_denied' | 'camera_unsupported' | 'session_failed';
 // shopper gates (login requirement / try limit), which arrive either from
 // /config (via the `blocked` prop, before any camera work) or as the
 // backend's error_code when /session rejects mid-flow.
-type ModalError = ErrorKind | ShopperBlockReason;
+type ModalError = ErrorKind | ShopperBlockReason | 'billing_failed';
 
 const DEFAULT_COUNTDOWN_SECONDS = 8;
 
@@ -687,9 +687,15 @@ export function TryOnModal({
     setStatus('idle');
     // /session can reject with a shopper-gate code even when /config said
     // allowed (limit hit between calls, tampered identity) — show the
-    // matching screen instead of a generic failure.
+    // matching screen instead of a generic failure. billing_failed is the
+    // backend refusing the session because the plan's usage charge couldn't
+    // be taken; retry stays available in case it was transient.
     setError(
-      errorCode === 'login_required' || errorCode === 'try_limit_reached' ? errorCode : 'session_failed'
+      errorCode === 'login_required' ||
+      errorCode === 'try_limit_reached' ||
+      errorCode === 'billing_failed'
+        ? errorCode
+        : 'session_failed'
     );
   }
 

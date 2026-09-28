@@ -163,8 +163,10 @@ QUERY;
                     BillingController::INTERVAL_ANNUAL,
                 'test' => (config('app.debug') || in_array($store->shopify_domain, $dev_test_stores)) ? true : null,
                 'trialDays' => $trialDays,
-                'usageTerms' => $plan->name == 'unlimited' ? "For each 1,000 over-plan orders you'll pay $1.50" : '$0.1 per additional order beyond monthly plan limit',
-                'usageCappedAmount' => $plan->name == 'unlimited' ? 500 : 200,
+                // Usage cap is the monthly ceiling Shopify enforces on over-limit
+                // session charges; the plan's session_rate drives the actual price.
+                'usageTerms' => $plan->name == 'unlimited' ? "For each 1,000 over-plan orders you'll pay $1.50" : '$' . number_format((float) ($plan->limits['session_rate'] ?? 0), 2) . ' per try-on session beyond the ' . ((int) ($plan->limits['sessions'] ?? 0)) . ' included in the plan',
+                'usageCappedAmount' => 500,
             ];
 
             // Free plan: show the $0.00 price on Shopify's approval page and

@@ -10,6 +10,7 @@ use App\Models\Plan;
 use App\Models\Store;
 use App\Models\TrySession;
 use App\Services\DecartService;
+use App\Services\UsageBillingService;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
@@ -209,6 +210,22 @@ class TrySessionsController extends Controller
 
         if (empty($clientToken['apiKey'])) {
             return response()->json(['error' => 'Failed to prepare try-on session'], 502);
+        }
+
+        if (!$resumable) {
+            // Usage billing gates every NEW session (reconnects never re-charge).
+            // It runs AFTER the Decart mint so an AI outage never bills anyone,
+            // and BEFORE the row insert so nothing billable gets provisioned for
+            // a refused attempt: once the plan's included sessions are spent,
+            // each new session costs the plan's session_rate through Shopify's
+            // usage charge — and a charge that can't go through refuses the
+            // session (storefront shows the "billing_failed" screen).
+            if (!app(UsageBillingService::class)->chargeForSession($store, $product)) {
+                return response()->json([
+                    'error' => 'Try-on is unavailable right now. Please try again in a few minutes.',
+                    'error_code' => 'billing_failed',
+                ], 402);
+            }
         }
 
         if ($resumable) {
