@@ -79,4 +79,25 @@ return [
         'max_session_duration' => env('DECART_MAX_SESSION_DURATION', 30),
     ],
 
+    // Self-hosted rembg background-removal service (Hetzner box).
+    'rembg' => [
+        'base_url' => env('REMBG_BASE_URL', ''),
+        'endpoint' => env('REMBG_ENDPOINT', '/removebg'),
+        'api_key' => env('REMBG_API_KEY', ''),
+    ],
+
+    // RunPod Serverless — the DeepFashion2-based clothing landmark model.
+    'runpod' => [
+        'api_key' => env('RUNPOD_API_KEY', ''),
+        'base_url' => env('RUNPOD_BASE_URL', 'https://api.runpod.ai'),
+        // Fallback endpoint id used before the first model_versions row
+        // records a deployment.
+        'endpoint_id' => env('RUNPOD_ENDPOINT_ID'),
+    ],
+
+    // Garment rigging pipeline scoring.
+    'rigging' => [
+        'auto_approve_threshold' => env('RIGGING_AUTO_APPROVE_THRESHOLD', 0.75),
+    ],
+
 ];
