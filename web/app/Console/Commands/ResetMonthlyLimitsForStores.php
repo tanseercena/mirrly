@@ -59,8 +59,12 @@ class ResetMonthlyLimitsForStores extends Command
                 $plan = $subscription->plan;
 
                 if ($plan) {
-                    // Reset limits
-                    $store->orders_per_month = $plan->limits['orders'] === 'unlimited' ? -1 : $plan->limits['orders'];
+                    // Legacy orders counter — the current plans no longer carry
+                    // an 'orders' key (billing moved to per-session usage), so
+                    // only touch the column when a plan still defines it.
+                    if (array_key_exists('orders', $plan->limits ?? [])) {
+                        $store->orders_per_month = $plan->limits['orders'] === 'unlimited' ? -1 : $plan->limits['orders'];
+                    }
                     // The usage-billing session counter resets with the cycle too.
                     $store->monthly_sessions = 0;
                     $store->save();
