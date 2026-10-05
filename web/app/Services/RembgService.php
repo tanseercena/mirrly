@@ -7,11 +7,10 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
- * Client for the self-hosted rembg background-removal service running on
- * our Hetzner box. Sends the raw product image, receives the garment
- * cutout as PNG bytes. The endpoint contract: multipart field `image`,
- * response body is the PNG binary. (The service is deployed separately —
- * adjust `endpoint`/field name in config if the wrapper differs.)
+ * Client for the self-hosted rembg background-removal service. Sends the
+ * raw product image, receives the garment cutout as PNG bytes. The
+ * endpoint contract: multipart field `file`, response body is the PNG
+ * binary stream.
  */
 class RembgService
 {
@@ -45,7 +44,7 @@ class RembgService
         }
 
         $response = $request
-            ->attach('image', $imageBinary, 'image.jpg')
+            ->attach('file', $imageBinary, 'image.jpg')
             ->post($this->baseUrl . $this->endpoint);
 
         if ($response->failed()) {

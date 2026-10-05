@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\RigStorage;
 use App\Models\Product;
 use App\Services\GarmentTypeClassifier;
 use Illuminate\Bus\Queueable;
@@ -11,7 +12,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Per-product ingestion & rigging pipeline — entry point.
@@ -65,7 +65,7 @@ class ProcessProductIngestionRiggingJob implements ShouldQueue
         // {merchant_id}/{product_id}/raw.jpg — the pipeline's shared
         // staging area; every later stage reads from here.
         $rawPath = "{$this->product->store_id}/{$this->product->id}/raw.jpg";
-        Storage::disk('s3')->put($rawPath, $response->body());
+        RigStorage::disk()->put($rawPath, $response->body());
 
         RemoveBGJob::dispatch(
             $this->product,

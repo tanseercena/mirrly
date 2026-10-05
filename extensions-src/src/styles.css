@@ -349,6 +349,19 @@
 }
 .tryon-video--local { transform: scaleX(-1); }
 
+/* Try-on overlay: the engine's three.js canvas, composited over the local
+   video. Mirrored exactly like the video so both stay pixel-aligned; object-
+   fit cover crops both identically since their bitmaps share aspect. */
+.tryon-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  pointer-events: none;
+}
+
 .tryon-silhouette {
   position: absolute;
   left: 50%;

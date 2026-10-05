@@ -9,7 +9,7 @@ use App\Models\Product;
 use App\Models\Plan;
 use App\Models\Store;
 use App\Models\TrySession;
-use App\Services\DecartService;
+use App\Services\RigService;
 use App\Services\UsageBillingService;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -20,7 +20,6 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
-use RuntimeException;
 
 class TrySessionsController extends Controller
 {
@@ -100,8 +99,9 @@ class TrySessionsController extends Controller
      * Storefront POST /api/{shop}/session. The moment this call lands is the
      * camera_opened funnel event (the session row's camera_opened_at write).
      * Verifies the /config-issued token, checks the product is try-on able,
-     * mints a scoped Decart client token and returns everything the browser
-     * needs to open the camera and connect.
+     * and returns the garment texture + rig the client-side runtime engine
+     * renders with. No third-party realtime session is provisioned — try-on
+     * rendering is 100% client-side.
      */
     public function start(Request $request, $shop)
     {
@@ -153,10 +153,10 @@ class TrySessionsController extends Controller
             ], 403);
         }
 
-        // Client tokens are single-use and short-lived, so a shopper who steps
-        // out of frame and back in needs a fresh one — but against the SAME
-        // session row (one row per shopper visit, not per connection).
-        // Unknown or mismatched tokens just fall through to a new row.
+        // A shopper who steps out of frame and back in resumes the SAME
+        // session row (one row per shopper visit, not per connection) —
+        // rendering is client-side, so resuming is free and needs no fresh
+        // token. Unknown or mismatched tokens just fall through to a new row.
         $session = TrySession::where('session_token', (string) $request->input('session_token'))
             ->where('store_id', $store->id)
             ->where('product_id', $product->id)
@@ -168,7 +168,6 @@ class TrySessionsController extends Controller
         // Only an in-progress session (person-detection dropout, network
         // blip) is resumable without consuming another try.
         $resumable = $session && !$session->tryon_completed_at;
-
         // Per-product try limit — counts distinct tries (session rows). Only
         // new sessions are checked; resuming an in-progress one is free.
         if (!$resumable && ($customerId || $anonymousId)) {
@@ -185,38 +184,29 @@ class TrySessionsController extends Controller
             }
         }
 
-        $modelName = (string) config('services.decart.model', 'lucy-vton-latest');
-        $maxDuration = max(30, (int) config('services.decart.max_session_duration', 30));
+        // Client-side session ceiling (seconds) — mirrors the plan's billing
+        // unit. Kept even though rendering costs nothing per second: it bounds
+        // the funnel metric and matches the documented billing unit.
+        $maxDuration = max(30, (int) config('services.tryon.max_session_duration', 30));
 
-        // Garment reference image for the try-on model — the storefront URL
-        // the browser converts to a Blob and applies post-connect via
-        // setImage (realtime sessions don't accept files-API ids). Non-fatal:
-        // without it the session runs prompt-only.
-        $referenceImageUrl = app(DecartService::class)->resolveReferenceImageUrl(
+        // Garment texture for the runtime engine — the storefront URL of the
+        // best product photo. Used directly when no rig exists yet; a rig's
+        // asset_url (background-removed cutout) wins when present.
+        $rigService = app(RigService::class);
+        $referenceImageUrl = $rigService->resolveReferenceImageUrl(
             $product,
             ctype_digit($variantId) ? (int) $variantId : null
         );
 
-        try {
-            $clientToken = app(DecartService::class)->createClientToken(
-                $modelName,
-                $this->storeOrigins($store),
-                300,
-                $maxDuration
-            );
-        } catch (RuntimeException) {
-            return response()->json(['error' => 'Failed to prepare try-on session'], 502);
-        }
-
-        if (empty($clientToken['apiKey'])) {
-            return response()->json(['error' => 'Failed to prepare try-on session'], 502);
-        }
+        // The product's current rig, or null. Never a gate: needs_review rigs
+        // ship live, and no rig at all means the engine falls back to a
+        // best-effort geometric overlay of the raw texture.
+        $rig = $rigService->resolveRig($product);
 
         if (!$resumable) {
-            // Usage billing gates every NEW session (reconnects never re-charge).
-            // It runs AFTER the Decart mint so an AI outage never bills anyone,
-            // and BEFORE the row insert so nothing billable gets provisioned for
-            // a refused attempt: once the plan's included sessions are spent,
+            // Usage billing gates every NEW session (resumes never re-charge).
+            // It runs BEFORE the row insert so nothing billable gets provisioned
+            // for a refused attempt: once the plan's included sessions are spent,
             // each new session costs the plan's session_rate through Shopify's
             // usage charge — and a charge that can't go through refuses the
             // session (storefront shows the "billing_failed" screen).
@@ -233,8 +223,6 @@ class TrySessionsController extends Controller
             $session->last_connected_at = now();
             $session->save();
         } else {
-            // Create the row only after the token mint succeeded, so a Decart
-            // failure can't leave an orphaned session behind.
             $session = TrySession::create([
                 'store_id' => $store->id,
                 'product_id' => $product->id,
@@ -253,13 +241,15 @@ class TrySessionsController extends Controller
 
         return response()->json([
             'session_token' => $session->session_token,
-            'client_token' => $clientToken['apiKey'],
-            'model_name' => $modelName,
-            'prompt' => $this->buildPrompt($product, $variantId),
+            // Garment texture + rig for the client-side runtime engine.
+            // reference_image_url is the raw product photo (best-effort
+            // overlay texture when no rig exists); rig is null until the
+            // ingestion pipeline has produced one for this product.
             'reference_image_url' => $referenceImageUrl,
+            'rig' => $rig,
             'max_duration_seconds' => $maxDuration,
-            // Client records the try-on output stream ONLY when this is true —
-            // otherwise nothing is ever captured or uploaded.
+            // Client records the composited try-on output ONLY when this is
+            // true — otherwise nothing is ever captured or uploaded.
             'recording' => (bool) ($store->setting?->privacy_recording['recording'] ?? false),
         ]);
     }
@@ -426,34 +416,6 @@ class TrySessionsController extends Controller
             $video,
             'mirrly-try-on.' . pathinfo($video, PATHINFO_EXTENSION)
         );
-    }
-
-    /**
-     * The browser connects to Decart from the storefront, so the client token
-     * must be scoped to the store's own web origins.
-     */
-    private function storeOrigins(Store $store): array
-    {
-        return array_map(
-            fn ($domain) => 'https://' . $domain,
-            array_filter([$store->shopify_domain, $store->domain])
-        );
-    }
-
-    private function buildPrompt(Product $product, string $variantId): string
-    {
-        $variantTitle = $this->variantTitle($product->shopify_product, $variantId);
-
-        $item = trim(
-            ($variantTitle && $variantTitle !== 'Default Title' ? $variantTitle . ' ' : '')
-            . $product->title
-        );
-
-        // Decart's VTON prompting guide: realtime sessions respond best to
-        // explicit "substitute" instructions that reference the garment image.
-        $description = collect([$product->style_hint, $item])->filter()->implode(' ');
-
-        return trim("Substitute the person's current outfit with the {$description} from the reference garment image.");
     }
 
     /**

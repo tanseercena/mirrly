@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\RigStorage;
 use App\Models\GarmentAsset;
 use App\Models\Product;
 use App\Services\AccessoryDetectionService;
@@ -11,7 +12,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
@@ -30,7 +30,7 @@ class AccessoryDetectionJob implements ShouldQueue
 
     public function handle(AccessoryDetectionService $detector, RigPublisher $publisher): void
     {
-        $cutoutBinary = Storage::disk('s3')->get($this->cutoutPath);
+        $cutoutBinary = RigStorage::disk()->get($this->cutoutPath);
 
         try {
             $result = $detector->detect($cutoutBinary, $this->templateType);

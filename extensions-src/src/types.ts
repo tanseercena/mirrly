@@ -58,26 +58,60 @@ export interface ConfigResponse {
 // (pre-camera) and enforced again by /session (authoritative).
 export type ShopperBlockReason = 'login_required' | 'try_limit_reached';
 
+// A product's rig, produced by the offline ingestion pipeline and served by
+// /session. Null until the pipeline has processed this product.
+export interface RigData {
+  template_type: string;
+  detection_method: 'ml_model' | 'geometric';
+  // v1 rig format (below). Null → the runtime engine falls back to its own
+  // per-template-type geometric defaults.
+  anchor_points: RigAnchorPoints | null;
+  // Background-removed garment cutout (S3/CloudFront) — preferred texture
+  // over the raw reference_image_url.
+  asset_url: string;
+  confidence_score?: number | null;
+}
+
+// v2 rig anchor format. The pipeline produces garment-space named anchors
+// (0..1 within the cutout image); the engine maps them to MediaPipe body
+// landmarks via its per-template ANCHOR_TO_BODY table. The review queue
+// (phase 3) edits these same anchor values in place.
+export interface RigAnchorPoints {
+  version: 2;
+  coordinate_space?: string;
+  // Named garment anchors — e.g. glasses: lens_left/bridge/lens_right;
+  // cap: crown_top/brim_front/side_left/side_right; clothing:
+  // shoulder_left/right, hem_left/right. Produced by the pipeline,
+  // correctable by the review queue.
+  anchors: Record<string, { x: number; y: number }>;
+  bounding_box?: { x: number; y: number; width: number; height: number } | null;
+  image?: { width: number; height: number } | null;
+}
+
+// One try-on layer the engine should render, keyed by garment slot. The
+// modal builds these from the /session response: one per product slot, with
+// the rig (or null for the best-effort geometric fallback).
+export interface EngineLayer {
+  // Garment slot, one active item per slot (template_type values).
+  slot: string;
+  // Garment image URL — the background-removed cutout (rig.asset_url) when
+  // a rig exists, else the raw reference image.
+  textureUrl: string;
+  rig: RigData | null;
+}
+
 export interface SessionStartResponse {
   session_token: string;
-  // Short-lived, scoped client token from client.tokens.create() — never the
-  // permanent account API key. Passed as `apiKey` when the browser calls
-  // createDecartClient() in realtime-engine.ts.
-  client_token: string;
-  // e.g. "lucy-vton-3.5" — which realtime model to connect with. Server-driven
-  // so this can change without a frontend redeploy.
-  model_name: string;
-  prompt: string;
-  // Storefront URL of the best garment photo. Realtime sessions take the
-  // reference image as a Blob/URL — NOT a files-API id — so the browser
-  // converts this to a flat-background JPEG blob and applies it post-connect
-  // via setImage (see garment-image.ts / realtime-engine.ts).
+  // Garment texture for the client-side runtime engine — raw product photo.
+  // Used when rig is null (the engine's best-effort geometric overlay);
+  // rig.asset_url (background-removed cutout) wins when a rig exists.
   reference_image_url?: string;
+  rig?: RigData | null;
   // Hard ceiling in seconds enforced client-side (mirrors backend billing unit).
   max_duration_seconds: number;
   // True only when the merchant enabled recording in Settings → Privacy &
-  // recording. The client records the try-on output stream ONLY when this is
-  // set; the upload endpoint re-checks the setting server-side.
+  // recording. The client records the composited try-on output ONLY when
+  // this is set; the upload endpoint re-checks the setting server-side.
   recording?: boolean;
 }
 // Note: a successful call to this endpoint is itself the `camera_opened`

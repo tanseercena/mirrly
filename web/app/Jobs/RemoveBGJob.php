@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\RigStorage;
 use App\Models\Product;
 use App\Services\RembgService;
 use Illuminate\Bus\Queueable;
@@ -10,7 +11,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Stage 2: remove the background from the raw product image via the
@@ -32,11 +32,11 @@ class RemoveBGJob implements ShouldQueue
 
     public function handle(RembgService $rembg): void
     {
-        $rawBinary = Storage::disk('s3')->get($this->rawPath);
+        $rawBinary = RigStorage::disk()->get($this->rawPath);
         $cutoutBinary = $rembg->removeBackground($rawBinary);
 
         $cutoutPath = "{$this->product->store_id}/{$this->product->id}/cutout.png";
-        Storage::disk('s3')->put($cutoutPath, $cutoutBinary);
+        RigStorage::disk()->put($cutoutPath, $cutoutBinary);
 
         LandmarkDetectionJob::dispatch(
             $this->product,

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { startSession, sendEvent, uploadRecording, emailRecording } from './session-api';
-import { connectEngine, type EngineConnection } from './realtime-engine';
+import { startEngine, type EngineHandle } from './runtime-engine';
 import { startPersonDetection, type PersonDetection } from './person-detection';
 import { addVariantToCart } from './cart';
 import type { ProductInfo, ShopperBlockReason } from './types';
@@ -101,11 +101,12 @@ export function TryOnModal({
 
   const overlayRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
+  // The try-on render target — a transparent three.js canvas composited over
+  // the local video. CSS mirrors it exactly like the video element.
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const engineRef = useRef<EngineConnection | null>(null);
+  const engineRef = useRef<EngineHandle | null>(null);
   const detectionRef = useRef<PersonDetection | null>(null);
   const sessionTokenRef = useRef<string | null>(null);
   const currentVariantRef = useRef(variantId);
@@ -213,9 +214,11 @@ export function TryOnModal({
       downloadUrlRef.current = null;
     }
 
-    // Restart-safe: a previous run's detector and camera may still be alive
-    // (Try again from the result screen re-enters here) — stop them first
-    // so two pollers never fight over person-present state.
+    // Restart-safe: a previous run's engine, detector and camera may still
+    // be alive (Try again from the result screen re-enters here) — stop them
+    // first so two render loops never fight over the canvas.
+    engineRef.current?.destroy();
+    engineRef.current = null;
     detectionRef.current?.stop();
     detectionRef.current = null;
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -273,22 +276,29 @@ export function TryOnModal({
   }
 
   function handlePersonPresent() {
-    console.log('[tryon] person present — connecting');
     personPresentRef.current = true;
-    void ensureConnected();
+    const engine = engineRef.current;
+    if (engine) {
+      // Stepped back into frame mid-session — resume the SAME engine, no
+      // new /session call needed (rendering is client-side and free).
+      engine.setPaused(false);
+      markStreaming();
+    } else {
+      console.log('[tryon] person present — starting engine');
+      void ensureConnected();
+    }
   }
 
   function handlePersonAbsent() {
-    console.log('[tryon] person absent — disconnecting to stop billing');
+    console.log('[tryon] person absent — pausing engine');
     personPresentRef.current = false;
-    if (!engineRef.current) return;
-    // Detach before disconnecting so the engine's own onDisconnect/onError
-    // (which check engineRef) no-op instead of reporting a "loss".
     const engine = engineRef.current;
-    engineRef.current = null;
+    if (!engine) return;
+    // Pause rather than disconnect: rendering is client-side, so nothing is
+    // billed while the shopper is out of frame and resuming is instant.
+    engine.setPaused(true);
     stopSegment();
     stopSessionRecording();
-    engine.disconnect();
     setStatus('waiting_person');
   }
 
@@ -298,8 +308,9 @@ export function TryOnModal({
     setStatus('connecting');
 
     try {
-      // Reconnects pass the existing session_token: the backend mints a fresh
-      // client token against the SAME session row instead of creating a new one.
+      // Reconnects pass the existing session_token: the backend resumes the
+      // SAME session row instead of creating a new one (which would consume
+      // another try against the per-product limit).
       const session = await startSession(
         configToken,
         productId,
@@ -314,50 +325,38 @@ export function TryOnModal({
       // and the merchant's master switch echoed by /session.
       recordingEnabledRef.current = recordOptInRef.current && !!session.recording;
 
-      // No "is this still the current connection?" identity checks in these
-      // callbacks: the engine suppresses events after disconnect(), and
-      // early callbacks (the remote track can arrive BEFORE connectEngine
-      // resolves) must never be dropped — that stranded the modal in
-      // 'connecting'.
-      const connection = await connectEngine({
-        clientToken: session.client_token,
-        modelName: session.model_name,
-        prompt: session.prompt,
-        referenceImageUrl: session.reference_image_url ?? undefined,
-        stream: localStreamRef.current!,
-        onRemoteStream: (remoteStream) => {
-          if (!aliveRef.current) return;
-          remoteStreamRef.current = remoteStream;
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream;
-            startSessionRecording(remoteVideoRef.current);
-          }
-          markStreaming();
-        },
-        onStateChange: (state) => {
-          if (!aliveRef.current) return;
-          // 'generating' = the model is actively producing frames — the
-          // authoritative "try-on is live" signal.
-          if (state === 'generating') markStreaming();
-        },
-        onError: (err) => {
-          if (!aliveRef.current) return;
-          failSession(err.message);
-        },
-        onDisconnect: () => {
-          if (!aliveRef.current) return;
-          handleUnexpectedDisconnect();
-        },
+      // Build layers from the session payload: a rig (cutout + anchor data)
+      // when the pipeline has produced one, else the raw reference image
+      // with the engine's geometric defaults.
+      const layers = [];
+      const textureUrl = session.rig?.asset_url ?? session.reference_image_url;
+      if (textureUrl) {
+        layers.push({
+          slot: session.rig?.template_type ?? 'top',
+          textureUrl,
+          rig: session.rig ?? null,
+        });
+      }
+
+      const engine = await startEngine({
+        video: localVideoRef.current!,
+        canvas: overlayCanvasRef.current!,
+        layers,
+        onReady: markStreaming,
+        onError: (err) => failSession(err.message),
       });
 
       if (!aliveRef.current) {
-        connection.disconnect();
+        engine.destroy();
         return;
       }
-      engineRef.current = connection;
+      engineRef.current = engine;
+      // Resume (paused is the engine's initial state) unless the person
+      // already left frame — then the pause path owns it.
+      engine.setPaused(personPresentRef.current);
 
-      // Person left while we were still connecting — markStreaming never ran,
-      // so nothing else would tear this fresh connection down.
+      // Person left while we were still starting — markStreaming never ran,
+      // so nothing else would pause this fresh engine.
       if (!personPresentRef.current) handlePersonAbsent();
     } catch (err: any) {
       failSession(err?.message, err?.errorCode);
@@ -366,14 +365,13 @@ export function TryOnModal({
     }
   }
 
-  // Idempotent "try-on is live" transition. Both the remote track arrival
-  // and the 'generating' connection state funnel into this — whichever comes
-  // first wins, so ordering races can't strand the modal in 'connecting'.
+  // Idempotent "try-on is live" transition, fired by the engine's onReady
+  // (first rendered pose frame).
   function markStreaming() {
     if (!aliveRef.current || segmentStartRef.current !== null) return;
 
-    // Person left while we were still connecting — drop the connection
-    // immediately instead of streaming (and billing) to an empty room.
+    // Person left while we were still starting — pause the engine instead
+    // of rendering to an empty room.
     if (!personPresentRef.current) {
       handlePersonAbsent();
       return;
@@ -384,21 +382,8 @@ export function TryOnModal({
     if (sessionTokenRef.current) {
       sendEvent(sessionTokenRef.current, 'tryon_started');
     }
+    startSessionRecording(overlayCanvasRef.current);
     armDurationCap(maxDurationRef.current);
-  }
-
-  // The engine died on its own (network drop, server-side close). If the
-  // person is still in frame, reconnect right away with a fresh token;
-  // otherwise drop to waiting state and let detection drive the reconnect.
-  function handleUnexpectedDisconnect() {
-    engineRef.current = null;
-    stopSegment();
-    stopSessionRecording();
-    if (personPresentRef.current) {
-      void ensureConnected();
-    } else {
-      setStatus('waiting_person');
-    }
   }
 
   function armDurationCap(maxSeconds: number) {
@@ -418,33 +403,38 @@ export function TryOnModal({
     }
   }
 
-  // Freezes the current remote frame so the result screen can show it blurred.
+  // Freezes the current try-on view (camera + garment overlay, both CSS-
+  // mirrored on screen — mirror here too so the snapshot matches what the
+  // shopper sees) for the result screen.
   function captureSnapshot(): string | null {
     try {
-      const video = remoteVideoRef.current;
+      const video = localVideoRef.current;
+      const overlay = overlayCanvasRef.current;
       if (!video || !video.videoWidth) return null;
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      canvas.getContext('2d')?.drawImage(video, 0, 0);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      if (overlay) ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
       return canvas.toDataURL('image/jpeg', 0.85);
     } catch {
       return null;
     }
   }
 
-  // Try-on recording. The stream recorded is the try-on OUTPUT (the remote
-  // stream the shopper watches) — the raw camera feed is never captured.
-  //
-  // MediaRecorder pointed straight at a WebRTC remote stream records BLACK
-  // in Chrome even while the same stream plays fine in a <video>. So every
-  // frame is drawn through an off-screen canvas and the recorder captures
-  // canvas.captureStream() instead — identical to what the shopper sees.
-  // One recorder per connection segment: reconnects flush the previous
-  // segment (uploaded immediately) and the next connection records a fresh
-  // one. Everything is gated on the merchant's recording flag, and the
-  // upload endpoint re-checks that flag server-side.
-  function startSessionRecording(video: HTMLVideoElement) {
+  // Try-on recording. The stream recorded is the try-on OUTPUT the shopper
+  // sees — the mirrored camera feed with the garment overlay drawn on top —
+  // never the raw camera feed. Both the video and the overlay canvas are
+  // drawn through an off-screen canvas every 40ms (MediaRecorder can't take
+  // the composite directly) and the recorder captures canvas.captureStream()
+  // — identical to what the shopper sees. Everything is gated on the
+  // merchant's recording flag; the upload endpoint re-checks that flag
+  // server-side.
+  function startSessionRecording(overlay: HTMLCanvasElement | null) {
     if (!recordingEnabledRef.current || recorderRef.current) return;
     if (typeof MediaRecorder === 'undefined') return;
     try {
@@ -458,15 +448,20 @@ export function TryOnModal({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Resize to the incoming video's real dimensions on first frames
       const draw = () => {
-        if (video.videoWidth) {
-          if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-          }
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const video = localVideoRef.current;
+        if (!video || !video.videoWidth) return;
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
         }
+        // Mirror exactly like the on-screen elements (see captureSnapshot).
+        ctx.save();
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        if (overlay) ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
       };
       draw();
       const drawTimer = window.setInterval(draw, 40);
@@ -569,9 +564,8 @@ export function TryOnModal({
     const captured = captureSnapshot();
     setSnapshot((current) => current ?? captured);
     if (engineRef.current) {
-      const engine = engineRef.current;
+      engineRef.current.destroy();
       engineRef.current = null;
-      engine.disconnect();
     }
 
     if (sessionTokenRef.current && totalStreamMsRef.current > 0) {
@@ -624,9 +618,8 @@ export function TryOnModal({
       stopSessionRecording();
       setSnapshot((current) => current ?? captureSnapshot());
       if (engineRef.current) {
-        const engine = engineRef.current;
+        engineRef.current.destroy();
         engineRef.current = null;
-        engine.disconnect();
       }
       setAdded(true);
       setStatus('ended');
@@ -705,7 +698,7 @@ export function TryOnModal({
     detectionRef.current = null;
     if (durationTimerRef.current) window.clearTimeout(durationTimerRef.current);
     stopSessionRecording();
-    engineRef.current?.disconnect();
+    engineRef.current?.destroy();
     engineRef.current = null;
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     if (downloadUrlRef.current) {
@@ -723,8 +716,11 @@ export function TryOnModal({
   // --- derived view state ---
   const inCameraStep =
     status === 'requesting_camera' || status === 'detecting' || status === 'connecting' || status === 'waiting_person';
-  const showLocal = inCameraStep;
-  const showRemote = status === 'streaming' || (status === 'ended' && !!snapshot);
+  // The overlay canvas composites over the live camera feed, so the local
+  // video stays visible during 'streaming' too (it hides only on the result
+  // screen, where the snapshot takes over).
+  const showLocal = inCameraStep || status === 'streaming';
+  const showRemote = status === 'streaming';
 
   const pill =
     status === 'requesting_camera'
@@ -796,7 +792,7 @@ export function TryOnModal({
                     Try-on in progress&hellip;
                   </h2>
                   <p class="tryon-body">
-                    Your live try-on is running with AI. This usually takes just a few seconds.
+                    Try-on is running live in your browser. Keep moving — the garment follows you.
                   </p>
                   {countdownLeft > 0 && (
                     <div class="tryon-preparing">
@@ -820,15 +816,11 @@ export function TryOnModal({
                   if (el && localStreamRef.current) el.srcObject = localStreamRef.current;
                 }}
               />
-              <video
-                class="tryon-video tryon-video--remote"
+              <canvas
+                class="tryon-canvas"
                 style={{ display: showRemote ? '' : 'none' }}
-                autoPlay
-                playsInline
-                muted
                 ref={(el) => {
-                  remoteVideoRef.current = el;
-                  if (el && remoteStreamRef.current) el.srcObject = remoteStreamRef.current;
+                  overlayCanvasRef.current = el;
                 }}
               />
               {status === 'ended' && snapshot && (

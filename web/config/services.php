@@ -67,22 +67,17 @@ return [
       'api_key' => env('HOOKDECK_API_KEY', ''),
     ],
 
-    'decart' => [
-        'api_key' => env('DECART_API_KEY', ''),
-        'base_url' => env('DECART_BASE_URL', 'https://api.decart.ai'),
-        // Realtime virtual try-on model the client tokens are scoped to.
-        // Docs: realtime uses the "lucy-vton-latest" alias; "lucy-vton-3.5"
-        // is the batch endpoint's model and has no realtime agent.
-        'model' => env('DECART_TRYON_MODEL', 'lucy-vton-latest'),
-        // Client-side session ceiling (seconds) — later mirrored by the
-        // plan's billing unit. Also sent to Decart as maxSessionDuration.
-        'max_session_duration' => env('DECART_MAX_SESSION_DURATION', 30),
+    // Storefront try-on runtime.
+    'tryon' => [
+        // Client-side session ceiling (seconds) — mirrors the plan's billing
+        // unit and bounds the funnel metric.
+        'max_session_duration' => env('TRYON_MAX_SESSION_DURATION', 30),
     ],
 
     // Self-hosted rembg background-removal service (Hetzner box).
     'rembg' => [
         'base_url' => env('REMBG_BASE_URL', ''),
-        'endpoint' => env('REMBG_ENDPOINT', '/removebg'),
+        'endpoint' => env('REMBG_ENDPOINT', '/remove-background'),
         'api_key' => env('REMBG_API_KEY', ''),
     ],
 
@@ -98,6 +93,15 @@ return [
     // Garment rigging pipeline scoring.
     'rigging' => [
         'auto_approve_threshold' => env('RIGGING_AUTO_APPROVE_THRESHOLD', 0.75),
+        // Storage disk the rigging pipeline stages files on (raw.jpg, cutouts,
+        // rig.json). 's3' in production; set RIGGING_STORAGE_DISK=public in
+        // dev to use the local public disk (browser-fetchable via /storage).
+        'storage_disk' => env('RIGGING_STORAGE_DISK', 's3'),
+        // Internal review-queue admins — comma-separated shopify domains of
+        // the app operator's own stores. Empty = the queue is disabled (the
+        // pooled queue shows cross-merchant data, so it's never a merchant
+        // feature).
+        'review_admins' => env('REVIEW_QUEUE_ADMINS', ''),
     ],
 
 ];

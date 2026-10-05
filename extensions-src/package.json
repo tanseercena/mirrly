@@ -6,11 +6,12 @@
         "watch": "node build.js --watch"
     },
     "dependencies": {
-        "@decartai/sdk": "^0.1.22",
         "@mediapipe/tasks-vision": "^1.0.1",
-        "preact": "^10.19.0"
+        "preact": "^10.19.0",
+        "three": "^0.170.0"
     },
     "devDependencies": {
+        "@types/three": "^0.186.0",
         "esbuild": "^0.21.0",
         "typescript": "^5.4.0"
     }

@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\RigStorage;
 use App\Models\GarmentAsset;
 use App\Models\ModelVersion;
 use App\Models\Product;
@@ -14,7 +15,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
@@ -46,7 +46,7 @@ class ClothingDetectionJob implements ShouldQueue
         RigPublisher $publisher
     ): void {
         $modelVersion = ModelVersion::currentlyDeployed();
-        $cutoutBinary = Storage::disk('s3')->get($this->cutoutPath);
+        $cutoutBinary = RigStorage::disk()->get($this->cutoutPath);
 
         $detection = null;
 

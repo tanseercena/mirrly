@@ -55,6 +55,7 @@ export default function App() {
                             <Link to="/settings">{t("sidebar.settings")}</Link>
                             <Link to="/sessions">{t("sidebar.sessions")}</Link>
                             <Link to="/plans">{t("sidebar.plans")}</Link>
+                            <Link to="/reviewQueue">Review queue</Link>
                         </NavMenu>
                         <AppProvider>
                             <Suspense fallback={<PageLoader />}>

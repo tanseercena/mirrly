@@ -2,11 +2,11 @@
 
 namespace App\Services;
 
+use App\Services\RigStorage;
 use App\Models\GarmentAsset;
 use App\Models\ModelVersion;
 use App\Models\Product;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Single place where a rigging pipeline run is scored, recorded and
@@ -71,13 +71,18 @@ class RigPublisher
                 'status' => $status,
                 'confidence_score' => round($score, 4),
                 'anchor_points_json' => array_filter([
+                    // Rig format v2: garment-space named anchors (0..1 within
+                    // the cutout). The runtime engine maps them to MediaPipe
+                    // body landmarks via its per-template ANCHOR_TO_BODY table
+                    // (see extensions-src/src/engine-layers.ts).
+                    'version' => 2,
                     'coordinate_space' => 'normalized',
                     'anchors' => $anchors,
                     'bounding_box' => $boundingBox,
                     'image' => $image,
                     'sanity' => $sanity,
                 ]),
-                'asset_url' => Storage::disk('s3')->url($cutoutPath),
+                'asset_url' => RigStorage::disk()->url($cutoutPath),
                 'model_version' => $modelVersion?->id,
                 'scored_at' => now(),
                 // A re-rig resets any previous review state — the new
@@ -101,6 +106,16 @@ class RigPublisher
     }
 
     /**
+     * Re-write rig.json for an already-published asset — used after a review
+     * correction. No re-scoring: the human-corrected anchors ARE the ground
+     * truth, so the asset ships them immediately.
+     */
+    public function republish(Product $product, GarmentAsset $asset): void
+    {
+        $this->writeRigJson($product, $asset, "{$product->store_id}/{$product->id}/cutout.png");
+    }
+
+    /**
      * rig.json at s3://{merchant_id}/{product_id}/rig.json — the only file
      * the storefront runtime fetches. Written for every status.
      */
@@ -109,7 +124,7 @@ class RigPublisher
         $rig = [
             'product_id' => $product->shopify_product_id,
             'template_type' => $asset->template_type,
-            'asset_url' => Storage::disk('s3')->url($cutoutPath),
+            'asset_url' => RigStorage::disk()->url($cutoutPath),
             'anchor_points' => $asset->anchor_points_json,
             'confidence_score' => $asset->confidence_score,
             'status' => $asset->status,
@@ -118,7 +133,7 @@ class RigPublisher
             'scored_at' => $asset->scored_at?->toIso8601String(),
         ];
 
-        Storage::disk('s3')->put(
+        RigStorage::disk()->put(
             "{$product->store_id}/{$product->id}/rig.json",
             json_encode($rig, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)
         );
@@ -132,7 +147,7 @@ class RigPublisher
      */
     private function assessCutoutQuality(string $cutoutPath): float
     {
-        $binary = Storage::disk('s3')->get($cutoutPath);
+        $binary = RigStorage::disk()->get($cutoutPath);
         $image = @imagecreatefromstring($binary);
 
         if ($image === false) {
