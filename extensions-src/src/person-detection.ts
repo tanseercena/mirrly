@@ -1,5 +1,5 @@
 // This is the ONLY file that imports MediaPipe directly, mirroring how
-// realtime-engine.ts is the only file that touches the realtime vendor SDK.
+// runtime-engine.ts is the only file that does the three.js rendering.
 //
 // Why this exists: the realtime connection is billed from the moment it
 // opens — regardless of whether anyone is standing in front of the camera.
@@ -10,11 +10,7 @@
 // The WASM runtime and model are fetched from public CDNs at first use,
 // pinned to the installed npm version so the two can't drift apart.
 
-import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
-
-const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm';
-const MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+import { acquirePoseLandmarker, releasePoseLandmarker } from './pose-model';
 
 // Polling cadence and the consecutive-empty-frame budget before we declare
 // the person gone. 3 misses ≈ 3s — short enough to stop billing promptly,
@@ -30,23 +26,11 @@ export async function startPersonDetection(
   video: HTMLVideoElement,
   callbacks: { onPresent: () => void; onAbsent: () => void }
 ): Promise<PersonDetection> {
-  const fileset = await FilesetResolver.forVisionTasks(WASM_BASE);
-  let landmarker: PoseLandmarker;
-  try {
-    landmarker = await PoseLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
-      runningMode: 'VIDEO',
-      numPoses: 1,
-    });
-  } catch {
-    // GPU delegate unavailable (driver/blocked WebGL) — CPU still works,
-    // just slower, which a 1s polling cadence doesn't care about.
-    landmarker = await PoseLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: MODEL_URL, delegate: 'CPU' },
-      runningMode: 'VIDEO',
-      numPoses: 1,
-    });
-  }
+  // GPU→CPU fallback and URL pinning live in the shared factory. The
+  // instance is SHARED with the runtime engine (one GPU landmarker per
+  // page — two contend for WebGL and the second returns no landmarks), so
+  // stop() releases rather than closes it.
+  const landmarker = await acquirePoseLandmarker();
 
   let present = false;
   let misses = 0;
@@ -88,7 +72,8 @@ export async function startPersonDetection(
     stop: () => {
       stopped = true;
       window.clearInterval(interval);
-      landmarker.close();
+      // Release the SHARED landmarker (the engine may still be using it).
+      releasePoseLandmarker();
     },
   };
 }

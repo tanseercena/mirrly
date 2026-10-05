@@ -93,6 +93,15 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
     Route::get('sessions/product-performance', [TrySessionsController::class, 'productPerformance']);
     Route::get('sessions/product-stats', [TrySessionsController::class, 'productStats']);
 
+    // Internal rig review queue — pooled across merchants, gated to the
+    // REVIEW_QUEUE_ADMINS allowlist (see ReviewQueueController).
+    Route::controller(ReviewQueueController::class)->group(function () {
+        Route::get('review-queue', 'index');
+        Route::get('review-queue/{id}', 'show');
+        Route::post('review-queue/{id}/correct', 'correct');
+        Route::post('review-queue/{id}/approve', 'approve');
+    });
+
     // Billing routes
     Route::post('billing', [BillingController::class, 'process']);
     Route::post('billing/cancel', [BillingController::class, 'cancel']);

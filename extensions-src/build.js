@@ -40,8 +40,8 @@ const shared = {
   define: {
     'process.env.API_BASE_URL': JSON.stringify(env.API_BASE_URL ?? ''),
   },
-  // es2020 minimum — the Decart SDK's WebRTC diagnostics use BigInt literals
-  // (0n), which don't exist before ES2020. es2019 will fail the build.
+  // es2020 baseline. Kept for parity with the shipped bundles (and the MediaPipe
+  // runtime); safe for three.js + Preact.
   target: 'es2020',
   jsx: 'automatic',
   jsxImportSource: 'preact',

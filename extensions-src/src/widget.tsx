@@ -4,7 +4,7 @@ import type { ProductInfo, ShopperBlockReason } from './types';
 
 // Build marker — bump whenever debugging whether the storefront is running
 // a stale cached copy of this bundle.
-console.log('[tryon] widget bundle 2026-09-24-r1 (usage billing)');
+console.log('[tryon] widget bundle 2026-10-05-r6 (warp grid snapshot)');
 
 interface MountOptions {
   configToken: string;

@@ -132,9 +132,17 @@ class ProcessBulkOperationResultJob implements ShouldQueue
             return;
         }
 
-        DB::transaction(function () use ($buffer) {
+        // Featured-image URLs before this upsert — the rigging pipeline
+        // re-runs only when the product is new or its image changed.
+        $featuredBefore = Product::where('store_id', $this->store->id)
+            ->whereIn('shopify_product_id', collect($buffer)->pluck('shopify_product_id'))
+            ->pluck('shopify_product', 'shopify_product_id');
+
+        DB::transaction(function () use ($buffer, $featuredBefore) {
             foreach ($buffer as $row) {
-                Product::updateOrCreate(
+                $previous = $featuredBefore[$row['shopify_product_id']] ?? null;
+
+                $product = Product::updateOrCreate(
                     ['store_id' => $this->store->id, 'shopify_product_id' => $row['shopify_product_id']],
                     [
                         'shopify_collection_id' => $row['shopify_collection_id'],
@@ -146,6 +154,13 @@ class ProcessBulkOperationResultJob implements ShouldQueue
                         'synced_at' => now(),
                     ]
                 );
+
+                $featuredAfter = $row['shopify_product']['featuredImage']['url'] ?? null;
+                $featuredWas = $previous['featuredImage']['url'] ?? null;
+
+                if ($featuredAfter !== null && $featuredAfter !== $featuredWas) {
+                    ProcessProductIngestionRiggingJob::dispatch($product);
+                }
             }
         });
 
