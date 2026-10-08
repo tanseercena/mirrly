@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\Shopify;
+use App\Jobs\ProcessProductIngestionRiggingJob;
 use App\Jobs\TriggerCatalogSyncJob;
 use App\Models\Product;
 use App\Models\Store;
@@ -367,6 +368,157 @@ class ProductsController extends Controller
         }
 
         return response()->json(['success' => true, 'sync_running' => $syncRunning]);
+    }
+
+    /**
+     * Add (or refresh) the products the merchant picked in the admin's
+     * resource picker ("Add more Products" on the Products page). Fetches
+     * each picked product from the Admin GraphQL with the same field set the
+     * bulk catalog sync persists, so rows are identical in shape either way.
+     * Existing rows are refreshed, never duplicated; try_on is switched on
+     * and the rigging pipeline runs for new products / changed images.
+     */
+    public function addProducts(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array|max:250',
+            'ids.*' => 'required|string',
+        ]);
+
+        $store = $this->resolveStore($request);
+
+        if (!$store) {
+            return response()->json(['message' => 'Store not found'], 404);
+        }
+
+        // Accept GIDs (what resourcePicker returns) or bare numeric ids.
+        $productIds = collect($request->input('ids'))
+            ->map(fn ($id) => Shopify::numericId((string) $id))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($productIds->isEmpty()) {
+            return response()->json(['message' => 'No valid product ids'], 422);
+        }
+
+        // Which of the picks are already synced — "already added" feedback.
+        $existingIds = Product::where('store_id', $store->id)
+            ->whereIn('shopify_product_id', $productIds)
+            ->pluck('shopify_product_id')
+            ->all();
+
+        $accessToken = $request->get('shopifySession')->getAccessToken();
+        $featuredBefore = Product::where('store_id', $store->id)
+            ->whereIn('shopify_product_id', $productIds)
+            ->pluck('shopify_product', 'shopify_product_id');
+
+        $added = 0;
+        $existing = 0;
+
+        // nodes(ids:) takes up to 250 ids; chunk conservatively. Products
+        // that no longer exist come back as null entries and are skipped.
+        foreach ($productIds->chunk(100) as $chunk) {
+            $gids = $chunk->map(fn ($id) => "gid://shopify/Product/{$id}")->all();
+
+            $response = Shopify::queryOrException($store->shopify_domain, $accessToken, [
+                'query' => <<<'QUERY'
+                query GetProductsByIds($ids: [ID!]!) {
+                  nodes(ids: $ids) {
+                    ... on Product {
+                      id
+                      title
+                      handle
+                      status
+                      productType
+                      featuredImage { url }
+                      updatedAt
+                      variants(first: 100) { edges { node { id title price image { url } } } }
+                      collections(first: 100) { edges { node { id title } } }
+                    }
+                  }
+                }
+                QUERY,
+                'variables' => ['ids' => $gids],
+            ]);
+
+            foreach ($response['data']['nodes'] ?? [] as $node) {
+                if (empty($node['id'])) {
+                    continue;
+                }
+
+                $row = $this->buildProductRow($node);
+                $previous = $featuredBefore[$row['shopify_product_id']] ?? null;
+                $isNew = !in_array($row['shopify_product_id'], $existingIds, true);
+
+                $product = Product::updateOrCreate(
+                    ['store_id' => $store->id, 'shopify_product_id' => $row['shopify_product_id']],
+                    array_merge($row, ['try_on' => true, 'synced_at' => now()])
+                );
+
+                $isNew ? $added++ : $existing++;
+
+                // Same trigger as the bulk sync: (re)run the rigging pipeline
+                // only when the product is new or its featured image changed.
+                $featuredAfter = $node['featuredImage']['url'] ?? null;
+                $featuredWas = $previous['featuredImage']['url'] ?? null;
+                if ($featuredAfter !== null && $featuredAfter !== $featuredWas) {
+                    ProcessProductIngestionRiggingJob::dispatch($product);
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'added' => $added,
+            'existing' => $existing,
+        ]);
+    }
+
+    /**
+     * Flatten an Admin GraphQL product node (with nested variant/collection
+     * connections) into the exact columns ProcessBulkOperationResultJob
+     * persists, so a picked product's row matches a synced one.
+     */
+    private function buildProductRow(array $node): array
+    {
+        $featuredImageUrl = $node['featuredImage']['url'] ?? null;
+
+        $variantImages = [];
+        $variants = [];
+        foreach (collect($node['variants']['edges'] ?? [])->pluck('node') as $variant) {
+            $url = $variant['image']['url'] ?? $featuredImageUrl;
+            if (!empty($url)) {
+                $variantImages[] = [
+                    'variant_id' => Shopify::numericId($variant['id'] ?? ''),
+                    'variant_title' => $variant['title'] ?? null,
+                    'url' => $url,
+                ];
+            }
+            $variants[] = [
+                'id' => $variant['id'],
+                'title' => $variant['title'] ?? null,
+                'image' => $variant['image'] ?? ($featuredImageUrl ? ['url' => $featuredImageUrl] : null),
+            ];
+        }
+
+        $collections = collect($node['collections']['edges'] ?? [])->pluck('node')
+            ->map(fn ($c) => ['id' => $c['id'], 'title' => $c['title'] ?? null])
+            ->values()
+            ->all();
+
+        $node['variants'] = $variants;
+        $node['collections'] = $collections;
+
+        return [
+            'shopify_product_id' => Shopify::numericId($node['id']),
+            'shopify_collection_id' => !empty($collections) ? Shopify::numericId($collections[0]['id']) : null,
+            'title' => $node['title'],
+            'product_type' => $node['productType'] ?? null,
+            'shopify_product' => $node,
+            'variant_images' => $variantImages,
+            'shopify_updated_at' => $node['updatedAt'] ?? null,
+        ];
     }
 
     /**

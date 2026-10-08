@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Try-On Preview</title>
+    <link rel="stylesheet" href="./tryon-styles.css">
+    <style>
+        /* The page is embedded in the onboarding Step 4 preview card — keep it
+           transparent and let the widget's fixed modal own the viewport. */
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        #tryon-demo-error {
+            display: none;
+            margin: 24px auto;
+            max-width: 320px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            background: #FEF3F2;
+            border: 1px solid #F2C4C4;
+            color: #B42318;
+            font-size: 13px;
+            line-height: 1.5;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="tryon-demo-host"></div>
+    <div id="tryon-demo-error"></div>
+
+    <script type="module">
+        // Onboarding Step 4 live-test host. Mirrors what loader.ts does on the
+        // storefront (api-token → config → mountWidget) but with three
+        // onboarding-specific twists:
+        //
+        // 1. A FRESH anonymous id on every load — the storefront's per-product
+        //    try limit (default 1 per anonymous shopper) would otherwise refuse
+        //    the onboarding merchant's 2nd/3rd tries. Each page load IS a new
+        //    try, so each load presents as a new shopper.
+        // 2. Relative /api URLs — the page is served from the app domain
+        //    (directly in prod, via the Vite proxy in dev), and CORS is open.
+        // 3. No insert-button step — mountWidget renders the full-screen modal
+        //    immediately, which fills this iframe (the "preview area").
+
+        const errorBox = document.getElementById('tryon-demo-error');
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.style.display = 'block';
+        }
+
+        function fail(message, err) {
+            console.error('[tryon-demo]', message, err ?? '');
+            showError(message);
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const shop = params.get('shop') || '';
+        const productId = params.get('product_id') || '';
+
+        if (!shop || !productId) {
+            fail('Missing shop or product_id — reopen the try-on from the onboarding step.');
+        } else {
+            boot();
+        }
+
+        async function boot() {
+            // Fresh shopper identity per try (per-page-load). Same key the
+            // widget's session-api reads, written before mountWidget so the
+            // /config and /session calls both carry it.
+            const anonymousId = 'onboarding-' +
+                (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+            try {
+                localStorage.setItem('tryon:anon-id', anonymousId);
+            } catch {
+                /* storage blocked — the widget falls back to a per-visit id */
+            }
+
+            let token;
+            try {
+                const res = await fetch(`/api/${shop}/api-token`, { headers: { Accept: 'application/json' } });
+                if (!res.ok) throw new Error(`api-token ${res.status}`);
+                token = (await res.json()).data;
+            } catch (err) {
+                return fail('Could not connect to the try-on service. Please try again.', err);
+            }
+
+            let config;
+            try {
+                const query = new URLSearchParams({
+                    shop,
+                    'api-token': token,
+                    product_id: productId,
+                    variant_id: '',
+                    anonymous_id: anonymousId,
+                });
+                const res = await fetch(`/api/${shop}/config?${query}`, { headers: { Accept: 'application/json' } });
+                if (!res.ok) throw new Error(`config ${res.status}`);
+                config = await res.json();
+            } catch (err) {
+                return fail('Could not load the try-on for this product. Please try again.', err);
+            }
+
+            try {
+                const mod = await import('./tryon-widget.js');
+                mod.mountWidget(document.getElementById('tryon-demo-host'), {
+                    configToken: config.config_token,
+                    productId,
+                    variantId: '',
+                    customerId: '',
+                    product: config.product ?? null,
+                    recording: config.recording ?? false,
+                    blocked: config.shopper?.allowed === false ? config.shopper.reason ?? undefined : undefined,
+                });
+            } catch (err) {
+                fail('The try-on engine failed to load. Please refresh and try again.', err);
+            }
+        }
+    </script>
+</body>
+</html>

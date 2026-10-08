@@ -679,9 +679,8 @@ const IndexPage = () => {
         ============================================ */
     const productTypeDone = !!store?.setting?.collection_type; // set by onboarding step 2
     const planDone = !!activeSubscription?.plan_selected; // plan chosen: paid via billing (plan_selected=true) or Free selected (defaults true); false on install's default free sub
-    const liveTestDone = !!store?.setup_steps?.live_test_done; // saved by onboarding step 4
 
-    const stepDoneFlags = [productTypeDone, themeExtensionEnabled, planDone, liveTestDone];
+    const stepDoneFlags = [productTypeDone, themeExtensionEnabled, planDone];
     const allStepsDone = stepDoneFlags.every(Boolean);
     const currentStepIndex = stepDoneFlags.indexOf(false); // -1 when all completed
 
@@ -689,7 +688,6 @@ const IndexPage = () => {
         { label: t('dashboard.setup_progress_banner.steps.product_type') },
         { label: t('dashboard.setup_progress_banner.steps.theme_embed') },
         { label: t('dashboard.setup_progress_banner.steps.choose_plan') },
-        { label: t('dashboard.setup_progress_banner.steps.live_test') },
     ].map((step, index) => ({
         ...step,
         status: currentStepIndex === -1 || index < currentStepIndex

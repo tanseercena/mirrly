@@ -68,6 +68,9 @@ export default defineConfig({
     proxy: {
       "^/(\\?.*)?$": proxyOptions,
       "^/api(/|(\\?.*)?$)": proxyOptions,
+      // Static try-on demo page served by Laravel from public/tryon —
+      // embedded as the onboarding Step 4 live-test iframe.
+      "^/tryon(/|(\\?.*)?$)": proxyOptions,
     },
   },
     build: {

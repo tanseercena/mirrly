@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Page,
@@ -18,8 +18,6 @@ import {
 } from '@shopify/polaris';
 import { useAppBridge } from '@shopify/app-bridge-react';
 import {
-    RefreshIcon,
-    CheckCircleIcon,
     SearchIcon,
     FilterIcon,
     AlertTriangleIcon,
@@ -27,6 +25,7 @@ import {
     ChevronLeftIcon,
     InfoIcon,
     ImageIcon,
+    PlusIcon,
 } from '@shopify/polaris-icons';
 
 import ProductSettingsDrawer from '../components/ProductSettingsDrawer';
@@ -93,8 +92,7 @@ const ProductsPage = () => {
     const [stats, setStats] = useState({ total: 0, enabled: 0, lastSyncedAt: null });
     const [collections, setCollections] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isSyncing, setIsSyncing] = useState(false);
-    const syncPollRef = useRef(null);
+    const [isAdding, setIsAdding] = useState(false);
 
     const [searchInput, setSearchInput] = useState('');
     const [searchValue, setSearchValue] = useState('');
@@ -230,45 +228,60 @@ const ProductsPage = () => {
         clearSelection();
     }, [selectedResources, clearSelection, fetchProducts, t, shopify]);
 
-    const handleSyncNow = useCallback(async () => {
-        if (isSyncing) return;
-        setIsSyncing(true);
+    // "Add more Products" — Shopify's native resource picker, then the
+    // picked products are fetched and upserted server-side. Products that
+    // were already in the list come back as "already added" (refreshed,
+    // never duplicated).
+    const handleAddProducts = useCallback(async () => {
+        if (isAdding) return;
+
+        let selection;
         try {
-            await fetch('/api/products/sync', { method: 'POST' });
-
-            const poll = async () => {
-                try {
-                    const response = await fetch('/api/sync-status');
-                    const data = await response.json();
-                    if (data.sync && data.sync.status === 'running') {
-                        syncPollRef.current = setTimeout(poll, 2000);
-                        return;
-                    }
-                    setIsSyncing(false);
-                    if (data.sync && data.sync.status === 'completed') {
-                        setPage(1);
-                        fetchProducts();
-                        shopify.toast.show(t('products_page.sync_completed'));
-                    } else if (data.sync && data.sync.status === 'failed') {
-                        shopify.toast.show(t('products_page.sync_failed'), { isError: true , duration: 999999 });
-                    }
-                } catch (error) {
-                    syncPollRef.current = setTimeout(poll, 2000);
-                }
-            };
-            poll();
+            selection = await shopify.resourcePicker({
+                type: 'product',
+                action: 'add',
+                multiple: true,
+            });
         } catch (error) {
-            console.error('Failed to start sync:', error);
-            setIsSyncing(false);
-            shopify.toast.show(t('products_page.sync_failed'), { isError: true , duration: 999999 });
+            // Picker errors are logged; a cancel resolves undefined instead.
+            console.error('Product picker failed:', error);
+            return;
         }
-    }, [isSyncing, fetchProducts, t, shopify]);
 
-    useEffect(() => () => {
-        if (syncPollRef.current) {
-            clearTimeout(syncPollRef.current);
+        if (!selection || selection.length === 0) return; // closed without picking
+
+        setIsAdding(true);
+        try {
+            const response = await fetch('/api/products/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selection.map((product) => product.id) }),
+            });
+            if (!response.ok) {
+                throw new Error(`Add products failed with status ${response.status}`);
+            }
+            const data = await response.json();
+
+            if (data.existing > 0) {
+                shopify.toast.show(
+                    t('products_page.products_added_with_existing_toast', {
+                        added: data.added,
+                        existing: data.existing,
+                    })
+                );
+            } else {
+                shopify.toast.show(t('products_page.products_added_toast', { count: data.added }));
+            }
+
+            setPage(1);
+            fetchProducts();
+        } catch (error) {
+            console.error('Failed to add products:', error);
+            shopify.toast.show(t('products_page.add_products_failed'), { isError: true, duration: 999999 });
+        } finally {
+            setIsAdding(false);
         }
-    }, []);
+    }, [isAdding, shopify, fetchProducts, t]);
 
     const enabledCount = stats.enabled;
     const syncTimeAgo = useMemo(() => {
@@ -410,18 +423,12 @@ const ProductsPage = () => {
 
                     <InlineStack gap="400" blockAlign="center">
                         <Button
-                            icon={isSyncing ? undefined : RefreshIcon}
-                            loading={isSyncing}
-                            onClick={handleSyncNow}
+                            icon={PlusIcon}
+                            loading={isAdding}
+                            onClick={handleAddProducts}
                         >
-                            {isSyncing ? t('products_page.syncing') : t('products_page.sync_now')}
+                            {t('products_page.add_more_products')}
                         </Button>
-                        <InlineStack gap="100" blockAlign="center">
-                            <Icon source={CheckCircleIcon} tone="success" />
-                            <Text variant="bodyMd" as="span" tone="success">
-                                {t('products_page.auto_sync_is_on')}
-                            </Text>
-                        </InlineStack>
                     </InlineStack>
                 </InlineStack>
 

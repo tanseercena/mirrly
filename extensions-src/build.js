@@ -71,8 +71,27 @@ const builds = [
   },
 ];
 
+// The onboarding Step 4 live-test page (web/public/tryon/index.html) loads
+// these same bundles from the app domain instead of Shopify's CDN. Copied via
+// an onEnd plugin so watch mode keeps the copy fresh too.
+const copyToWebPublic = {
+  name: 'copy-to-web-public',
+  setup(build) {
+    build.onEnd(() => {
+      const from = path.join(__dirname, '..', 'extensions', 'mirrly', 'assets');
+      const to = path.join(__dirname, '..', 'web', 'public', 'tryon');
+      fs.mkdirSync(to, { recursive: true });
+      for (const file of ['tryon-widget.js', 'tryon-styles.css']) {
+        fs.copyFileSync(path.join(from, file), path.join(to, file));
+      }
+    });
+  },
+};
+
 async function run() {
-  const contexts = await Promise.all(builds.map((cfg) => esbuild.context(cfg)));
+  const contexts = await Promise.all(
+    builds.map((cfg) => esbuild.context({ ...cfg, plugins: [...(cfg.plugins ?? []), copyToWebPublic] }))
+  );
 
   if (watch) {
     await Promise.all(contexts.map((ctx) => ctx.watch()));
