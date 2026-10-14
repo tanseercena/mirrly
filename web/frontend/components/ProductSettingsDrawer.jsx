@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppBridge } from '@shopify/app-bridge-react';
 import {
@@ -27,6 +27,7 @@ import {
     ArrowRightIcon,
 } from '@shopify/polaris-icons';
 import SessionFunnelDateFilter from './SessionFunnelDateFilter';
+import { AppContext } from './providers/AppProvider.jsx';
 
 /* ============================================
     PERFORMANCE HELPERS (mirror the Sessions page)
@@ -500,6 +501,7 @@ const VariantDrawer = ({ variant, product, onClose, onUploaded }) => {
 const ProductSettingsDrawer = ({ product, open, onClose, onSaved }) => {
     const { t } = useTranslation();
     const shopify = useAppBridge();
+    const { store } = useContext(AppContext);
     const [tryOnEnabled, setTryOnEnabled] = useState(true);
     const [selectedImageId, setSelectedImageId] = useState('1');
     const [styleHint, setStyleHint] = useState('');
@@ -554,6 +556,46 @@ const ProductSettingsDrawer = ({ product, open, onClose, onSaved }) => {
     const handleStyleHintChange = useCallback((value) => {
         if (value.length <= 120) setStyleHint(value);
     }, []);
+
+    // "Test this product": opens this product's real storefront page in a new
+    // tab with ?o_try=1 — the theme app embed auto-launches the try-on modal
+    // (fresh shopper identity per tab, so the per-product try limit never
+    // blocks repeated tests). Needs try-on saved ON so /session doesn't
+    // refuse. The app-embed flag only shapes the hint text: the saved flag
+    // can be stale (embed enabled straight in the theme editor), so it never
+    // blocks the test itself.
+    const storefrontDomain = store?.domain || store?.shopify_domain;
+    const embedFlagOn = !!(store?.setup_steps?.theme_extension_step);
+    const testTryOnDisabledReason =
+        !product?.tryOn ? 'disabled'
+        : !product?.handle ? 'unavailable'
+        : null;
+    const testTryOnHint = !product?.tryOn
+        ? t('product_drawer.test_try_on_hint_disabled')
+        : !product?.handle || !storefrontDomain
+            ? t('product_drawer.test_try_on_hint_embed')
+            : embedFlagOn
+                ? t('product_drawer.test_try_on_hint_active')
+                : t('product_drawer.test_try_on_hint_embed');
+    const [isOpeningTest, setIsOpeningTest] = useState(false);
+    const handleTestTryOn = useCallback(async () => {
+        if (testTryOnDisabledReason || !product?.handle || isOpeningTest) return;
+        setIsOpeningTest(true);
+        try {
+            // The backend returns the SIGNED storefront link (?o_try=1&o_sig=…) —
+            // the signature is what lets /session skip billing and session
+            // tracking, so it must come from the server, not be built here.
+            const response = await fetch('/api/products/test-url?product=' + product.id);
+            if (!response.ok) throw new Error(`test-url ${response.status}`);
+            const { url } = await response.json();
+            window.open(url, '_blank', 'noopener');
+        } catch (error) {
+            console.error('Failed to build test link:', error);
+            shopify.toast.show(t('product_drawer.test_try_on_failed'), { isError: true, duration: 999999 });
+        } finally {
+            setIsOpeningTest(false);
+        }
+    }, [testTryOnDisabledReason, isOpeningTest, product?.id, product?.handle, shopify, t]);
 
     if (!open || !product) return null;
 
@@ -926,7 +968,8 @@ const ProductSettingsDrawer = ({ product, open, onClose, onSaved }) => {
                                     </InlineStack>
                                 </BlockStack>
 
-                                {/* Test this product */}
+                                {/* Test this product — opens the real storefront page
+                                    with ?o_try=1; the app embed auto-launches the try-on */}
                                 <Box borderColor="border" borderWidth="025" padding="400" borderRadius="200">
                                     <InlineStack align="space-between" blockAlign="center" wrap={false}>
                                         <InlineStack gap="300" blockAlign="center" wrap={false}>
@@ -938,13 +981,19 @@ const ProductSettingsDrawer = ({ product, open, onClose, onSaved }) => {
                                                     {t('product_drawer.test_this_product')}
                                                 </Text>
                                                 <Text variant="bodySm" as="p" tone="subdued" >
-                                                    {t('product_drawer.test_this_product_description')}
+                                                    {testTryOnHint}
                                                 </Text>
                                             </BlockStack>
                                         </InlineStack>
 
                                         <div style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-                                            <Button>{t('product_drawer.test_now')}</Button>
+                                            <Button
+                                                onClick={handleTestTryOn}
+                                                disabled={testTryOnDisabledReason !== null}
+                                                loading={isOpeningTest}
+                                            >
+                                                {t('product_drawer.test_now')}
+                                            </Button>
                                         </div>
 
                                     </InlineStack>

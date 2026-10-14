@@ -21,16 +21,19 @@ class PlansSeeder extends Seeder
             'monthly_charge' => 0.00,
             'yearly_charge' => 0.00,
             'features' => [
-                'Unlimited try-on sessions',
+                '100 free try-on sessions',
                 '7-day analytics history',
                 '30 seconds session ',
                 'Standard try-on button',
                 'Chat Support',
-                
+
             ],
             'limits' => [
-                'sessions' => '',
-                'session_rate' => 0.90,
+                'sessions' => 100,
+                // Overage is granted in prepaid blocks: one $5 usage charge
+                // unlocks the whole block (never per-session billing).
+                'block_price' => 5.00,
+                'block_sessions' => 1000,
                 'analytics_history_days' => 7,
             ],
             'can' => [
@@ -40,7 +43,7 @@ class PlansSeeder extends Seeder
 
         Plan::create([
             'name' => 'Growth',
-            'monthly_charge' => 79.00,
+            'monthly_charge' => 29.00,
             'yearly_charge' => 63.00,
             'features' => [
                 '90-day analytics history',
@@ -52,8 +55,9 @@ class PlansSeeder extends Seeder
                 
             ],
             'limits' => [
-                'sessions' => 90,
-                'session_rate' => 0.80,
+                'sessions' => 5000,
+                'block_price' => 5.00,
+                'block_sessions' => 3000,
                 'analytics_history_days' => 90,
             ],
             'can' => [
@@ -63,7 +67,7 @@ class PlansSeeder extends Seeder
 
         Plan::create([
             'name' => 'Scale',
-            'monthly_charge' => 199.00,
+            'monthly_charge' => 49.00,
             'yearly_charge' => 159.00,
             'features' => [
                 'Unlimited analytics history',
@@ -75,8 +79,9 @@ class PlansSeeder extends Seeder
                 
             ],
             'limits' => [
-                'sessions' => 250,
-                'session_rate' => 0.75,
+                'sessions' => 10000,
+                'block_price' => 5.00,
+                'block_sessions' => 5000,
                 'analytics_history_days' => 'unlimited',
             ],
             'can' => [

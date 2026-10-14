@@ -72,6 +72,7 @@ Route::group(['middleware' => 'shopify.auth', 'prefix' => 'api'], function () {
     Route::post('products/bulk-toggle', [ProductsController::class, 'bulkToggleTryOn']);
     Route::post('products/settings', [ProductsController::class, 'updateSettings']);
     Route::post('products/add', [ProductsController::class, 'addProducts']);
+    Route::get('products/test-url', [ProductsController::class, 'testUrl']);
     Route::post('products/variant-images', [ProductsController::class, 'uploadVariantImages']);
     Route::post('products/sync', [ProductsController::class, 'syncNow']);
     Route::post('product-scope', [StoresController::class, 'saveProductScope']);

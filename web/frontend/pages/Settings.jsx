@@ -753,7 +753,7 @@ const PrivacyCard = ({ settings, onChange, t }) => {
     SECTION: CUSTOMER SESSION SETTINGS
     ============================================ */
 const CustomerSessionCard = ({ settings, onChange, t }) => {
-    const [trySessions, setTrySessions] = useState(String(settings?.try_sessions_per_product ?? '1'));
+    const [trySessions, setTrySessions] = useState(String(settings?.try_sessions_per_product ?? '10'));
     const [allowTryOnFor, setAllowTryOnFor] = useState(settings?.allow_try_on_for || 'all');
     const saveTimeoutRef = useRef(null);
     const pendingValueRef = useRef(null);
@@ -763,7 +763,7 @@ const CustomerSessionCard = ({ settings, onChange, t }) => {
         if (settings) {
             // Don't clobber the field while a debounced save is still pending
             if (pendingValueRef.current === null) {
-                setTrySessions(String(settings.try_sessions_per_product ?? '1'));
+                setTrySessions(String(settings.try_sessions_per_product ?? '10'));
             }
             setAllowTryOnFor(settings.allow_try_on_for || 'all');
         }
@@ -784,7 +784,7 @@ const CustomerSessionCard = ({ settings, onChange, t }) => {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = setTimeout(() => {
             pendingValueRef.current = null;
-            onChange('try_sessions_per_product', value === '' ? '1' : value);
+            onChange('try_sessions_per_product', value === '' ? '10' : value);
         }, 600);
     };
 
@@ -1008,9 +1008,9 @@ const NotificationsCard = ({ settings, onChange, storeEmail, t }) => {
                                 />
                             </div>
                         </InlineStack>
-                        <Text variant="bodySm" as="p" tone="subdued">
+                        {/* <Text variant="bodySm" as="p" tone="subdued">
                             {t('mirrly_settings.notifications_card.notifications_email_description')}
-                        </Text>
+                        </Text> */}
                     </BlockStack>
                 </BlockStack>
             </Card>
@@ -1049,59 +1049,59 @@ const NotificationsCard = ({ settings, onChange, storeEmail, t }) => {
 /* ============================================
     SECTION: ADVANCED
     ============================================ */
-const AdvancedCard = ({ t }) => {
-    const recordingOff = true;
+// const AdvancedCard = ({ t }) => {
+//     const recordingOff = true;
 
-    return (
-        <Box
-            background="bg-surface"
-            borderWidth="025"
-            borderColor="border-critical"
-            borderRadius="200"
-            padding="400"
-        >
-            <BlockStack gap="400">
-                <BlockStack gap="050">
-                    <Text variant="headingMd" as="h3" fontWeight={600} tone="critical">
-                        {t('mirrly_settings.advanced_card.title')}
-                    </Text>
-                    <Text variant="bodySm" as="p" tone="subdued">
-                        {t('mirrly_settings.advanced_card.description')}
-                    </Text>
-                </BlockStack>
+//     return (
+//         <Box
+//             background="bg-surface"
+//             borderWidth="025"
+//             borderColor="border-critical"
+//             borderRadius="200"
+//             padding="400"
+//         >
+//             <BlockStack gap="400">
+//                 <BlockStack gap="050">
+//                     <Text variant="headingMd" as="h3" fontWeight={600} tone="critical">
+//                         {t('mirrly_settings.advanced_card.title')}
+//                     </Text>
+//                     <Text variant="bodySm" as="p" tone="subdued">
+//                         {t('mirrly_settings.advanced_card.description')}
+//                     </Text>
+//                 </BlockStack>
 
-                <InlineStack align="space-between" blockAlign="center" wrap={false}>
-                    <SettingsRow
-                        icon={RefreshIcon}
-                        iconBg="bg-fill-critical-secondary"
-                        iconTone="critical"
-                        title={t('mirrly_settings.advanced_card.reset_onboarding')}
-                        description={t('mirrly_settings.advanced_card.reset_onboarding_description')}
-                    />
-                    <Button>{t('mirrly_settings.advanced_card.reset_onboarding_button')}</Button>
-                </InlineStack>
+//                 <InlineStack align="space-between" blockAlign="center" wrap={false}>
+//                     <SettingsRow
+//                         icon={RefreshIcon}
+//                         iconBg="bg-fill-critical-secondary"
+//                         iconTone="critical"
+//                         title={t('mirrly_settings.advanced_card.reset_onboarding')}
+//                         description={t('mirrly_settings.advanced_card.reset_onboarding_description')}
+//                     />
+//                     <Button>{t('mirrly_settings.advanced_card.reset_onboarding_button')}</Button>
+//                 </InlineStack>
 
-                <InlineStack align="space-between" blockAlign="center" wrap={false}>
-                    <SettingsRow
-                        icon={DeleteIcon}
-                        iconBg="bg-fill-critical-secondary"
-                        iconTone="critical"
-                        title={t('mirrly_settings.advanced_card.clear_stored_clips')}
-                        description={t('mirrly_settings.advanced_card.clear_stored_clips_description')}
-                    />
-                    <BlockStack gap="100" inlineAlign="end">
-                        <Button disabled={recordingOff}>{t('mirrly_settings.advanced_card.clear_clips_button')}</Button>
-                        {recordingOff && (
-                            <Text variant="bodySm" as="p" tone="subdued">
-                                {t('mirrly_settings.advanced_card.recording_is_off')}
-                            </Text>
-                        )}
-                    </BlockStack>
-                </InlineStack>
-            </BlockStack>
-        </Box>
-    );
-};
+//                 <InlineStack align="space-between" blockAlign="center" wrap={false}>
+//                     <SettingsRow
+//                         icon={DeleteIcon}
+//                         iconBg="bg-fill-critical-secondary"
+//                         iconTone="critical"
+//                         title={t('mirrly_settings.advanced_card.clear_stored_clips')}
+//                         description={t('mirrly_settings.advanced_card.clear_stored_clips_description')}
+//                     />
+//                     <BlockStack gap="100" inlineAlign="end">
+//                         <Button disabled={recordingOff}>{t('mirrly_settings.advanced_card.clear_clips_button')}</Button>
+//                         {recordingOff && (
+//                             <Text variant="bodySm" as="p" tone="subdued">
+//                                 {t('mirrly_settings.advanced_card.recording_is_off')}
+//                             </Text>
+//                         )}
+//                     </BlockStack>
+//                 </InlineStack>
+//             </BlockStack>
+//         </Box>
+//     );
+// };
 
 /* ============================================
     SETTINGS PAGE
@@ -1132,7 +1132,7 @@ const SettingsPage = () => {
 
     // Customer session state
     const [customerSession, setCustomerSession] = useState({
-        try_sessions_per_product: '1',
+        try_sessions_per_product: '10',
         allow_try_on_for: 'all',
     });
 
@@ -1356,7 +1356,7 @@ const SettingsPage = () => {
                 </div>
                 {/* <CameraFallbackCard settings={cameraFallback} onChange={handleCameraFallbackChange} t={t} /> */}
                 <NotificationsCard settings={notification} onChange={handleNotificationChange} storeEmail={storeEmail} t={t} />
-                <AdvancedCard t={t} />
+                {/* <AdvancedCard t={t} /> */}
             </BlockStack>
         </Page>
     );

@@ -164,20 +164,15 @@ QUERY;
                 'test' => (config('app.debug') || in_array($store->shopify_domain, $dev_test_stores)) ? true : null,
                 'trialDays' => $trialDays,
                 // Usage cap is the monthly ceiling Shopify enforces on over-limit
-                // session charges; the plan's session_rate drives the actual price.
-                'usageTerms' => $plan->name == 'unlimited' ? "For each 1,000 over-plan orders you'll pay $1.50" : '$' . number_format((float) ($plan->limits['session_rate'] ?? 0), 2) . ' per try-on session beyond the ' . ((int) ($plan->limits['sessions'] ?? 0)) . ' included in the plan',
+                // block charges; block_price/block_sessions drive the actual price.
+                'usageTerms' => $plan->name == 'unlimited' ? "For each 1,000 over-plan orders you'll pay $1.50" : '$' . number_format((float) ($plan->limits['block_price'] ?? 0), 2) . ' per ' . number_format((int) ($plan->limits['block_sessions'] ?? 0)) . ' try-on sessions beyond the ' . number_format((int) ($plan->limits['sessions'] ?? 0)) . ' included in the plan',
                 'usageCappedAmount' => 500,
             ];
 
-            // Free plan: show the $0.00 price on Shopify's approval page and
-            // describe usage in sessions (pay-as-you-go), matching the plan.
+            // Free plan: show the $0.00 price on Shopify's approval page — the
+            // usage terms (block overage) are the same as every other plan.
             if ($plan->id == 1) {
                 $billing['chargeName'] = 'Free ($0.00/month)';
-
-                $sessionRate = (float) ($plan->limits['session_rate'] ?? 0);
-                if ($sessionRate > 0) {
-                    $billing['usageTerms'] = '$' . number_format($sessionRate, 2) . ' per try-on session (pay as you go)';
-                }
             }
 
     //        Log::debug("Initiated billing for $shop");
@@ -386,6 +381,11 @@ QUERY;
             'next_reset_date' => now()->addMonth(),
         ]);
 
+        // Fresh cycle on Free — usage from the cancelled plan doesn't count
+        // against the Free plan's included sessions.
+        $store->monthly_sessions = 0;
+        $store->save();
+
         return response()->json(['message' => 'Successfully downgraded to free plan'], 200);
     }
 
@@ -458,6 +458,11 @@ QUERY;
             ->update([
                 'status' => 'cancelled',
             ]);
+
+        // A purchased plan starts a fresh cycle (the reset dates above were
+        // pushed to now + 1 month too) — usage counted under the previous
+        // plan must not eat into the new plan's included sessions.
+        $store->monthly_sessions = 0;
 
         if ($plan) {
             /* This is for pro rata calculation based but not need as for now

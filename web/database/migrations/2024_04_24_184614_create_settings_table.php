@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('settings', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('store_id');
-            $table->enum("collection_type", ['all', 'specific'])->default('all');
+            $table->string("collection_type", 20)->default('all');
             $table->json('collections')->nullable();
             $table->json('button_branding')->nullable();
             $table->json('camera_fallback')->nullable();

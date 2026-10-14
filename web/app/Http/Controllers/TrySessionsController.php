@@ -58,6 +58,12 @@ class TrySessionsController extends Controller
             return response()->json(['error' => 'Unknown event'], 400);
         }
 
+        // Admin-test sessions aren't rows in try_sessions — their synthetic
+        // admintest-* tokens are acked and dropped, never stored or counted.
+        if (str_starts_with((string) $request->input('session_token'), 'admintest-')) {
+            return response()->json(['success' => true]);
+        }
+
         $session = TrySession::where('store_id', $store->id)
             ->where('session_token', $request->input('session_token'))
             ->first();
@@ -112,17 +118,20 @@ class TrySessionsController extends Controller
 
         // Integrity check: ties this call back to the exact /config response
         // the shopper was shown — /session can't be reached with an arbitrary
-        // product_id without going through /config first.
+        // product_id without going through /config first. The admin_test
+        // claim (verified upstream in /config via the signed o_sig link) is
+        // trusted only because it arrives inside this signed token.
         $claims = ConfigToken::verify($request->input('config_token'));
         $productId = (string) ($claims['product_id'] ?? '');
+        $adminTest = (bool) ($claims['admin_test'] ?? false);
         if (!$claims || ($claims['shop'] ?? null) !== $shop || $productId === '') {
             return response()->json(['error' => 'Invalid or expired config token'], 401);
         }
 
         $variantId = (string) ($request->input('variant_id') ?: $claims['variant_id']);
 
-        // A product without try_on enabled can't be tried on, even if someone
-        // crafts the request directly.
+        // A product without try_on enabled can't be tried on, even for an
+        // admin test — the drawer disables the button for it anyway.
         $product = Product::where('store_id', $store->id)
             ->where('shopify_product_id', $productId)
             ->where('try_on', true)
@@ -131,13 +140,38 @@ class TrySessionsController extends Controller
             return response()->json(['error' => 'Try-on is not available for this product'], 404);
         }
 
+        // ── Admin test path ─────────────────────────────────────────────
+        // Verified via the admin_test claim inside the SIGNED config token
+        // (which /config only mints for valid o_sig links). Full try-on, but:
+        // no identity gates, no per-product try limit, NO usage billing, and
+        // NO try_sessions row — so nothing shows up in dashboards, analytics,
+        // usage counters, or Shopify charges. The synthetic token is only
+        // usable for this response; /event and /recording ignore it.
+        if ($adminTest) {
+            $rigService = app(RigService::class);
+            $referenceImageUrl = $rigService->resolveReferenceImageUrl(
+                $product,
+                ctype_digit($variantId) ? (int) $variantId : null
+            );
+            $rig = $rigService->resolveRig($product);
+
+            return response()->json([
+                'session_token' => 'admintest-' . Str::uuid(),
+                'reference_image_url' => $referenceImageUrl,
+                'rig' => $rig,
+                'max_duration_seconds' => max(30, (int) config('services.tryon.max_session_duration', 30)),
+                'recording' => false,
+                'admin_test' => true,
+            ]);
+        }
+
         // Customer session gates (Settings → Customer session card): who may
         // try on, and how many times the same shopper may try ONE product.
         // The shopper is their logged-in Shopify customer id when available,
         // otherwise a browser-persisted anonymous id sent by the widget.
         $customerSession = $store->setting?->customer_session ?? [];
         $allowTryOnFor = $customerSession['allow_try_on_for'] ?? 'all';
-        $tryLimit = max(1, (int) ($customerSession['try_sessions_per_product'] ?? 1));
+        $tryLimit = max(1, (int) ($customerSession['try_sessions_per_product'] ?? 10));
 
         $customerId = ctype_digit((string) $request->input('customer_id'))
             ? (int) $request->input('customer_id')
@@ -207,8 +241,8 @@ class TrySessionsController extends Controller
             // Usage billing gates every NEW session (resumes never re-charge).
             // It runs BEFORE the row insert so nothing billable gets provisioned
             // for a refused attempt: once the plan's included sessions are spent,
-            // each new session costs the plan's session_rate through Shopify's
-            // usage charge — and a charge that can't go through refuses the
+            // the attempt that opens a new overage block fires ONE charge for
+            // the whole block — and a charge that can't go through refuses the
             // session (storefront shows the "billing_failed" screen).
             if (!app(UsageBillingService::class)->chargeForSession($store, $product)) {
                 return response()->json([

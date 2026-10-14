@@ -78,7 +78,8 @@ class CheckSpendMilestoneJob implements ShouldQueue
                 $used,
                 $included,
                 $threshold,
-                (float) ($plan->limits['session_rate'] ?? 0)
+                (float) ($plan->limits['block_price'] ?? 0),
+                (int) ($plan->limits['block_sessions'] ?? 0)
             ));
 
         StoreNotifications::logSent($this->store, 'spend_milestone', [

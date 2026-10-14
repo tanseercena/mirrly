@@ -43,6 +43,11 @@ export interface ConfigResponse {
   // explicit opt-in — not this flag — is what starts the recorder. Optional
   // so a stale cached config without the flag simply means "no checkbox".
   recording?: boolean;
+  // True when /config verified the visit as an admin test (signed o_sig link
+  // from the product drawer). The loader passes it into the widget so the
+  // result screens hide the commerce UI (add-to-cart) — it's a test, not a
+  // shopper path to checkout.
+  admin_test?: boolean;
   button: ButtonSettings;
   product: ProductInfo | null;
   // Short-lived (~5 min) signed JWT (product_id, variant_id, shop, exp).

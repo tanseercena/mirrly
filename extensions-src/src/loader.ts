@@ -17,16 +17,48 @@ function init() {
   roots.forEach(setUpRoot);
 }
 
+/**
+ * Admin-triggered test (Products page drawer opens
+ * {storefront}/products/{handle}?o_try=1 in a new tab): auto-launch the
+ * try-on instead of waiting for the button click. A FRESH anonymous id is
+ * written first so the per-product try limit (keyed on that id) never
+ * blocks repeated tests by the same merchant.
+ */
+function isAutoTry(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).get('o_try') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function primeFreshAnonymousId() {
+  const KEY = 'tryon:anon-id';
+  const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `anon-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  try {
+    localStorage.setItem(KEY, id);
+  } catch {
+    /* storage blocked — the widget falls back to a per-visit id */
+  }
+}
+
 async function setUpRoot(root: HTMLElement) {
   const data = root.dataset as unknown as RootDataset;
   const { customerId } = data;
+  const autoTry = isAutoTry();
+
+  if (autoTry) {
+    primeFreshAnonymousId();
+  }
 
   let config;
   try {
     // Token first — cached in sessionStorage after the first call, so later
     // pages/calls reuse it instead of hitting the api-token route again.
     await fetchApiToken(data.shop);
-    config = await fetchConfig(data.productId, data.variantId, customerId);
+    config = await fetchConfig(data.productId, data.variantId, customerId, adminTestParams());
   } catch (err) {
     // Fail silently on the storefront — a broken config fetch should never
     // surface an error to a shopper who wasn't trying to use the feature.
@@ -47,6 +79,38 @@ async function setUpRoot(root: HTMLElement) {
       launching = false;
     });
   });
+
+  if (autoTry) {
+    // Drop the admin-test params from the address bar so a manual refresh
+    // doesn't auto-open the modal again.
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('o_try');
+      url.searchParams.delete('o_exp');
+      url.searchParams.delete('o_sig');
+      window.history.replaceState(null, '', url.toString());
+    } catch {
+      /* leave the params — cosmetic only */
+    }
+
+    void launchWidget(button, root, data, config, config.admin_test === true);
+  }
+}
+
+/**
+ * The signed admin-test proof (?o_try=1&o_exp=…&o_sig=…), forwarded to
+ * /config verbatim. Empty for normal storefront visits — /config then
+ * treats it as a regular shopper.
+ */
+function adminTestParams(): Record<string, string> {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const sig = params.get('o_sig');
+    const exp = params.get('o_exp');
+    return sig && exp ? { o_sig: sig, o_exp: exp } : {};
+  } catch {
+    return {};
+  }
 }
 
 function buildButton(settings: ButtonSettings): HTMLButtonElement {
@@ -70,7 +134,8 @@ async function launchWidget(
   button: HTMLButtonElement,
   root: HTMLElement,
   data: RootDataset,
-  bootConfig: ConfigResponse
+  bootConfig: ConfigResponse,
+  adminTest = false
 ) {
   setButtonLoading(button, true);
 
@@ -89,6 +154,8 @@ async function launchWidget(
       product: resolved.config.product,
       // Recording offer for the intro screen — /session still re-checks.
       recording: resolved.config.recording ?? false,
+      // Admin test: hide the commerce UI on the result screens.
+      adminTest,
       // Blocked shoppers get an explanatory screen inside the modal instead
       // of the intro — the camera is never requested. /session re-checks.
       blocked:

@@ -29,7 +29,7 @@ import {
 } from '@shopify/polaris-icons';
 
 import ProductSettingsDrawer from '../components/ProductSettingsDrawer';
-import { prefetchJSON } from '../utils/prefetch.js';
+import { prefetchJSON, getCachedPageData, putCachedPageData } from '../utils/prefetch.js';
 
 /* ============================================
     CUSTOM TOGGLE SWITCH
@@ -120,30 +120,47 @@ const ProductsPage = () => {
         return () => clearTimeout(timer);
     }, [searchInput]);
 
-    const fetchProducts = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const params = new URLSearchParams({
-                page: String(page),
-                per_page: perPage,
-                status: statusFilter,
-            });
-            if (searchValue) {
-                params.set('search', searchValue);
-            }
-            if (collectionFilter !== 'all') {
-                params.set('collection_id', collectionFilter);
-            }
+    const applyProductsData = useCallback((data) => {
+        setProducts(data.products ?? []);
+        setPagination(data.pagination ?? null);
+        setStats(data.stats ?? { total: 0, enabled: 0, lastSyncedAt: null });
+        setCollections(data.collections ?? []);
+    }, []);
 
+    const fetchProducts = useCallback(async () => {
+        const params = new URLSearchParams({
+            page: String(page),
+            per_page: perPage,
+            status: statusFilter,
+        });
+        if (searchValue) {
+            params.set('search', searchValue);
+        }
+        if (collectionFilter !== 'all') {
+            params.set('collection_id', collectionFilter);
+        }
+        const url = `/api/products?${params.toString()}`;
+
+        // Revisits render instantly from the last response for this exact
+        // query (page cache); the background refetch keeps it current.
+        const cached = getCachedPageData(url);
+        if (cached) {
+            applyProductsData(cached);
+            setIsLoading(false);
+        } else {
+            setIsLoading(true);
+        }
+
+        try {
             // The initial load resolves instantly from the request that
             // index.html warmed at parse time; filter/page changes fetch fresh.
-            const response = await prefetchJSON(`/api/products?${params.toString()}`);
+            const response = await prefetchJSON(url);
             const data = response?.data ?? {};
+            if (response?.ok && data.products) {
+                putCachedPageData(url, data);
+            }
 
-            setProducts(data.products ?? []);
-            setPagination(data.pagination ?? null);
-            setStats(data.stats ?? { total: 0, enabled: 0, lastSyncedAt: null });
-            setCollections(data.collections ?? []);
+            applyProductsData(data);
         } catch (error) {
             console.error('Failed to fetch products:', error);
         } finally {
@@ -257,9 +274,19 @@ const ProductsPage = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ids: selection.map((product) => product.id) }),
             });
+
+            // Backend attaches a specific reason (e.g. Shopify unreachable) —
+            // prefer it over the generic fallback.
             if (!response.ok) {
-                throw new Error(`Add products failed with status ${response.status}`);
+                let message = t('products_page.add_products_failed');
+                try {
+                    message = (await response.json())?.message ?? message;
+                } catch {
+                    // non-JSON body — keep the generic message
+                }
+                throw new Error(message);
             }
+
             const data = await response.json();
 
             if (data.existing > 0) {
@@ -277,7 +304,10 @@ const ProductsPage = () => {
             fetchProducts();
         } catch (error) {
             console.error('Failed to add products:', error);
-            shopify.toast.show(t('products_page.add_products_failed'), { isError: true, duration: 999999 });
+            shopify.toast.show(error.message || t('products_page.add_products_failed'), {
+                isError: true,
+                duration: 999999,
+            });
         } finally {
             setIsAdding(false);
         }

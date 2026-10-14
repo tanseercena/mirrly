@@ -19,7 +19,8 @@ class SpendMilestoneMail extends Mailable implements ShouldQueue
         public int $used,
         public int $included,
         public int $threshold,
-        public float $sessionRate,
+        public float $blockPrice,
+        public int $blockSessions,
     ) {
     }
 

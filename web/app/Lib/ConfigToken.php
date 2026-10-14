@@ -9,16 +9,16 @@ class ConfigToken
 {
     public const TTL = 300;
 
-    public static function mint(string $shop, ?string $productId, ?string $variantId): string
+    public static function mint(string $shop, ?string $productId, ?string $variantId, array $extraClaims = []): string
     {
         $segments = [
             self::base64UrlEncode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])),
-            self::base64UrlEncode(json_encode([
+            self::base64UrlEncode(json_encode(array_merge([
                 'shop' => $shop,
                 'product_id' => $productId,
                 'variant_id' => $variantId,
                 'exp' => time() + self::TTL,
-            ])),
+            ], $extraClaims))),
         ];
         $signature = hash_hmac('sha256', implode('.', $segments), (string) config('app.key'), true);
         $segments[] = self::base64UrlEncode($signature);

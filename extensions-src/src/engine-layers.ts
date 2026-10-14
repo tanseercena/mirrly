@@ -160,13 +160,16 @@ export interface ActiveLayer {
 }
 
 // Load a texture cross-origin-safe. Resolves null when the image can't be
-// loaded (the layer is skipped — never blocks the try-on).
+// loaded (the layer is skipped — never blocks the try-on). Failures are
+// LOGGED: a silently-invisible garment is indistinguishable from a broken
+// rig without this.
 async function loadTexture(url: string): Promise<THREE.Texture | null> {
   try {
     const texture = await new THREE.TextureLoader().loadAsync(url);
     texture.colorSpace = THREE.SRGBColorSpace;
     return texture;
-  } catch {
+  } catch (err) {
+    console.error('[tryon] garment texture failed to load:', url, err);
     return null;
   }
 }

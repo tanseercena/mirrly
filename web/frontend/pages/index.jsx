@@ -29,7 +29,7 @@ import { PageLoader } from "../components/PageLoader.jsx";
 import SessionFunnelDateFilter from '../components/SessionFunnelDateFilter';
 import { isCardDismissed, dismissCard } from "../utils/sessionStorage.js";
 import { defaultRange, toISODate } from "../utils/analyticsRange.js";
-import { prefetchJSON } from "../utils/prefetch.js";
+import { prefetchJSON, getCachedPageData, putCachedPageData } from "../utils/prefetch.js";
 
 
 import useReviewModal from "../hooks/useReviewModal.js";
@@ -61,6 +61,12 @@ const APP_ID = '9d72bb0915715baf6d8d8b6b9bb15d29';
 const EXTENSION_HANDLE = 'mirrly';
 const THEME_POLL_INTERVAL_MS = 1000;
 const THEME_POLL_MAX_ATTEMPTS = 30; // checks every 1s for up to 30s
+
+// Last /api/subscription response — module scope survives route changes, so
+// navigating back to the dashboard renders instantly instead of re-showing
+// the banner's loading state on every visit. Every mount still refetches in
+// the background to stay current.
+let dashboardSubscriptionCache = null;
 
 /* ============================================
     OVERVIEW ANALYTICS
@@ -383,7 +389,12 @@ const IndexPage = () => {
         enabled: true,
     });
 
-    const [subscriptionData, setSubscriptionData] = useState(null);
+    // Module-level cache: survives route changes, so returning to the
+    // dashboard renders the banner (and plan card) instantly from the last
+    // response while the background refetch keeps it current.
+    const [subscriptionData, setSubscriptionData] = useState(
+        () => dashboardSubscriptionCache?.data ?? null
+    );
 
     /**
      * Plan/usage derived values
@@ -429,10 +440,17 @@ const IndexPage = () => {
         let cancelled = false;
 
         const load = async () => {
+            // Revisits render instantly from the last response (page cache);
+            // the background refetch below keeps it current.
+            const cached = getCachedPageData('/api/sessions/recent');
+            if (cached?.data) {
+                setRecentSessions(cached.data);
+            }
             try {
                 const response = await prefetchJSON('/api/sessions/recent');
                 const payload = response && response.ok ? response.data : null;
                 if (!cancelled && payload && payload.data) {
+                    putCachedPageData('/api/sessions/recent', payload);
                     setRecentSessions(payload.data);
                 }
             } catch (error) {
@@ -468,6 +486,7 @@ const IndexPage = () => {
             try {
                 const response = await prefetchJSON("/api/subscription");
                 if (response && response.ok && response.data) {
+                    dashboardSubscriptionCache = { data: response.data.data };
                     setSubscriptionData(response.data.data);
                 }
             } catch (error) {
@@ -489,15 +508,25 @@ const IndexPage = () => {
         let cancelled = false;
 
         const load = async () => {
-            setIsOverviewLoading(true);
+            const params = new URLSearchParams({
+                from: toISODate(overviewRange.start),
+                to: toISODate(overviewRange.end),
+            });
+            const url = '/api/sessions/analytics?' + params.toString();
+            // Revisits render instantly from the last response (page cache);
+            // the background refetch below keeps it current.
+            const cached = getCachedPageData(url);
+            if (cached?.data) {
+                setOverviewAnalytics(cached.data);
+                setIsOverviewLoading(false);
+            } else {
+                setIsOverviewLoading(true);
+            }
             try {
-                const params = new URLSearchParams({
-                    from: toISODate(overviewRange.start),
-                    to: toISODate(overviewRange.end),
-                });
-                const response = await prefetchJSON('/api/sessions/analytics?' + params.toString());
+                const response = await prefetchJSON(url);
                 const payload = response && response.ok ? response.data : null;
                 if (!cancelled && payload && payload.data) {
+                    putCachedPageData(url, payload);
                     setOverviewAnalytics(payload.data);
                 }
             } catch (error) {

@@ -34,7 +34,7 @@ import { SparkLineChart, LineChart } from '@shopify/polaris-viz';
 import '@shopify/polaris-viz/build/esm/styles.css';
 import SessionFunnelDateFilter from '../components/SessionFunnelDateFilter';
 import { PageLoader } from '../components/PageLoader.jsx';
-import { prefetchJSON } from '../utils/prefetch.js';
+import { prefetchJSON, getCachedPageData, putCachedPageData } from '../utils/prefetch.js';
 
 /* ============================================
     SHARED HELPERS
@@ -628,17 +628,25 @@ const SessionsProductTables = ({ range }) => {
         let cancelled = false;
 
         const load = async () => {
-            setIsLoading(true);
+            const params = new URLSearchParams({
+                from: toISODate(range.start),
+                to: toISODate(range.end),
+            });
+            const url = '/api/sessions/product-performance?' + params.toString();
+            // Revisits render instantly from the last response (page cache);
+            // the background refetch below keeps it current.
+            const cached = getCachedPageData(url);
+            if (cached?.data) {
+                setPerformance(cached.data);
+                setIsLoading(false);
+            } else {
+                setIsLoading(true);
+            }
             try {
-                const params = new URLSearchParams({
-                    from: toISODate(range.start),
-                    to: toISODate(range.end),
-                });
-                // Initial load resolves instantly from the request index.html
-                // warmed at parse time; range changes fetch fresh.
-                const response = await prefetchJSON('/api/sessions/product-performance?' + params.toString());
+                const response = await prefetchJSON(url);
                 const payload = response && response.ok ? response.data : null;
                 if (!cancelled && payload && payload.data) {
+                    putCachedPageData(url, payload);
                     setPerformance(payload.data);
                 }
             } catch (error) {
@@ -690,17 +698,25 @@ const SessionsPage = () => {
         let cancelled = false;
 
         const load = async () => {
-            setIsLoading(true);
+            const params = new URLSearchParams({
+                from: toISODate(range.start),
+                to: toISODate(range.end),
+            });
+            const url = '/api/sessions/analytics?' + params.toString();
+            // Revisits render instantly from the last response (page cache);
+            // the background refetch below keeps it current.
+            const cached = getCachedPageData(url);
+            if (cached?.data) {
+                setAnalytics(cached.data);
+                setIsLoading(false);
+            } else {
+                setIsLoading(true);
+            }
             try {
-                const params = new URLSearchParams({
-                    from: toISODate(range.start),
-                    to: toISODate(range.end),
-                });
-                // Initial load resolves instantly from the request index.html
-                // warmed at parse time; range changes fetch fresh.
-                const response = await prefetchJSON('/api/sessions/analytics?' + params.toString());
+                const response = await prefetchJSON(url);
                 const payload = response && response.ok ? response.data : null;
                 if (!cancelled && payload && payload.data) {
+                    putCachedPageData(url, payload);
                     setAnalytics(payload.data);
                 }
             } catch (error) {

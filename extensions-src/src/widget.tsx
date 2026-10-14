@@ -4,7 +4,7 @@ import type { ProductInfo, ShopperBlockReason } from './types';
 
 // Build marker — bump whenever debugging whether the storefront is running
 // a stale cached copy of this bundle.
-console.log('[tryon] widget bundle 2026-10-05-r6 (warp grid snapshot)');
+console.log('[tryon] widget bundle 2026-10-10-r5 (fix inverted engine resume on connect)');
 
 interface MountOptions {
   configToken: string;
@@ -21,6 +21,9 @@ interface MountOptions {
   // Master switch from /config — when true the intro screen offers the
   // optional recording checkbox. The shopper's opt-in drives the recorder.
   recording?: boolean;
+  // Admin test (signed ?o_try=1&o_sig=… link from the product drawer):
+  // hides the commerce UI (add-to-cart) on the result screens.
+  adminTest?: boolean;
 }
 
 export function mountWidget(root: HTMLElement, opts: MountOptions) {
@@ -42,6 +45,7 @@ export function mountWidget(root: HTMLElement, opts: MountOptions) {
       product={opts.product}
       blocked={opts.blocked}
       recording={opts.recording ?? false}
+      adminTest={opts.adminTest ?? false}
       onClose={close}
     />,
     modalHost

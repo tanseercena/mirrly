@@ -48,7 +48,12 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
   // Transparent, over the <video>; orthographic camera so normalized
   // landmark coordinates map linearly to scene x/y (z stays free for
   // rotation/occlusion logic later).
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  // preserveDrawingBuffer is REQUIRED: the recorder and the result-screen
+  // snapshot drawImage() this canvas from outside its own render frame
+  // (setInterval / session-end) — without it the WebGL back buffer is
+  // already cleared and the composite captures the camera feed with NO
+  // garment on it.
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(videoWidth, videoHeight, false);
   const scene = new THREE.Scene();

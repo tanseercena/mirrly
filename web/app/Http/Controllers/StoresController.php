@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Lib\AdminTestLink;
 use App\Lib\ConfigToken;
 use App\Lib\TopLevelRedirection;
 use App\Mail\SendFeedback;
@@ -62,17 +63,25 @@ class StoresController extends Controller
         // Shopper eligibility for the customer-session gates (login requirement
         // + per-product try limit). The widget shows a friendly message before
         // ever requesting the camera; /session re-checks both authoritatively.
+        // Admin tests skip eligibility entirely — they exercise the try-on.
+        $adminTest = AdminTestLink::verify(
+            $store->shopify_domain,
+            (string) $request->input('product_id'),
+            $request->input('o_exp'),
+            $request->input('o_sig')
+        );
+
         $customerSession = $store->setting?->customer_session ?? [];
         [$customerId, $anonymousId] = $this->shopperIdentity($request);
-        $shopper = $this->shopperEligibility($store, $product, $customerSession, $customerId, $anonymousId);
+        $shopper = $adminTest ? ['allowed' => true] : $this->shopperEligibility($store, $product, $customerSession, $customerId, $anonymousId);
 
         return response()->json([
             'enabled' => true, // later changed based on products try on enable or disabled from products table
             'shopper' => $shopper,
-            // Master switch for the intro screen's optional "record my
-            // session" checkbox. Only makes the checkbox visible — the
-            // shopper's explicit opt-in is what actually starts the recorder.
-            'recording' => (bool) ($store->setting?->privacy_recording['recording'] ?? false),
+            'admin_test' => $adminTest,
+            // Admin tests never see the recording checkbox — the offer only
+            // makes sense for real shoppers.
+            'recording' => $adminTest ? false : (bool) ($store->setting?->privacy_recording['recording'] ?? false),
             'button' => [
                 'text' => $branding['buttonText'] ?? 'Try it on live',
                 'position' => $positionMap[$branding['position']] ?? 'below_add_to_cart',
@@ -86,7 +95,10 @@ class StoresController extends Controller
             'config_token' => ConfigToken::mint(
                 $shop,
                 $request->input('product_id'),
-                $request->input('variant_id')
+                $request->input('variant_id'),
+                // Signed proof rides inside the token — /session can trust it
+                // without ever seeing the original o_sig.
+                $adminTest ? ['admin_test' => true] : []
             ),
         ]);
     }
@@ -119,7 +131,7 @@ class StoresController extends Controller
         $gate = ($allowTryOnFor === 'logged_in' && !$customerId) ? 'login_required' : null;
 
         if (!$gate && $product && ($customerId || $anonymousId)) {
-            $tryLimit = max(1, (int) ($customerSession['try_sessions_per_product'] ?? 1));
+            $tryLimit = max(1, (int) ($customerSession['try_sessions_per_product'] ?? 10));
             $tries = TrySession::where('store_id', $store->id)
                 ->where('product_id', $product->id)
                 ->where($customerId ? 'shopify_customer_id' : 'anonymous_id', $customerId ?? $anonymousId)
@@ -392,7 +404,7 @@ class StoresController extends Controller
         $collections = $request->input('collections');
 
         $setting->collection_type = $collectionType;
-        $setting->collections = $collectionType === 'specific' ? $collections : null;
+        $setting->collections = in_array($collectionType, ['specific', 'products']) ? $collections : null;
         $setting->save();
 
         // Save live test completion into setup steps (checked by the dashboard setup banner)
@@ -415,7 +427,7 @@ class StoresController extends Controller
     public function saveProductScope(Request $request)
     {
         $request->validate([
-            'collection_type' => 'required|in:all,specific',
+            'collection_type' => 'required|in:all,specific,products',
             'collections' => 'nullable|array',
         ]);
 
@@ -432,7 +444,7 @@ class StoresController extends Controller
         $setting = $store->setting ?: $store->setting()->create([]);
 
         $collectionType = $request->input('collection_type');
-        $collections = $collectionType === 'specific' ? $request->input('collections', []) : null;
+        $collections = in_array($collectionType, ['specific', 'products']) ? $request->input('collections', []) : null;
 
         $scopeChanged = $setting->collection_type !== $collectionType
             || $setting->collections !== $collections;
@@ -574,7 +586,7 @@ class StoresController extends Controller
 
         // Build customer session data structure
         $customerSession = [
-            'try_sessions_per_product' => max(1, (int) $request->input('try_sessions_per_product', 1)),
+            'try_sessions_per_product' => max(1, (int) $request->input('try_sessions_per_product', 10)),
             'allow_try_on_for' => in_array($request->input('allow_try_on_for'), ['all', 'logged_in'], true)
                 ? $request->input('allow_try_on_for')
                 : 'all',

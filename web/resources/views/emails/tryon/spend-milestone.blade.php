@@ -9,8 +9,8 @@
             ({{ $included > 0 ? round(($used / $included) * 100, 1) : 0 }}%).
         </p>
         <p style="margin:0 0 16px;font-size:14px;color:#333;">
-            Once all included sessions are used, each additional try-on session is billed at
-            <strong>${{ number_format($sessionRate, 2) }}</strong> per session.
+            Once all included sessions are used, a <strong>${{ number_format($blockPrice, 2) }}</strong> charge
+            unlocks <strong>{{ number_format($blockSessions) }}</strong> additional try-on sessions.
         </p>
         <p style="margin:0 0 20px;font-size:14px;color:#333;">
             Upgrade your plan or keep going — your sessions keep running either way.

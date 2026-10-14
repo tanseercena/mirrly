@@ -169,9 +169,23 @@ class ProcessBulkOperationResultJob implements ShouldQueue
 
     /**
      * Second pass: flip try_on on for every product this sync covers.
+     *
+     * For the "products" scope (individual picks) the sync pulled the whole
+     * catalog, but only the picked product ids get try-on enabled.
      */
     private function enableTryOnForScope(array $scopeIds): void
     {
+        $setting = $this->store->setting;
+
+        if ($setting && $setting->collection_type === 'products') {
+            $pickedIds = collect($setting->collections ?? [])
+                ->filter(fn ($p) => is_array($p) && !empty($p['id']))
+                ->map(fn ($p) => Shopify::numericId($p['id']))
+                ->all();
+
+            $scopeIds = array_values(array_intersect($scopeIds, $pickedIds));
+        }
+
         foreach (array_chunk($scopeIds, 1000) as $chunk) {
             Product::where('store_id', $this->store->id)
                 ->whereIn('shopify_product_id', $chunk)

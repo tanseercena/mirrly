@@ -143,6 +143,12 @@ class TriggerCatalogSyncJob implements ShouldQueue
     /**
      * The try-on scope lives on the store's Setting (collection_type +
      * collections), which is what onboarding Step 2 just saved.
+     *
+     * "specific" filters the bulk query down to the picked collections.
+     * "products" (individual picks) CANNOT be filtered — Shopify's product
+     * search doesn't take id: terms — so it runs unfiltered like "all";
+     * ProcessBulkOperationResultJob restricts try-on enablement to the
+     * picked product ids afterwards.
      */
     private function buildProductsQuery(Store $store): string
     {

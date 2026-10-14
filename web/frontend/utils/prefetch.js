@@ -39,6 +39,30 @@ export const prefetchJSON = (url) => {
     return fetchJSON(url);
 };
 
+/* --- Page-level cache (stale-while-revalidate) ---
+
+   Navigating between pages remounts them, and without this every visit
+   re-showed the page's loading state while it refetched. Pages put their
+   last response here and read it back on the next mount: the cached data
+   renders instantly, the background refetch keeps it current. Keyed by the
+   exact request URL, so filter/range variants cache independently. */
+const pageCache = new Map();
+const PAGE_CACHE_TTL_MS = 60000;
+
+export const getCachedPageData = (url) => {
+    const entry = pageCache.get(url);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+        pageCache.delete(url);
+        return null;
+    }
+    return entry.data;
+};
+
+export const putCachedPageData = (url, data) => {
+    pageCache.set(url, { data, expiresAt: Date.now() + PAGE_CACHE_TTL_MS });
+};
+
 // Fallback for when index.html didn't seed __earlyApi (e.g. a stale cached
 // HTML). Mirrors the route-aware warm list of the inline script: store on
 // every route, page-specific requests on their routes.

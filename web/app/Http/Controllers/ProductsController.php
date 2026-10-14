@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Helpers\Shopify;
 use App\Jobs\ProcessProductIngestionRiggingJob;
 use App\Jobs\TriggerCatalogSyncJob;
+use App\Lib\AdminTestLink;
 use App\Models\Product;
 use App\Models\Store;
 use App\Models\SyncJob;
@@ -133,6 +134,7 @@ class ProductsController extends Controller
             'id' => $product->id,
             'shopify_product_id' => $product->shopify_product_id,
             'name' => $product->title,
+            'handle' => $payload['handle'] ?? null,
             'image' => $image,
             'warning' => $warning,
             'collection' => $collectionTitle,
@@ -418,54 +420,67 @@ class ProductsController extends Controller
 
         // nodes(ids:) takes up to 250 ids; chunk conservatively. Products
         // that no longer exist come back as null entries and are skipped.
-        foreach ($productIds->chunk(100) as $chunk) {
-            $gids = $chunk->map(fn ($id) => "gid://shopify/Product/{$id}")->all();
+        try {
+            foreach ($productIds->chunk(100) as $chunk) {
+                $gids = $chunk->map(fn ($id) => "gid://shopify/Product/{$id}")->all();
 
-            $response = Shopify::queryOrException($store->shopify_domain, $accessToken, [
-                'query' => <<<'QUERY'
-                query GetProductsByIds($ids: [ID!]!) {
-                  nodes(ids: $ids) {
-                    ... on Product {
-                      id
-                      title
-                      handle
-                      status
-                      productType
-                      featuredImage { url }
-                      updatedAt
-                      variants(first: 100) { edges { node { id title price image { url } } } }
-                      collections(first: 100) { edges { node { id title } } }
+                $response = Shopify::queryOrException($store->shopify_domain, $accessToken, [
+                    'query' => <<<'QUERY'
+                    query GetProductsByIds($ids: [ID!]!) {
+                      nodes(ids: $ids) {
+                        ... on Product {
+                          id
+                          title
+                          handle
+                          status
+                          productType
+                          featuredImage { url }
+                          updatedAt
+                          variants(first: 100) { edges { node { id title price image { url } } } }
+                          collections(first: 100) { edges { node { id title } } }
+                        }
+                      }
                     }
-                  }
-                }
-                QUERY,
-                'variables' => ['ids' => $gids],
-            ]);
+                    QUERY,
+                    'variables' => ['ids' => $gids],
+                ]);
 
-            foreach ($response['data']['nodes'] ?? [] as $node) {
-                if (empty($node['id'])) {
-                    continue;
-                }
+                foreach ($response['data']['nodes'] ?? [] as $node) {
+                    if (empty($node['id'])) {
+                        continue;
+                    }
 
-                $row = $this->buildProductRow($node);
-                $previous = $featuredBefore[$row['shopify_product_id']] ?? null;
-                $isNew = !in_array($row['shopify_product_id'], $existingIds, true);
+                    $row = $this->buildProductRow($node);
+                    $previous = $featuredBefore[$row['shopify_product_id']] ?? null;
+                    $isNew = !in_array($row['shopify_product_id'], $existingIds, true);
 
-                $product = Product::updateOrCreate(
-                    ['store_id' => $store->id, 'shopify_product_id' => $row['shopify_product_id']],
-                    array_merge($row, ['try_on' => true, 'synced_at' => now()])
-                );
+                    $product = Product::updateOrCreate(
+                        ['store_id' => $store->id, 'shopify_product_id' => $row['shopify_product_id']],
+                        array_merge($row, ['try_on' => true, 'synced_at' => now()])
+                    );
 
-                $isNew ? $added++ : $existing++;
+                    $isNew ? $added++ : $existing++;
 
-                // Same trigger as the bulk sync: (re)run the rigging pipeline
-                // only when the product is new or its featured image changed.
-                $featuredAfter = $node['featuredImage']['url'] ?? null;
-                $featuredWas = $previous['featuredImage']['url'] ?? null;
-                if ($featuredAfter !== null && $featuredAfter !== $featuredWas) {
-                    ProcessProductIngestionRiggingJob::dispatch($product);
+                    // Same trigger as the bulk sync: (re)run the rigging pipeline
+                    // only when the product is new or its featured image changed.
+                    $featuredAfter = $node['featuredImage']['url'] ?? null;
+                    $featuredWas = $previous['featuredImage']['url'] ?? null;
+                    if ($featuredAfter !== null && $featuredAfter !== $featuredWas) {
+                        ProcessProductIngestionRiggingJob::dispatch($product);
+                    }
                 }
             }
+        } catch (\Throwable $e) {
+            // Server-side Shopify calls fail when the host's route to Shopify
+            // drops (flaky VPN/network) — report it cleanly instead of a 500.
+            Log::error('Add products: Shopify API unreachable', [
+                'store_id' => $store->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => "Couldn't reach Shopify to fetch the selected products. Check your connection and try again.",
+            ], 503);
         }
 
         return response()->json([
@@ -519,6 +534,42 @@ class ProductsController extends Controller
             'variant_images' => $variantImages,
             'shopify_updated_at' => $node['updatedAt'] ?? null,
         ];
+    }
+
+    /**
+     * Signed storefront URL for the drawer's "Test try-on" button. The
+     * o_sig HMAC (App\Lib\AdminTestLink, keyed on the app secret) proves the
+     * launch came from the admin — without it, an unsigned ?o_try=1 param on
+     * the PUBLIC product page would let anyone bypass session billing and
+     * tracking. 24h expiry.
+     */
+    public function testUrl(Request $request)
+    {
+        $store = $this->resolveStore($request);
+
+        if (!$store) {
+            return response()->json(['message' => 'Store not found'], 404);
+        }
+
+        $product = Product::where('store_id', $store->id)
+            ->where('id', (int) $request->input('product'))
+            ->first();
+
+        if (!$product || empty($product->shopify_product['handle'])) {
+            return response()->json(['message' => 'Product not found'], 404);
+        }
+
+        $expiresAt = time() + AdminTestLink::TTL;
+        // Canonical identity for the signature: the permanent myshopify
+        // domain — the custom primary domain may change or not exist, and
+        // /config verifies against the same value.
+        $shop = $store->shopify_domain;
+
+        $url = 'https://' . ($store->domain ?: $store->shopify_domain) . '/products/' . $product->shopify_product['handle']
+            . '?o_try=1&o_exp=' . $expiresAt
+            . '&o_sig=' . AdminTestLink::sign($shop, (string) $product->shopify_product_id, $expiresAt);
+
+        return response()->json(['url' => $url]);
     }
 
     /**

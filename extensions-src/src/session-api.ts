@@ -102,18 +102,26 @@ export function getShopperParams(customerId: string): Record<string, string> {
 export async function fetchConfig(
   productId: string,
   variantId: string,
-  customerId: string
+  customerId: string,
+  // Admin-test proof (?o_try=1 links carry o_exp + o_sig) — forwarded
+  // verbatim so /config can verify the launch came from the admin.
+  extraParams: Record<string, string> = {}
 ): Promise<ConfigResponse> {
   // Keyed by variant too: a shopper who switches variants before opening
   // the modal must not be served a config (price/image/token) for the
   // boot-time variant. Customer id is in the key so a logged-in shopper's
   // eligibility never leaks into the guest view (and vice versa).
-  const cacheKey = `tryon:config:${productId}:${variantId}:${customerId || 'guest'}`;
+  const cacheKey = `tryon:config:${productId}:${variantId}:${customerId || 'guest'}:${extraParams.o_sig ?? ''}`;
   const cached = readCache<ConfigResponse>(cacheKey);
   if (cached) return cached;
 
   const res = await fetch(
-    buildUrl('/config', { product_id: productId, variant_id: variantId, ...getShopperParams(customerId) }),
+    buildUrl('/config', {
+      product_id: productId,
+      variant_id: variantId,
+      ...getShopperParams(customerId),
+      ...extraParams,
+    }),
     {
       headers: { Accept: 'application/json' },
     }

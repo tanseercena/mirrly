@@ -62,10 +62,10 @@ export default function NewOnboarding() {
 
     const [themeExtensionActivated, setThemeExtensionActivated] =
         useState(false);
-    const [selectedProductType, setSelectedProductType] = useState("all"); // Default to "all"
+    const [selectedProductType, setSelectedProductType] = useState("products"); // Default to "products" (recommended)
 
     // Step 2: Product scope selection
-    const [productScope, setProductScope] = useState("all"); // "all" or "specific"
+    const [productScope, setProductScope] = useState("products"); // "products" (individual products, default), "all" or "specific" (collections)
     const [selectedProductsOrCollections, setSelectedProductsOrCollections] = useState([]);
     const [productCount, setProductCount] = useState(0);
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
@@ -182,7 +182,8 @@ export default function NewOnboarding() {
         const raw = planLimitRaw(p);
         return typeof raw === "number" ? raw : null;
     };
-    const planRateOf = (p) => Number(p?.limits?.session_rate ?? 0);
+    const planRateOf = (p) => Number(p?.limits?.block_price ?? 0);
+    const planBlockSessionsOf = (p) => Number(p?.limits?.block_sessions ?? 0);
     const planPriceOf = (p) => Number((billingPeriod === "yearly" ? p?.yearly_charge : p?.monthly_charge) ?? 0);
     const formatNumber = (n) => Number(n || 0).toLocaleString();
     const formatMoney = (n) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -391,7 +392,16 @@ export default function NewOnboarding() {
                                         image: item.image || '',
                                         products_count: item.products_count || 0
                                     }))
-                                : null,
+                                : productScope === "products"
+                                    ? selectedProductsOrCollections
+                                        .filter(item => item.id)
+                                        .map(item => ({
+                                            id: item.id,
+                                            title: item.title,
+                                            image: item.image || '',
+                                            products_count: 1
+                                        }))
+                                    : null,
                         }),
                     });
                 } catch (error) {
@@ -409,7 +419,7 @@ export default function NewOnboarding() {
                             "Content-Type": "application/json",
                         },
                         body: JSON.stringify({
-                            collection_type: productScope, // "all" or "specific"
+                            collection_type: productScope, // "all", "specific" or "products"
                             collections: productScope === "specific" ? [
                                 ...selectedProductsOrCollections.map(item => ({
                                     id: item.id,
@@ -417,6 +427,16 @@ export default function NewOnboarding() {
                                     image: item.image || '',
                                     products_count: item.products_count || 0
                                 })),
+                                { totalProductsCount: productCount }
+                            ] : productScope === "products" ? [
+                                ...selectedProductsOrCollections
+                                    .filter(item => item.id)
+                                    .map(item => ({
+                                        id: item.id,
+                                        title: item.title,
+                                        image: item.image || '',
+                                        products_count: 1
+                                    })),
                                 { totalProductsCount: productCount }
                             ] : null,
                             //totalProductsCount: productCount,// Add total across all collections
@@ -508,6 +528,36 @@ export default function NewOnboarding() {
                 console.log(totalProductsCount);
 
                 setSelectedProductType("specific");
+            }
+        } catch (error) {
+            console.error('Resource picker error:', error);
+            // User cancelled the picker
+        }
+    };
+
+    // Step 2: individual-product picker for the "Choose specific products"
+    // scope. Same selected-list state as the collection flow, but each pick
+    // counts as exactly one product.
+    const handleProductPickerOpen = async () => {
+        try {
+            const selected = await shopify.resourcePicker({
+                type: 'product',
+                action: 'select',
+                multiple: true,
+            });
+
+            if (selected && selected.length > 0) {
+                const selectedItems = selected.map((item) => ({
+                    id: item.id,
+                    title: item.title,
+                    type: 'product',
+                    image: item.images?.[0]?.originalSrc ?? '',
+                    products_count: 1,
+                }));
+
+                setSelectedProductsOrCollections(selectedItems);
+                setProductCount(selectedItems.length);
+                setSelectedProductType("products");
             }
         } catch (error) {
             console.error('Resource picker error:', error);
@@ -1710,6 +1760,30 @@ export default function NewOnboarding() {
                             transition: all 0.2s ease;
                         }
 
+                        /* Skip + Continue grouped on the right side of the footer */
+                        .step2-footer-actions {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 16px;
+                        }
+
+                        .step2-skip-btn {
+                            background: none;
+                            border: none;
+                            color: #616161;
+                            font-size: 14px;
+                            font-weight: 500;
+                            cursor: pointer;
+                            text-decoration: underline;
+                            text-underline-offset: 3px;
+                            padding: 8px 4px;
+                            transition: color 0.2s ease;
+                        }
+
+                        .step2-skip-btn:hover {
+                            color: #0F8B8D;
+                        }
+
                         .step2-continue-btn:hover:not(:disabled) {
                             background-color: #0C7778;
                             transform: translateY(-1px);
@@ -1938,7 +2012,45 @@ export default function NewOnboarding() {
                                     {t("onboarding.step2_description")}
                                 </p>
 
-                                {/* Option Card 1: All apparel */}
+                                {/* Option Card 1: Specific products (recommended) */}
+                                <div
+                                    className={`step2-option-card ${productScope === "products" ? "selected" : ""}`}
+                                    onClick={() => {
+                                        setProductScope("products");
+                                        setSelectedProductType("products");
+                                        // Fresh start whenever the scope switches
+                                        setSelectedProductsOrCollections([]);
+                                        setProductCount(0);
+                                        setHasFetchedAllProducts(false);
+                                    }}
+                                >
+                                    <div className="step2-radio">
+                                        <div className="step2-radio-inner"></div>
+                                    </div>
+                                    <div className="step2-card-content">
+                                        <div>
+                                            <div className="step2-card-title">
+                                                {t("onboarding.step2_products_title")}
+                                                <span className="step2-badge">{t("onboarding.recommended")}</span>
+                                            </div>
+                                            <div className="step2-card-desc">
+                                                {t("onboarding.step2_products_desc")}
+                                            </div>
+                                        </div>
+                                        <div className="step2-icon-container">
+                                            {/* Tag icon */}
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0F8B8D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                                                <line x1="7" y1="7" x2="7.01" y2="7" />
+                                            </svg>
+                                            <div className="step2-sparkle step2-sparkle-1"></div>
+                                            <div className="step2-sparkle step2-sparkle-2"></div>
+                                            <div className="step2-sparkle step2-sparkle-3"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Option Card 2: All apparel */}
                                 <div
                                     className={`step2-option-card ${productScope === "all" ? "selected" : ""}`}
                                     onClick={() => {
@@ -1957,7 +2069,6 @@ export default function NewOnboarding() {
                                         <div>
                                             <div className="step2-card-title">
                                                 {t("onboarding.step2_all_apparel_title")}
-                                                <span className="step2-badge">{t("onboarding.recommended")}</span>
                                             </div>
                                             <div className="step2-card-desc">
                                                 {t("onboarding.step2_all_apparel_desc")}
@@ -1970,22 +2081,20 @@ export default function NewOnboarding() {
                                             </svg>
                                             <div className="step2-sparkle step2-sparkle-1"></div>
                                             <div className="step2-sparkle step2-sparkle-2"></div>
-                                            <div className="step2-sparkle step2-sparkle-3"></div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Option Card 2: Specific collections */}
+                                {/* Option Card 3: Specific collections */}
                                 <div
                                     className={`step2-option-card ${productScope === "specific" ? "selected" : ""}`}
                                     onClick={() => {
                                         setProductScope("specific");
                                         setSelectedProductType("specific");
                                         // Clear "all" products state when switching to "specific"
-                                        setCollectionProducts([]);
+                                        setSelectedProductsOrCollections([]);
                                         setProductCount(0);
                                         setHasFetchedAllProducts(false);
-                                        setLiveTestProduct(null);
                                     }}
                                 >
                                     <div className="step2-radio">
@@ -2011,11 +2120,11 @@ export default function NewOnboarding() {
                                     </div>
                                 </div>
 
-                                {/* Browse button (only show when specific is selected) */}
-                                {productScope === "specific" && (
+                                {/* Browse button (only show when a picker-based scope is selected) */}
+                                {(productScope === "specific" || productScope === "products") && (
                                     <button
                                         className="step2-browse-btn"
-                                        onClick={handleResourcePickerOpen}
+                                        onClick={productScope === "specific" ? handleResourcePickerOpen : handleProductPickerOpen}
                                     >
                                         {/* Search icon */}
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2026,8 +2135,8 @@ export default function NewOnboarding() {
                                     </button>
                                 )}
 
-                                {/* Selected items list (when specific is selected) */}
-                                {productScope === "specific" && selectedProductsOrCollections.length > 0 && (
+                                {/* Selected items list (when a picker-based scope is selected) */}
+                                {(productScope === "specific" || productScope === "products") && selectedProductsOrCollections.length > 0 && (
                                     <div className="step2-selected-list">
                                         {selectedProductsOrCollections.map((item) => (
                                             <div key={item.id} className="step2-selected-item">
@@ -2147,13 +2256,30 @@ export default function NewOnboarding() {
                                 <span className="step2-progress-label">2/5</span>
                             </div>
 
-                            <button
+                            <div className="step2-footer-actions">
+                                <button
+                                    className="step2-skip-btn"
+                                    onClick={() => {
+                                        // Leave nothing selected — the merchant
+                                        // adds products from the product page later.
+                                        setProductScope(null);
+                                        setSelectedProductType(null);
+                                        setSelectedProductsOrCollections([]);
+                                        setProductCount(0);
+                                        setCurrentStep(3);
+                                    }}
+                                >
+                                    {t("onboarding.skip_this_step")}
+                                </button>
+
+                                <button
                                 className="step2-continue-btn"
                                 disabled={
                                     !selectedProductType ||
                                     isFinishingOnboarding ||
                                     (productScope === "all" && (!hasFetchedAllProducts || productCount === 0)) ||
-                                    (productScope === "specific" && (selectedProductsOrCollections.length === 0 || productCount === 0))
+                                    (productScope === "specific" && (selectedProductsOrCollections.length === 0 || productCount === 0)) ||
+                                    (productScope === "products" && selectedProductsOrCollections.length === 0)
                                 }
                                 onClick={handleNext}
                             >
@@ -2171,6 +2297,7 @@ export default function NewOnboarding() {
                                     </>
                                 )}
                             </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -4116,16 +4243,14 @@ export default function NewOnboarding() {
                                                             // Features come from the seeded plans; translated descriptors only as fallback
                                                             const features = plan?.features?.length ? plan.features : meta.featuresFallback;
 
-                                                            // Sessions line - starter is pay-as-you-go, unlimited plans use their own label
+                                                            // Sessions line - unlimited plans use their own label, otherwise the included count
                                                             const subtitle = !plan
                                                                 ? meta.subtitleFallback
-                                                                : meta.key === "starter"
-                                                                    ? t("plans_page.pay_as_you_go")
-                                                                    : unlimited
-                                                                        ? t("plans_page.scale_included")
-                                                                        : limit !== null
-                                                                            ? t("plans_page.sessions_included", { count: formatNumber(limit) })
-                                                                            : meta.subtitleFallback;
+                                                                : unlimited
+                                                                    ? t("plans_page.scale_included")
+                                                                    : limit !== null
+                                                                        ? t("plans_page.sessions_included", { count: formatNumber(limit) })
+                                                                        : meta.subtitleFallback;
 
                                                             return (
                                                                 <div
@@ -4143,7 +4268,7 @@ export default function NewOnboarding() {
                                                                     <div className="step5-plan-subtitle">{subtitle}</div>
                                                                     {rate > 0 && (
                                                                         <div className="step5-plan-subtitle" style={{ marginTop: "-8px" }}>
-                                                                            {t("plans_page.per_extra_session", { price: rate.toFixed(2) })}
+                                                                            {t("plans_page.block_overage", { price: rate.toFixed(2), count: formatNumber(planBlockSessionsOf(plan)) })}
                                                                         </div>
                                                                     )}
                                                                     <div className="step5-plan-features">

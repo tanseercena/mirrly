@@ -87,7 +87,8 @@ const PlansPage = () => {
         const raw = getLimitRaw(p);
         return typeof raw === 'number' ? raw : null;
     };
-    const rateOf = (p) => Number(p?.limits?.session_rate ?? 0);
+    const rateOf = (p) => Number(p?.limits?.block_price ?? 0);
+    const blockSessionsOf = (p) => Number(p?.limits?.block_sessions ?? 0);
     const priceOf = (p) => Number((cycle === 'yearly' ? p?.yearly_charge : p?.monthly_charge) ?? 0);
 
     const formatNumber = (n) => Number(n || 0).toLocaleString();
@@ -107,19 +108,41 @@ const PlansPage = () => {
     const activePlanRow = findPlanByKey(activeKey);
     const hasActiveLimit = !!activePlanRow && !isUnlimitedPlan(activePlanRow);
     const sessionLimit = limitOf(activePlanRow);
+    const blockSize = blockSessionsOf(activePlanRow);
 
-    const usagePercent = hasActiveLimit && sessionLimit
+    // Current allowance: the plan's included sessions plus every overage
+    // block already paid for this cycle. The usage bar scales to this total —
+    // once a $5 block is unlocked, the bar spans included + unlocked blocks
+    // (e.g. Free: 100 → 1,100 → 2,100 as blocks open), not just the quota.
+    const unlockedBlocks = (() => {
+        if (!hasActiveLimit || !(blockSize > 0)) return 0;
+        const overage = Math.max(0, usedSessions - (sessionLimit ?? 0));
+        return Math.ceil(overage / blockSize);
+    })();
+    const totalAllowance = hasActiveLimit
+        ? (sessionLimit ?? 0) + unlockedBlocks * blockSize
+        : null;
+
+    const usagePercent = hasActiveLimit && totalAllowance
+        ? Math.min(100, Math.round((usedSessions / totalAllowance) * 100))
+        : null;
+
+    // Share of the INCLUDED quota — what the upgrade nudges are keyed on,
+    // separate from the dynamic bar (a freshly unlocked block drops the bar
+    // but shouldn't hide that the merchant is past their plan's quota).
+    const includedPercent = hasActiveLimit && sessionLimit
         ? Math.min(100, Math.round((usedSessions / sessionLimit) * 100))
         : null;
 
-    // Spend from per-session rate.
-    // Free is pay-as-you-go: every session billed. Paid plans bill only sessions over the included limit.
+    // Spend from prepaid overage blocks: each block opened this cycle costs
+    // the plan's block overage price, regardless of how much of it was used.
     const sessionSpend = (() => {
-        const rate = rateOf(activePlanRow);
-        if (!(rate > 0)) return 0;
-        if (!hasActiveLimit) return 0; // unlimited - nothing extra to bill
-        const included = activeKey === 'free' ? 0 : sessionLimit ?? 0;
-        return Math.max(0, usedSessions - included) * rate;
+        const price = rateOf(activePlanRow);
+        const size = blockSessionsOf(activePlanRow);
+        if (!hasActiveLimit || !(price > 0) || !(size > 0)) return 0;
+        const overage = usedSessions - (sessionLimit ?? 0);
+        if (overage <= 0) return 0;
+        return Math.ceil(overage / size) * price;
     })();
 
     // Cycle window: ends on next_reset_date, spans one month/year back
@@ -141,7 +164,7 @@ const PlansPage = () => {
     const nextHigherKey = activeRank > -1 && activeRank < PLAN_RANK.length - 1
         ? PLAN_RANK[activeRank + 1]
         : null;
-    const showBreakeven = usagePercent !== null && usagePercent > 60 && !!nextHigherKey;
+    const showBreakeven = includedPercent !== null && includedPercent > 60 && !!nextHigherKey;
 
     /* ---------- Billing ---------- */
     const scrollToPricing = () => {
@@ -290,7 +313,7 @@ const PlansPage = () => {
     const PLAN_META = {
         free: {
             title: t('plans_page.free'),
-            note: t('plans_page.pay_as_you_go'),
+            note: t('plans_page.free_note'),
             popular: false,
             includesLabel: t('plans_page.includes'),
             features: [
@@ -404,14 +427,10 @@ const PlansPage = () => {
                                         </Text>
                                     </InlineStack>
 
-                                    {/* Included sessions line - unlimited plans use their own label, free plan shows pay-as-you-go */}
+                                    {/* Included sessions line - unlimited plans use their own label */}
                                     {unlimited ? (
                                         <Text variant="bodySm" as="p" fontWeight="medium">
                                             {t('plans_page.scale_included')}
-                                        </Text>
-                                    ) : planKey === 'free' ? (
-                                        <Text variant="bodySm" as="p" fontWeight="medium">
-                                            {t('plans_page.pay_as_you_go')}
                                         </Text>
                                     ) : (
                                         <Text variant="bodySm" as="p" fontWeight="medium">
@@ -421,10 +440,10 @@ const PlansPage = () => {
                                         </Text>
                                     )}
 
-                                    {/* Extra-session rate - rendered for every plan, from the seed */}
+                                    {/* Overage block terms - rendered for every plan, from the seed */}
                                     {rate > 0 && (
                                         <Text variant="bodySm" as="p" fontWeight="medium">
-                                            {t('plans_page.per_extra_session', { price: rate.toFixed(2) })}
+                                            {t('plans_page.block_overage', { price: rate.toFixed(2), count: formatNumber(blockSessionsOf(plan)) })}
                                         </Text>
                                     )}
                                 </BlockStack>
@@ -557,7 +576,7 @@ const PlansPage = () => {
                                                 <Text variant="bodySm" as="span" tone="subdued">
                                                     {!hasActiveLimit
                                                         ? `${formatNumber(usedSessions)} ${t('plans_page.of_unlimited_sessions')}`
-                                                        : `${formatNumber(usedSessions)} ${t('dashboard.session_usage.of_sessions', { count: formatNumber(sessionLimit) })}`}
+                                                        : `${formatNumber(usedSessions)} ${t('dashboard.session_usage.of_sessions', { count: formatNumber(totalAllowance) })}`}
                                                 </Text>
                                                 <Text variant="bodySm" as="span" tone="subdued">
                                                     {t('plans_page.this_cycle')}
@@ -618,10 +637,10 @@ const PlansPage = () => {
                         </BlockStack>
                         <BlockStack gap="050">
                             <Text variant="bodySm" as="p" tone="subdued">
-                                {t('plans_page.rate')}
+                                {t('plans_page.extra_sessions')}
                             </Text>
                             <Text variant="bodyMd" as="p" fontWeight="medium">
-                                ${rateOf(activePlanRow).toFixed(2)} {t('plans_page.per_session')}
+                                ${rateOf(activePlanRow).toFixed(2)} / {formatNumber(blockSessionsOf(activePlanRow))} {t('plans_page.sessions')}
                             </Text>
                         </BlockStack>
                         <div>

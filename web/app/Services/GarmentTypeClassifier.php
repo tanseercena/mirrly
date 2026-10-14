@@ -31,7 +31,7 @@ class GarmentTypeClassifier
         'skirt' => ['skirt'],
         'dress' => ['dress', 'gown', 'sundress', 'kaftan', 'caftan', 'jumpsuit', 'romper'],
         'jacket' => ['jacket', 'coat', 'blazer', 'parka', 'cardigan', 'windbreaker', 'bomber', 'anorak', 'puffer'],
-        'pants' => ['pants', 'trousers', 'jeans', 'leggings', 'joggers', 'sweatpants', 'chinos'],
+        'pants' => ['pants', 'trousers', 'jeans', 'denim', 'leggings', 'joggers', 'sweatpants', 'chinos'],
         'top' => ['t-shirt', 'tshirt', 'shirt', 'blouse', 'top', 'sweater', 'hoodie', 'sweatshirt', 'tank', 'polo', 'pullover', 'tunic'],
     ];
 

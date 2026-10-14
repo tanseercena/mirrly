@@ -14,9 +14,12 @@ use Throwable;
 
 /**
  * Usage-based billing for try-on sessions. A plan includes N sessions per
- * billing cycle (limits.sessions — 0 on Free); every session beyond that is
- * charged through the subscription's Shopify usage line item at the plan's
- * session_rate.
+ * billing cycle (limits.sessions); once those are spent, sessions are granted
+ * in prepaid BLOCKS — one usage charge of limits.block_price through the
+ * subscription's Shopify usage line item unlocks the next
+ * limits.block_sessions sessions. No per-session billing: the charge fires
+ * only on the attempt that crosses into a fresh block, and the rest of the
+ * block rides on it. Blocks repeat within the cycle until it resets.
  *
  * The counter is stores.monthly_sessions. It rolls over lazily here when the
  * subscription's cycle date has passed (app:reset-monthly-limits-for-stores
@@ -50,7 +53,7 @@ QUERY;
 
     /**
      * Count this start attempt against the store's cycle and charge for it
-     * when the plan's included sessions are spent. TRUE = the attempt may go
+     * when it crosses into a fresh overage block. TRUE = the attempt may go
      * on to create a session; FALSE = refuse it (the counter was rolled back
      * and an alert raised).
      */
@@ -58,7 +61,8 @@ QUERY;
     {
         $plan = $this->planFor($store);
         $included = (int) ($plan?->limits['sessions'] ?? 0);
-        $rate = (float) ($plan?->limits['session_rate'] ?? 0);
+        $blockPrice = (float) ($plan?->limits['block_price'] ?? 0);
+        $blockSessions = (int) ($plan?->limits['block_sessions'] ?? 0);
 
         $this->rollCycleIfNeeded($store);
 
@@ -73,11 +77,33 @@ QUERY;
         ]);
         $used = (int) $store->fresh()->monthly_sessions;
 
-        if (!($rate > 0 && $used > $included)) {
+        if ($used <= $included) {
             return true;
         }
 
-        if ($this->chargeUsage($store, $plan, $rate, $product) !== null) {
+        // Over the included allowance. Sessions are granted in prepaid blocks:
+        // the attempt that opens a fresh block pays limits.block_price once
+        // and unlocks the whole block; every other over-limit attempt rides on
+        // a block that was already paid for.
+        if ($blockSessions <= 0 || $blockPrice <= 0) {
+            // Misconfigured plan — refuse rather than grant unbounded
+            // over-limit sessions, and flag it loudly.
+            DB::table('stores')
+                ->where('id', $store->id)
+                ->where('monthly_sessions', '>', 0)
+                ->decrement('monthly_sessions');
+            $this->alertRefusal($store, $plan, 'plan has no usable block terms (block_price/block_sessions missing)');
+
+            return false;
+        }
+
+        $opensNewBlock = ($used - $included - 1) % $blockSessions === 0;
+
+        if (!$opensNewBlock) {
+            return true;
+        }
+
+        if ($this->chargeUsage($store, $plan, $blockPrice, $product, $blockSessions) !== null) {
             return true;
         }
 
@@ -104,11 +130,11 @@ QUERY;
     }
 
     /**
-     * Create the Shopify usage record for one over-limit session. Returns the
-     * record id, or null on any failure (no subscription / no usage line item /
-     * userErrors / network) — null means the caller refuses the session.
+     * Create the Shopify usage record that grants one overage block. Returns
+     * the record id, or null on any failure (no subscription / no usage line
+     * item / userErrors / network) — null means the caller refuses the session.
      */
-    private function chargeUsage(Store $store, ?Plan $plan, float $rate, Product $product): ?string
+    private function chargeUsage(Store $store, ?Plan $plan, float $blockPrice, Product $product, int $blockSessions): ?string
     {
         $subscription = $store->subscription;
         $lineItemId = $subscription?->usage_link_item_id;
@@ -133,13 +159,13 @@ QUERY;
                     'variables' => [
                         'subscriptionLineItemId' => $lineItemId,
                         // Shopify dedupes on this key — a retried HTTP call can
-                        // never create the same charge twice. Each start attempt
-                        // is its own billable session, so a fresh uuid per call.
+                        // never create the same charge twice. A fresh uuid per
+                        // call: each block is its own charge.
                         'idempotencyKey' => (string) Str::uuid(),
-                        'description' => "Try-on session — {$product->title}",
+                        'description' => "Try-on sessions — block of {$blockSessions} ({$product->title})",
                         // API 2024-04+ types price as MoneyInput (USD only, same
                         // as BillingController's recurring charges).
-                        'price' => ['amount' => $rate, 'currencyCode' => 'USD'],
+                        'price' => ['amount' => $blockPrice, 'currencyCode' => 'USD'],
                     ],
                 ]
             );
@@ -174,14 +200,16 @@ QUERY;
             'store_id' => $store->id,
             'shop' => $store->shopify_domain,
             'plan' => $plan?->name,
-            'price' => $rate,
+            'price' => $blockPrice,
+            'block_sessions' => $blockSessions,
             'usage_record' => $recordId,
         ]);
 
         try {
             (new MixpanelService())->track('Usage Charge Created', $store->shopify_domain, [
                 'Plan' => $plan?->name,
-                'Amount' => $rate,
+                'Amount' => $blockPrice,
+                'Block Sessions' => $blockSessions,
                 'Product' => $product->title,
             ]);
         } catch (Throwable $e) {

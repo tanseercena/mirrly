@@ -51,6 +51,9 @@ interface Props {
   // recording checkbox. The shopper's opt-in, not this flag, starts the
   // recorder (checked together with the /session response server-side).
   recording?: boolean;
+  // Admin test (signed drawer link): hides the commerce UI — no add-to-cart
+  // bar during the try-on, no add-to-cart on the result screen.
+  adminTest?: boolean;
   countdownSeconds?: number;
   onClose: () => void;
 }
@@ -63,6 +66,7 @@ export function TryOnModal({
   product,
   blocked,
   recording = false,
+  adminTest = false,
   countdownSeconds = DEFAULT_COUNTDOWN_SECONDS,
   onClose,
 }: Props) {
@@ -351,10 +355,12 @@ export function TryOnModal({
         return;
       }
       engineRef.current = engine;
-      // Resume (paused is the engine's initial state) unless the person
-      // already left frame — then the pause path owns it.
-      engine.setPaused(personPresentRef.current);
-
+      // Resume unless the person already left frame — then the pause path
+      // owns it. (setPaused(true) means PAUSED, so this must be negated —
+      // an un-negated flag here started the engine PAUSED whenever the
+      // person was in frame, and it only came alive after an
+      // out-of-frame → in-frame cycle.)
+      engine.setPaused(!personPresentRef.current);
       // Person left while we were still starting — markStreaming never ran,
       // so nothing else would pause this fresh engine.
       if (!personPresentRef.current) handlePersonAbsent();
@@ -850,7 +856,9 @@ export function TryOnModal({
                       <CountdownRing remaining={countdownLeft} total={countdownSeconds} size={52} />
                     </div>
                   )}
-                  <GlassBottomBar product={product} onAddToCart={handleAddToCart} adding={adding} />
+                  {adminTest ? null : (
+                    <GlassBottomBar product={product} onAddToCart={handleAddToCart} adding={adding} />
+                  )}
                 </>
               )}
 
@@ -863,15 +871,22 @@ export function TryOnModal({
                     {added ? 'Added to your cart.' : 'How did that look?'}
                   </h2>
                   <p class="tryon-body">
-                    {added
-                      ? 'Ready for checkout whenever you are.'
-                      : 'Add it to your cart or try again with a different look.'}
+                    {adminTest
+                      ? 'This is an admin test — try it as many times as you need.'
+                      : added
+                        ? 'Ready for checkout whenever you are.'
+                        : 'Add it to your cart or try again with a different look.'}
                   </p>
                   <div class="tryon-result__actions">
                     {added ? (
                       <button type="button" class="tryon-btn tryon-btn--accent" onClick={dismiss}>
                         <BagIcon size={17} />
                         <span>Done</span>
+                      </button>
+                    ) : adminTest ? (
+                      // Admin test — no commerce UI, just run it again.
+                      <button type="button" class="tryon-btn tryon-btn--accent" onClick={tryAgain}>
+                        <span>Try again</span>
                       </button>
                     ) : (
                       <button
@@ -884,9 +899,11 @@ export function TryOnModal({
                         <span>{adding ? 'Adding…' : 'Add to cart'}</span>
                       </button>
                     )}
-                    <button type="button" class="tryon-btn tryon-btn--outline" onClick={tryAgain}>
-                      Try again
-                    </button>
+                    {adminTest ? null : (
+                      <button type="button" class="tryon-btn tryon-btn--outline" onClick={tryAgain}>
+                        Try again
+                      </button>
+                    )}
                   </div>
 
                   {recordingBlob && (
