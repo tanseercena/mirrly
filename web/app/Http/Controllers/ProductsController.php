@@ -483,6 +483,31 @@ class ProductsController extends Controller
             ], 503);
         }
 
+        // A merchant who skipped onboarding Step 2 has no scope yet (the
+        // dashboard banner shows "product type pending"). Their first
+        // successful add here adopts the products scope — the picked ids go
+        // into settings.collections so future catalog syncs enable try-on
+        // for exactly these products, and the banner step completes.
+        $setting = $store->setting ?: $store->setting()->create([]);
+        if (empty($setting->collection_type) && ($added > 0 || $existing > 0)) {
+            $picked = $productIds
+                ->map(fn ($id) => [
+                    'id' => "gid://shopify/Product/{$id}",
+                    'products_count' => 1,
+                ])
+                ->values()
+                ->all();
+
+            $setting->collection_type = 'products';
+            $setting->collections = array_values(array_merge(
+                collect($setting->collections ?? [])
+                    ->filter(fn ($p) => is_array($p) && !empty($p['id']))
+                    ->all(),
+                $picked
+            ));
+            $setting->save();
+        }
+
         return response()->json([
             'success' => true,
             'added' => $added,

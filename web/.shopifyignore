@@ -1,0 +1,11 @@
+# Excluded from `shopify app build` / `shopify app deploy` file walks.
+# web/storage holds runtime data (shopper recordings, rig assets) owned by
+# www-data on the server — deploying from the live web root must never scan
+# it, and it must never be packaged.
+web/storage
+web/.env
+web/tests
+node_modules
+web/node_modules
+frontend/node_modules
+extensions-src/node_modules

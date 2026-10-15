@@ -753,8 +753,8 @@ const IndexPage = () => {
 
     const handleBannerCta = () => {
         switch (currentStepIndex) {
-            case 0: // Product type → onboarding (product selection)
-                navigate("/NewOnboarding");
+            case 0: // Product type pending → Products page (enable products there)
+                navigate("/products");
                 break;
             case 1: // Theme embed → open theme editor + poll for activation
                 handleEnableThemeExtension();
