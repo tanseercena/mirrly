@@ -19,14 +19,13 @@
             <table cellpadding="0" cellspacing="0">
                 <tr>
                     <td style="padding-right:15px;">
-                        <img src="https://cdn.shopify.com/app-store/listing_images/78b2cf9c2a9c63431defd44ad600ee8f/icon/CPjNw7_F8v8CEAE=.png"
+                        <img src="{{ asset('images/mirrly_logo_with_bg.png') }}"
                              width="50"
                              alt="{{ config('app.name') }}"
                              style="display:block;">
                     </td>
                     <td style="font-size:20px;font-weight:700;color:#2C3E50;">
                         {{ config('app.name') }}
-                        <span style="color:#3498db;">@lang('emails.digital_product')</span>
                     </td>
                 </tr>
             </table>
@@ -36,8 +35,8 @@
     @php
         $shopDomain = explode('.', $store->shopify_domain)[0];
         $appHandle = config('shopify.app_handle');
-        $planPathUrl = "https://admin.shopify.com/store/{$shopDomain}/apps/{$appHandle}/pricing";
-        $embeddedAppUrl = "https://admin.shopify.com/store/{$shopDomain}/apps/{$appHandle}/createDigitalProduct";
+        $planPathUrl = "https://admin.shopify.com/store/{$shopDomain}/apps/{$appHandle}/plans";
+        $embeddedAppUrl = "https://admin.shopify.com/store/{$shopDomain}/apps/{$appHandle}/NewOnboarding";
     @endphp
 
     <!-- HERO -->
@@ -55,7 +54,7 @@
                     <td bgcolor="#3498db" style="padding:15px 35px;">
                         <a href="{{ $embeddedAppUrl }}"
                            style="color:#ffffff;text-decoration:none;font-weight:bold;font-size:16px;display:inline-block;">
-                            @lang('emails.cta_create')
+                            @lang('emails.cta_setup')
                         </a>
                     </td>
                 </tr>
@@ -73,36 +72,36 @@
             <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                     <td align="center" style="padding:15px;">
-                        📦<br>
-                        <strong>@lang('emails.instant_delivery')</strong><br>
-                        <span style="font-size:13px;color:#777;">@lang('emails.instant_desc')</span>
+                        📷<br>
+                        <strong>@lang('emails.feat_tryon')</strong><br>
+                        <span style="font-size:13px;color:#777;">@lang('emails.feat_tryon_desc')</span>
                     </td>
                     <td align="center" style="padding:15px;">
-                        📂<br>
-                        <strong>@lang('emails.files')</strong><br>
-                        <span style="font-size:13px;color:#777;">@lang('emails.files_desc')</span>
+                        🔄<br>
+                        <strong>@lang('emails.feat_variants')</strong><br>
+                        <span style="font-size:13px;color:#777;">@lang('emails.feat_variants_desc')</span>
                     </td>
                     <td align="center" style="padding:15px;">
-                        🔑<br>
-                        <strong>@lang('emails.license')</strong><br>
-                        <span style="font-size:13px;color:#777;">@lang('emails.license_desc')</span>
+                        🎛️<br>
+                        <strong>@lang('emails.feat_control')</strong><br>
+                        <span style="font-size:13px;color:#777;">@lang('emails.feat_control_desc')</span>
                     </td>
                 </tr>
                 <tr>
                     <td align="center" style="padding:15px;">
-                        ✉️<br>
-                        <strong>@lang('emails.email')</strong><br>
-                        <span style="font-size:13px;color:#777;">@lang('emails.email_desc')</span>
+                        🛡️<br>
+                        <strong>@lang('emails.feat_fallbacks')</strong><br>
+                        <span style="font-size:13px;color:#777;">@lang('emails.feat_fallbacks_desc')</span>
                     </td>
                     <td align="center" style="padding:15px;">
-                        🔐<br>
-                        <strong>@lang('emails.pdf')</strong><br>
-                        <span style="font-size:13px;color:#777;">@lang('emails.pdf_desc')</span>
+                        🔒<br>
+                        <strong>@lang('emails.feat_privacy')</strong><br>
+                        <span style="font-size:13px;color:#777;">@lang('emails.feat_privacy_desc')</span>
                     </td>
                     <td align="center" style="padding:15px;">
-                        🎥<br>
-                        <strong>@lang('emails.video')</strong><br>
-                        <span style="font-size:13px;color:#777;">@lang('emails.video_desc')</span>
+                        📊<br>
+                        <strong>@lang('emails.feat_analytics')</strong><br>
+                        <span style="font-size:13px;color:#777;">@lang('emails.feat_analytics_desc')</span>
                     </td>
                 </tr>
             </table>
@@ -116,7 +115,7 @@
                 @lang('emails.pricing_title')
             </h2>
             <p style="margin:0 0 15px;color:#ffffff;font-size:14px;">
-                @lang('emails.pricing_desc')
+                @lang($freeSessions ? 'emails.pricing_desc' : 'emails.pricing_desc_fallback', ['sessions' => $freeSessions])
             </p>
             <a href="{{ $planPathUrl }}" style="color:#ffffff;text-decoration:underline;font-weight:600;">
                 @lang('emails.view_pricing')

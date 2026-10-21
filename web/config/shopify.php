@@ -30,7 +30,7 @@ return [
     "api_key" => env("SHOPIFY_API_KEY", "not_defined"),
     "api_secret" => env("SHOPIFY_API_SECRET", "not_defined"),
     "scopes" => env("SCOPES", "not_defined"),
-    "app_handle" => env("SHOPIFY_APP_HANDLE", "digitally"),
+    "app_handle" => env("SHOPIFY_APP_HANDLE", "mirrly"),
     "app_id" => env("SHOPIFY_APP_ID", "88371920897"),
 
     'hookdeck_webhook_url' => env("HOOKDECK_WEBHOOK_URL", null),

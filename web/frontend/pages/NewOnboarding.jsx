@@ -185,6 +185,9 @@ export default function NewOnboarding() {
     const planRateOf = (p) => Number(p?.limits?.block_price ?? 0);
     const planBlockSessionsOf = (p) => Number(p?.limits?.block_sessions ?? 0);
     const planPriceOf = (p) => Number((billingPeriod === "yearly" ? p?.yearly_charge : p?.monthly_charge) ?? 0);
+    // Launch promotion applied to every plan's displayed and billed price
+    const PLAN_DISCOUNT = 0.2;
+    const planDiscountedPriceOf = (p) => planPriceOf(p) * (1 - PLAN_DISCOUNT);
     const formatNumber = (n) => Number(n || 0).toLocaleString();
     const formatMoney = (n) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
@@ -3797,8 +3800,7 @@ export default function NewOnboarding() {
                         .step5-plan-badge {
                             position: absolute;
                             top: -10px;
-                            left: 50%;
-                            transform: translateX(-50%);
+                            right: 12px;
                             padding: 4px 12px;
                             border-radius: 12px;
                             font-size: 12px;
@@ -3812,10 +3814,34 @@ export default function NewOnboarding() {
                             border: 1px solid #B8E4E9;
                         }
 
-                        .step5-plan-badge.popular {
+                                               .step5-plan-badge.popular {
                             background-color: #DDF8EA;
                             color: #1F8A4D;
                             border: 1px solid #B8E4E9;
+                        }
+
+                        /* 20%-off pill riding the top edge of each plan column */
+                        .step5-plan-discount {
+                            position: absolute;
+                            top: -12px;
+                            left: 12px;
+                            background: #0F8B8D;
+                            color: #fff;
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 4px 10px;
+                            border-radius: 12px;
+                            white-space: nowrap;
+                            z-index: 1;
+                        }
+
+                        /* Struck-through list price next to the discounted headline price */
+                        .step5-plan-price-was {
+                            text-decoration: line-through;
+                            color: #98A2B3;
+                            font-size: 15px;
+                            font-weight: 500;
+                            margin-right: 6px;
                         }
 
                         .step5-plan-name {
@@ -4261,9 +4287,19 @@ export default function NewOnboarding() {
                                                                     {meta.badge && (
                                                                         <div className={`step5-plan-badge ${meta.badge.className}`}>{meta.badge.label}</div>
                                                                     )}
+                                                                    {/* 20%-off pill riding the top edge of each plan column */}
+                                                                    <div className="step5-plan-discount">{t("onboarding.save_20_percent")}</div>
                                                                     <div className="step5-plan-name">{meta.name}</div>
                                                                     <div className="step5-plan-price">
-                                                                        {plan ? `$${formatMoney(planPriceOf(plan))}/month` : meta.priceFallback}
+                                                                        {plan ? (
+                                                                            <>
+                                                                                {planPriceOf(plan) > 0 && (
+                                                                                    <span className="step5-plan-price-was">${formatMoney(planPriceOf(plan))}</span>
+                                                                                )}
+                                                                                <span>${formatMoney(planDiscountedPriceOf(plan))}</span>
+                                                                                /month
+                                                                            </>
+                                                                        ) : meta.priceFallback}
                                                                     </div>
                                                                     <div className="step5-plan-subtitle">{subtitle}</div>
                                                                     {rate > 0 && (

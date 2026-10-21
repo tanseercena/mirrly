@@ -27,6 +27,9 @@ import '../App.css'
 /* Plan hierarchy - lowest to highest rank */
 const PLAN_RANK = ['free', 'growth', 'scale'];
 
+/* Launch promotion applied to every plan's displayed and billed price */
+const PLAN_DISCOUNT = 0.2;
+
 /* ============================================
     PLANS PAGE
     ============================================ */
@@ -90,6 +93,7 @@ const PlansPage = () => {
     const rateOf = (p) => Number(p?.limits?.block_price ?? 0);
     const blockSessionsOf = (p) => Number(p?.limits?.block_sessions ?? 0);
     const priceOf = (p) => Number((cycle === 'yearly' ? p?.yearly_charge : p?.monthly_charge) ?? 0);
+    const discountedPriceOf = (p) => priceOf(p) * (1 - PLAN_DISCOUNT);
 
     const formatNumber = (n) => Number(n || 0).toLocaleString();
     const formatMoney = (n) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -362,6 +366,7 @@ const PlansPage = () => {
     };
 
     const getCardWrapperStyle = (planKey) => ({
+        position: 'relative',
         border: selectedPlan === planKey ? '2px solid #0F6E5C' : '1px solid #E1E3E5',
         borderRadius: '14px',
         boxShadow: selectedPlan === planKey ? '0 4px 12px rgba(15, 110, 92, 0.15)' : 'none',
@@ -418,9 +423,22 @@ const PlansPage = () => {
                                 </InlineStack>
 
                                 <BlockStack gap="100">
-                                    <InlineStack gap="100" blockAlign="baseline">
+                                    <InlineStack gap="150" blockAlign="baseline">
+                                        {/* List price struck through; the 20%-off price is the headline */}
+                                        {priceOf(plan) > 0 && (
+                                            <span
+                                                style={{
+                                                    textDecoration: 'line-through',
+                                                    color: '#8A8A8A',
+                                                    fontSize: '16px',
+                                                    fontWeight: 500,
+                                                }}
+                                            >
+                                                ${formatMoney(priceOf(plan))}
+                                            </span>
+                                        )}
                                         <Text variant="heading2xl" as="p">
-                                            ${formatMoney(priceOf(plan))}
+                                            ${formatMoney(discountedPriceOf(plan))}
                                         </Text>
                                         <Text variant="bodyMd" as="span" tone="subdued">
                                             /month
@@ -711,7 +729,7 @@ const PlansPage = () => {
         ============================================ */
     const PricingSection = () => (
         <div ref={pricingSectionRef}>
-            <BlockStack gap="400">
+            <BlockStack gap="600">
                 <InlineStack align="space-between" blockAlign="start">
                     <BlockStack gap="050">
                         <Text variant="headingLg" as="h2" fontWeight={600}>
@@ -732,6 +750,25 @@ const PlansPage = () => {
                             style={getCardWrapperStyle(planKey)}
                             onClick={() => setSelectedPlan(planKey)}
                         >
+                            {/* Discount pill riding the top edge of each plan column */}
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: '-12px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: '#0F6E5C',
+                                    color: '#FFFFFF',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    padding: '4px 12px',
+                                    borderRadius: '999px',
+                                    whiteSpace: 'nowrap',
+                                    zIndex: 1,
+                                }}
+                            >
+                                {t('plans_page.save_20')}
+                            </div>
                             <PricingCard planKey={planKey} />
                         </div>
                     ))}

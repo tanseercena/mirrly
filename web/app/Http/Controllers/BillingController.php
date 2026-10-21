@@ -121,17 +121,12 @@ QUERY;
                 return response()->json(['error' => 'Plan not found'], 404);
             }
 
-            $creationDate = new Carbon();
-            $cutoffDate = new Carbon('2025-05-15');
-
             $originalPrice = $request->input('interval') == "monthly" ? $plan->monthly_charge : $plan->yearly_charge;
 
-            if ($creationDate < $cutoffDate && $request->input('interval') != 'monthly') {
-                $discountPercentage = 50;
-                $discountedPrice = $originalPrice * (1 - $discountPercentage / 100);
-            } else {
-                $discountedPrice = $originalPrice;
-            }
+            // Flat promotion: 20% off every plan's list price. Shopify's
+            // approval page bills this discounted amount.
+            $discountPercentage = 20;
+            $discountedPrice = $originalPrice * (1 - $discountPercentage / 100);
 
             $trialDays = $trialDays = !$store->trial_started_on ? 7 : max(0, 7 - $store->trial_started_on->diffInDays());
             if($plan->id == 1) {

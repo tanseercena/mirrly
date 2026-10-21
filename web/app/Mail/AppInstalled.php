@@ -18,8 +18,10 @@ class AppInstalled extends Mailable implements ShouldQueue
     /**
      * Create a new message instance.
      */
-    public function __construct(public Store $store)
-    {
+    public function __construct(
+        public Store $store,
+        public ?int $freeSessions = null,
+    ) {
         //
     }
 
@@ -31,7 +33,7 @@ class AppInstalled extends Mailable implements ShouldQueue
         App::setLocale($this->store->primary_locale ?? 'en');
 
         return new Envelope(
-            subject: __('emails.subject')
+            subject: __('emails.subject', ['app' => config('app.name')])
         );
     }
 
